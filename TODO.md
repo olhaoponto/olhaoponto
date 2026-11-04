@@ -80,7 +80,7 @@
 
 ## 7. Build, documentação e distribuição
 
-- [ ] Usar repositório GitHub existente `olhaoponto`, sem criar outro; push do projeto com `.gitignore` correto (`node_modules`, `.env`, `.expo`), commits organizados e README completo. Não commitar nenhum segredo. O destino foi identificado como público; push pendente de confirmação explícita.
+- [x] Usar repositório GitHub existente `olhaoponto`, sem criar outro; enviar o projeto com `.gitignore` correto (`node_modules`, `.env`, `.expo`), commit organizado e README completo. Não commitar segredos. Após confirmação explícita, enviar à branch `main` do repositório público existente sem mudar visibilidade; preservar o arquivo `inicio.txt` que já existia.
 - [x] Configurar `app.config.ts` com nome “Olha o Ponto”, package Android, versão, ícone, splash e permissões de notificação; criar `eas.json` com perfil `preview`, `android.buildType = apk` e distribuição interna.
 - [x] README em português: pré-requisitos, instalação pnpm, configurar `.env`, aplicar migrações e Edge Functions, criar o primeiro admin, iniciar Expo Go, gerar APK e alterar limite/níveis de alerta.
 - [x] README explica: criar conta Expo, instalar eas-cli, `eas login`, `eas build -p android --profile preview`, baixar o APK e instalar no celular habilitando instalação de fontes desconhecidas/modo desenvolvedor; distribuição iPhone exige conta de desenvolvedor Apple e fica para depois.
@@ -89,7 +89,6 @@
 - [x] Executadas verificações finais: TypeScript, ESLint, exportação Expo Web e Vitest; 38 testes passaram e 1 teste legado de logout permaneceu marcado como skip.
 - [x] Se algo ficar ambíguo, escolher opção mais simples e segura, documentar a decisão no README e continuar sem travar a entrega.
 
-## 8. Pendências externas de entrega
+## 8. Pendência externa de entrega
 
 - [ ] Gerar e entregar o APK Android real via EAS Build. O perfil `preview` está configurado, mas `eas-cli whoami` retornou “Not logged in”; também é necessário cadastrar `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` no ambiente EAS `preview`. Não incluir a service role key no app.
-- [ ] Enviar a cópia ao repositório GitHub público existente somente após confirmação explícita de que o código-fonte do app pode ficar público; manter o repositório canônico gerenciado e não alterar a visibilidade sem autorização.
