@@ -91,4 +91,4 @@
 
 ## 8. Pendência externa de entrega
 
-- [ ] Gerar e entregar o APK Android real via EAS Build. O perfil `preview` está configurado, mas `eas-cli whoami` retornou “Not logged in”; também é necessário cadastrar `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` no ambiente EAS `preview`. Não incluir a service role key no app.
+- [ ] Gerar e entregar o APK Android real via EAS Build. O projeto EAS `olhonoponto` está criado e ligado ao GitHub com acesso restrito a `olhaoponto/olhaoponto`; as variáveis públicas `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` foram cadastradas como Plain text somente no ambiente `preview`. Iniciar o perfil `preview` (APK interno), aguardar a conclusão e entregar o link/arquivo do APK; nunca incluir a service role key no app.

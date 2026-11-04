@@ -57,10 +57,16 @@ const publicRuntime = {
 };
 
 const config: ExpoConfig = {
+  owner: "edingtonmaquine",
   name: env.appName,
   slug: env.appSlug,
   version: "1.0.0",
-  extra: publicRuntime,
+  extra: {
+    ...publicRuntime,
+    eas: {
+      projectId: "97f93ccd-6d20-4ebd-9b52-f9bb7e4ab41a",
+    },
+  },
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,

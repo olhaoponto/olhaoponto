@@ -113,9 +113,13 @@ pnpm dlx eas-cli login
 pnpm dlx eas-cli build -p android --profile preview
 ```
 
-Antes do primeiro build, abra **Expo Dashboard → Project → Environment variables** e cadastre, no ambiente `preview`, `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` com os valores do `.env` local. O arquivo `.env` é ignorado e não é enviado ao Git; por isso, essas variáveis de cliente precisam existir no ambiente remoto da EAS. A anon/publishable key é pública e ficará embutida no app; nunca cadastre `service_role` como variável `EXPO_PUBLIC_*`.
+O novo projeto EAS está em `https://expo.dev/accounts/edingtonmaquine/projects/olhonoponto`; `app.config.ts` associa este código a `owner: edingtonmaquine` e ao `projectId` `97f93ccd-6d20-4ebd-9b52-f9bb7e4ab41a`. O repositório conectado é somente `olhaoponto/olhaoponto`; o acesso do Expo GitHub App foi limitado a esse repositório. O projeto não está vinculado aos projetos Expo `vivacondo` ou `herois-plus-app`.
 
-Na primeira execução, a EAS CLI pedirá para vincular o slug a uma conta Expo; o identificador Android configurado é `space.manus.olhaponto.t099013940753689`. Ao concluir, abra o link do build no Android para baixar e instalar o APK. Se necessário, permita instalação desta origem em **Configurações → Segurança/Apps**. No Android 13+, conceda notificações e configure **Alarmes e lembretes** se o sistema solicitar.
+Antes do build, abra **Expo Dashboard → projeto Olha o Ponto → Environment variables** e cadastre no ambiente `preview` `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` com os valores do `.env` local. O arquivo `.env` é ignorado e não é enviado ao Git; por isso, essas variáveis de cliente precisam existir no ambiente remoto da EAS. Use o tipo **Plain text**: ambas são configuração pública do cliente; a anon/publishable key ficará embutida no app. Nunca cadastre `service_role` como variável `EXPO_PUBLIC_*`.
+
+O build pode ser iniciado pela aba **Builds** do projeto EAS conectado ao GitHub ou pela EAS CLI autenticada. A configuração `extra.eas.projectId` já aponta ao projeto novo; não execute `eas project:init` nem selecione outro projeto.
+
+O identificador Android configurado é `space.manus.olhaponto.t099013940753689`. Ao concluir, abra o link do build no Android para baixar e instalar o APK. Se necessário, permita instalação desta origem em **Configurações → Segurança/Apps**. No Android 13+, conceda notificações e configure **Alarmes e lembretes** se o sistema solicitar.
 
 Uma distribuição iOS instalável fora do Expo Go exige Apple Developer/assinatura e configuração Apple; não está configurada neste perfil APK.
 
