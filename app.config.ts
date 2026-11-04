@@ -27,7 +27,7 @@ const schemeFromBundleId = "olhaponto";
 const env = {
   // App branding - update these values directly (do not use env vars)
   appName: "Olha o Ponto",
-  appSlug: "olhaponto",
+  appSlug: "olhonoponto",
   // Public project metadata asset; native icon remains the local Expo asset below.
   logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519664061183251/bxUHmCchZASbULpn.png",
   scheme: schemeFromBundleId,
