@@ -1,0 +1,102 @@
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { addMonths, subMonths } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppText, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
+import { useAppStore } from '@/store/app-store';
+import { loadEntriesByMonth } from '@/services/time-entry-service';
+import { calculateDailyTotals, calculatePeriodTotals, formatMinutesHHMM, getBahiaDate } from '@/utils/work-time';
+
+const ZONE = 'America/Bahia';
+const labelMonth = (month: string) => formatInTimeZone(new Date(`${month}-15T12:00:00Z`), ZONE, 'MMMM yyyy');
+const labelShortDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: ZONE, day: '2-digit', month: '2-digit' }).format(new Date(`${date}T12:00:00Z`));
+const weekday = (date: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: ZONE, weekday: 'short' }).format(new Date(`${date}T12:00:00Z`)).replace('.', '');
+
+export default function ResumoScreen() {
+  const colors = useAppColors();
+  const session = useAppStore((state) => state.session);
+  const entries = useAppStore((state) => state.entries);
+  const setEntries = useAppStore((state) => state.setEntries);
+  const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const userId = session?.user.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`)).then((result) => {
+      if (!active) return;
+      if (result.data) setEntries(result.data);
+      if (result.error && !result.data?.length) setError('Não foi possível sincronizar os dados do período.');
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [month, userId, setEntries]);
+
+  const changeMonth = (amount: -1 | 1) => {
+    const next = formatInTimeZone(amount < 0 ? subMonths(new Date(`${month}-15T12:00:00Z`), 1) : addMonths(new Date(`${month}-15T12:00:00Z`), 1), ZONE, 'yyyy-MM');
+    setLoading(true); setError(''); setMonth(next);
+  };
+
+  const periodEntries = useMemo(() => entries.filter((entry) => entry.data.startsWith(month)), [entries, month]);
+  const totals = useMemo(() => calculatePeriodTotals(periodEntries), [periodEntries]);
+  const days = useMemo(() => calculateDailyTotals(periodEntries), [periodEntries]);
+  const completedDays = days.filter((day) => day.workedMinutes > 0);
+  const average = completedDays.length ? Math.round(totals.workedMinutes / completedDays.length) : 0;
+  const today = getBahiaDate(new Date());
+  const lastWeekStart = new Date(`${today}T12:00:00-03:00`);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 6);
+  const weekStart = getBahiaDate(lastWeekStart);
+  const weekly = days.filter((day) => day.date >= weekStart && day.date <= today);
+  const maxWeek = Math.max(1, ...weekly.map((day) => day.workedMinutes));
+  const recent = [...days].slice(-5).reverse();
+
+  return (
+    <ScreenShell contentStyle={styles.page}>
+      <PageHeading eyebrow="Uma visão tranquila" title="Resumo" subtitle="Como está seu ritmo neste mês." right={<MaterialCommunityIcons name="chart-box-outline" size={27} color={colors.deepTeal} />} />
+      <SurfaceCard style={styles.monthCard}>
+        <Pressable onPress={() => changeMonth(-1)} accessibilityRole="button" accessibilityLabel="Mês anterior"><MaterialCommunityIcons name="chevron-left" size={25} color={colors.deepTeal} /></Pressable>
+        <AppText variant="subtitle" style={{ textTransform: 'capitalize', flex: 1, textAlign: 'center' }}>{labelMonth(month)}</AppText>
+        <Pressable onPress={() => changeMonth(1)} accessibilityRole="button" accessibilityLabel="Próximo mês"><MaterialCommunityIcons name="chevron-right" size={25} color={colors.deepTeal} /></Pressable>
+      </SurfaceCard>
+      {loading ? <ActivityIndicator color={colors.deepTeal} /> : null}
+      {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}
+      <View style={styles.cards}>
+        <SurfaceCard style={[styles.metricCard, { backgroundColor: colors.deepTeal, borderColor: colors.deepTeal }]}><MaterialCommunityIcons name="clock-outline" size={22} color="#D4F4EC" /><AppText variant="tiny" color="#D4F4EC">Horas trabalhadas</AppText><AppText variant="title" color="#FFFFFF">{formatMinutesHHMM(totals.workedMinutes)}</AppText><AppText variant="tiny" color="#D4F4EC">em {completedDays.length} dia(s) com registros</AppText></SurfaceCard>
+        <SurfaceCard style={styles.metricCard}><MaterialCommunityIcons name="chart-line" size={22} color={colors.coral} /><AppText variant="tiny" color={colors.muted}>Média por dia registrado</AppText><AppText variant="title" color={colors.foreground}>{formatMinutesHHMM(average)}</AppText><AppText variant="tiny" color={colors.muted}>dias sem batida não entram na média</AppText></SurfaceCard>
+        <SurfaceCard style={styles.metricCard}><MaterialCommunityIcons name="wallet-outline" size={22} color={colors.deepTeal} /><AppText variant="tiny" color={colors.muted}>Banco estimado</AppText><AppText variant="title" color={colors.deepTeal}>{formatMinutesHHMM(totals.overtimeMinutes)}</AppText><AppText variant="tiny" color={colors.muted}>extras acima de 8h no dia</AppText></SurfaceCard>
+      </View>
+      <SurfaceCard style={{ gap: 18 }}>
+        <View style={{ gap: 4 }}><AppText variant="subtitle">Últimos 7 dias</AppText><AppText variant="small" color={colors.muted}>Horas registradas em cada dia.</AppText></View>
+        {weekly.length ? <View style={styles.chart}>
+          {Array.from({ length: 7 }, (_, index) => {
+            const dateObj = new Date(`${today}T12:00:00-03:00`); dateObj.setDate(dateObj.getDate() - (6 - index));
+            const date = getBahiaDate(dateObj);
+            const item = days.find((day) => day.date === date);
+            const height = Math.max(6, Math.round(((item?.workedMinutes ?? 0) / maxWeek) * 112));
+            return <View key={date} style={styles.barSlot}><AppText variant="tiny" color={colors.muted}>{item ? formatMinutesHHMM(item.workedMinutes) : ''}</AppText><View style={[styles.barTrack, { backgroundColor: colors.input }]}><View style={[styles.bar, { height, backgroundColor: item && item.workedMinutes >= 570 ? colors.coral : colors.teal }]} /></View><AppText variant="tiny" color={colors.muted}>{weekday(date)}</AppText></View>;
+          })}
+        </View> : <AppText variant="small" color={colors.muted}>Ainda não há registros nos últimos dias.</AppText>}
+      </SurfaceCard>
+      <SurfaceCard>
+        <AppText variant="subtitle">Dias recentes</AppText>
+        {recent.length ? recent.map((day) => <View key={day.date} style={[styles.recentRow, { borderBottomColor: colors.border }]}><View style={{ flex: 1, gap: 2 }}><AppText variant="body" style={{ fontWeight: '600' }}>{labelShortDate(day.date)}</AppText><AppText variant="tiny" color={colors.muted}>{weekday(day.date)}</AppText></View><View style={{ alignItems: 'flex-end', gap: 2 }}><AppText variant="subtitle">{day.workedHHMM}</AppText><AppText variant="tiny" color={day.overtimeMinutes ? colors.coral : colors.muted}>{day.overtimeMinutes ? `+${day.overtimeHHMM} extras` : 'sem extra acima de 8h'}</AppText></View></View>) : <AppText variant="small" color={colors.muted}>O resumo aparece assim que você registrar sua primeira batida.</AppText>}
+      </SurfaceCard>
+      <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>O banco é uma estimativa baseada nas horas acima de 8h em cada dia. Consulte o espelho oficial da empresa para conferência.</AppText></SurfaceCard>
+    </ScreenShell>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: { gap: 16, paddingTop: 18 },
+  monthCard: { padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cards: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  metricCard: { flex: 1, minWidth: 145, padding: 15, gap: 5 },
+  chart: { flexDirection: 'row', justifyContent: 'space-between', gap: 5, minHeight: 160, alignItems: 'flex-end' },
+  barSlot: { flex: 1, alignItems: 'center', gap: 7 },
+  barTrack: { width: '100%', height: 116, borderRadius: 10, justifyContent: 'flex-end', overflow: 'hidden' },
+  bar: { width: '100%', borderRadius: 10 },
+  recentRow: { minHeight: 58, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+});

@@ -1,0 +1,13 @@
+project_id = "duqytmwhlrjqduzscgpa"
+
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.admin-set-user-status]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
