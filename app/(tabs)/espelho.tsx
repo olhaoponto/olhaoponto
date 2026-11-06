@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-nat
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { getDaysInMonth, subMonths, addMonths } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { deleteTimeEntry, insertTimeEntry, loadEntriesByMonth, updateTimeEntry } from '@/services/time-entry-service';
@@ -19,14 +20,19 @@ const dayLabel = (key: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: Z
 
 export default function EspelhoScreen() {
   const colors = useAppColors();
+  const router = useRouter();
   const profile = useAppStore((state) => state.profile);
   const session = useAppStore((state) => state.session);
+  const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const entries = useAppStore((state) => state.entries);
   const setEntries = useAppStore((state) => state.setEntries);
   const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [syncNotice, setSyncNotice] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [selected, setSelected] = useState<TimeEntry | null>(null);
   const [editTime, setEditTime] = useState('');
   const [reason, setReason] = useState('');
@@ -40,18 +46,33 @@ export default function EspelhoScreen() {
   const [retroReason, setRetroReason] = useState('');
 
   const userId = session?.user.id;
+  const authUnavailable = sessionInitialized && !userId;
+  const reportLoading = !sessionInitialized || (!authUnavailable && loading);
+  const visibleLoadError = authUnavailable ? 'Sua sessão não está ativa. Entre novamente para consultar o espelho.' : loadError;
   useEffect(() => {
     let alive = true;
-    if (!userId) return;
-    const monthDate = new Date(`${month}-15T12:00:00Z`);
-    void loadEntriesByMonth(monthDate).then((result) => {
+    if (!sessionInitialized || !userId) return () => { alive = false; };
+    void (async () => {
+      await Promise.resolve();
       if (!alive) return;
-      if (result.data) setEntries(result.data);
-      if (result.error && !result.data?.length) setError('Não foi possível sincronizar o período. Confira sua conexão.');
-      setLoading(false);
-    });
+      setLoading(true); setLoadError(''); setSyncNotice('');
+      try {
+        const result = await loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`));
+        if (!alive) return;
+        if (result.data) setEntries(result.data);
+        if (result.error && result.data?.length) {
+          setSyncNotice('Sem conexão com o Supabase. Exibindo os registros salvos neste aparelho; tente sincronizar novamente.');
+          setLoadError('');
+        } else if (result.error) {
+          setLoadError(result.error.toLowerCase().includes('sessão') ? result.error : 'Não foi possível carregar este mês. Confira sua conexão e tente novamente.');
+          setSyncNotice('');
+        } else { setLoadError(''); setSyncNotice(''); }
+      } catch {
+        if (alive) { setLoadError('Não foi possível carregar este mês. Confira sua conexão e tente novamente.'); setSyncNotice(''); }
+      } finally { if (alive) setLoading(false); }
+    })();
     return () => { alive = false; };
-  }, [month, userId, setEntries]);
+  }, [month, userId, sessionInitialized, retryCount, setEntries]);
 
   const monthEntries = useMemo(() => entries.filter((entry) => entry.data?.startsWith(month)), [entries, month]);
   const dailyTotals = useMemo(() => calculateDailyTotals(monthEntries), [monthEntries]);
@@ -66,7 +87,7 @@ export default function EspelhoScreen() {
     const next = formatInTimeZone(amount < 0 ? subMonths(new Date(`${month}-15T12:00:00Z`), 1) : addMonths(new Date(`${month}-15T12:00:00Z`), 1), ZONE, 'yyyy-MM');
     const today = formatInTimeZone(new Date(), ZONE, 'yyyy-MM-dd');
     setRetroDate(today.startsWith(next) ? today : `${next}-01`);
-    setLoading(true); setError(''); setMonth(next);
+    setLoading(true); setError(''); setLoadError(''); setSyncNotice(''); setMonth(next);
   };
 
   const saveEdit = async () => {
@@ -139,12 +160,12 @@ export default function EspelhoScreen() {
       <SurfaceCard style={styles.monthCard}>
         <View style={styles.monthControls}>
           <Pressable onPress={() => changeMonth(-1)} style={styles.monthArrow} accessibilityRole="button" accessibilityLabel="Mês anterior"><MaterialCommunityIcons name="chevron-left" size={24} color={colors.deepTeal} /></Pressable>
-          <View style={{ alignItems: 'center', flex: 1, gap: 2 }}><AppText variant="subtitle" style={{ textTransform: 'capitalize' }}>{monthLabel(month)}</AppText><AppText variant="tiny" color={colors.muted}>{monthEntries.length} batida(s) registradas</AppText></View>
+          <View style={{ alignItems: 'center', flex: 1, gap: 2 }}><AppText variant="subtitle" style={{ textTransform: 'capitalize' }}>{monthLabel(month)}</AppText><AppText variant="tiny" color={colors.muted}>{reportLoading ? 'Carregando registros…' : visibleLoadError ? 'Período indisponível' : `${monthEntries.length} batida(s) registradas`}</AppText></View>
           <Pressable onPress={() => changeMonth(1)} style={styles.monthArrow} accessibilityRole="button" accessibilityLabel="Próximo mês"><MaterialCommunityIcons name="chevron-right" size={24} color={colors.deepTeal} /></Pressable>
         </View>
         <View style={styles.metricsRow}>
-          <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Trabalhadas</AppText><AppText variant="subtitle">{formatMinutesHHMM(totals.workedMinutes)}</AppText></View>
-          <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Extras acima de 8h/dia</AppText><AppText variant="subtitle" color={colors.coral}>{formatMinutesHHMM(totals.overtimeMinutes)}</AppText></View>
+          <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Trabalhadas</AppText><AppText variant="subtitle">{reportLoading || visibleLoadError ? '—' : formatMinutesHHMM(totals.workedMinutes)}</AppText></View>
+          <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Extras acima de 8h/dia</AppText><AppText variant="subtitle" color={colors.coral}>{reportLoading || visibleLoadError ? '—' : formatMinutesHHMM(totals.overtimeMinutes)}</AppText></View>
         </View>
       </SurfaceCard>
 
@@ -154,10 +175,12 @@ export default function EspelhoScreen() {
       </View>
       <ActionButton title={retroOpen ? 'Fechar lançamento retroativo' : 'Adicionar batida esquecida'} variant="outline" onPress={() => { setRetroOpen((value) => !value); setNotice(''); }} />
       {retroOpen ? <SurfaceCard style={{ gap: 12 }}><AppText variant="subtitle">Registrar horário que ficou faltando</AppText><AppText variant="small" color={colors.muted}>Informe uma data deste mês e uma justificativa. O app sugere a próxima batida permitida e bloqueia horários fora de ordem, futuros ou acima do limite.</AppText><TextField label="Data (AAAA-MM-DD)" value={retroDate} onChangeText={setRetroDate} autoCapitalize="none" placeholder="2026-11-03" maxLength={10} /><TextField label="Horário (HH:mm)" value={retroTime} onChangeText={setRetroTime} keyboardType="numbers-and-punctuation" placeholder="Ex.: 08:00" maxLength={5} /><TextField label="Justificativa" value={retroReason} onChangeText={setRetroReason} multiline placeholder="Ex.: esquecimento ao registrar a entrada" style={{ minHeight: 72, textAlignVertical: 'top' }} /><View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}><MaterialCommunityIcons name="information-outline" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Próxima batida: {getNextPunch(monthEntries.filter((entry) => entry.data === retroDate)) ? LABELS[getNextPunch(monthEntries.filter((entry) => entry.data === retroDate))!] : 'dia completo'}</AppText></View><ActionButton title="Salvar batida esquecida" onPress={saveRetroactive} loading={saving} disabled={!retroTime || !retroReason.trim()} /></SurfaceCard> : null}
-      {loading ? <ActivityIndicator color={colors.deepTeal} /> : null}
+      {reportLoading ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}><ActivityIndicator color={colors.deepTeal} /><AppText variant="small" color={colors.muted}>Carregando batidas de {monthLabel(month)}…</AppText></View> : null}
+      {syncNotice && !authUnavailable ? <AppText variant="small" color={colors.coral}>{syncNotice}</AppText> : null}
+      {visibleLoadError ? <SurfaceCard tone="soft" style={{ gap: 10 }}><AppText variant="body" color={colors.error}>{visibleLoadError}</AppText>{!authUnavailable ? <ActionButton title="Tentar novamente" variant="outline" onPress={() => { setLoading(true); setLoadError(''); setRetryCount((value) => value + 1); }} /> : null}{visibleLoadError.toLowerCase().includes('sessão') ? <ActionButton title="Voltar ao login" onPress={() => router.replace('/login')} /> : null}</SurfaceCard> : null}
       {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}
       {notice ? <AppText variant="small" color={colors.deepTeal}>{notice}</AppText> : null}
-      <View style={{ gap: 10 }}>
+      {!reportLoading && !visibleLoadError ? <View style={{ gap: 10 }}>
         {dates.map((date) => {
           const rows = monthEntries.filter((entry) => entry.data === date);
           const daily = totalByDay.get(date);
@@ -179,7 +202,7 @@ export default function EspelhoScreen() {
             </SurfaceCard>
           );
         })}
-      </View>
+      </View> : null}
       <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>Este espelho é um controle pessoal e não substitui o documento oficial do empregador. Edições exigem justificativa; para preservar a sequência, exclua batidas da última para a primeira.</AppText></SurfaceCard>
 
       <Modal visible={Boolean(selected)} transparent animationType="fade" onRequestClose={() => setSelected(null)}>

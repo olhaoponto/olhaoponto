@@ -1,4 +1,4 @@
-import { ALERT_THRESHOLDS, describeAlert, getCurrentAlert, getReachedAlerts, shouldRepeatAlert } from '../utils/alerts';
+import { ALERT_THRESHOLDS, LUNCH_REMINDER_MINUTES, describeAlert, getCurrentAlert, getReachedAlerts, shouldRepeatAlert } from '../utils/alerts';
 
 declare const describe: (name: string, fn: () => void) => void;
 declare const it: (name: string, fn: () => void) => void;
@@ -10,6 +10,11 @@ declare const expect: (actual: unknown) => {
 };
 
 describe('alerts', () => {
+  it('mantém o lembrete de pausa separado dos limites de jornada', () => {
+    expect(LUNCH_REMINDER_MINUTES).toBe(240);
+    expect(ALERT_THRESHOLDS.map((item) => item.minutes)).toEqual([480, 540, 570, 585, 590, 595, 600]);
+  });
+
   it('configura todos os marcos solicitados e seleciona o nível atual', () => {
     expect(ALERT_THRESHOLDS.map((item) => item.minutes)).toEqual([480, 540, 570, 585, 590, 595, 600]);
     expect(getCurrentAlert(479)).toBe(null);

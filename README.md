@@ -1,6 +1,6 @@
 # Olha o Ponto
 
-Aplicativo mobile Expo/React Native + TypeScript para acompanhar os horários registrados pelo próprio usuário, pausar o contador durante o almoço e receber alertas locais antes do limite diário de trabalho. O app é um controle pessoal; não substitui o espelho oficial do empregador.
+Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios horários registrados no ponto da empresa, pausar o contador durante o almoço e receber alertas locais antes do limite diário de trabalho. O app é um controle pessoal; não substitui o relógio, sistema ou registro oficial de ponto do empregador. Idealizado e criado por Marcos Henrique Edington Santos.
 
 ## Tecnologia e estrutura
 
@@ -90,19 +90,25 @@ returning id, email, role;
 
 3. Confira que a consulta retorna exatamente uma linha e entre no app com esse usuário. Depois, a Administração cria as demais contas sem habilitar signup público. Nunca compartilhe uma senha provisória por canal público.
 
+O trigger cria automaticamente o perfil vinculado ao mesmo `auth.users.id`; a consulta SQL acima deve alterar apenas papel/ativação do administrador. Não é necessário gravar manualmente aceite de termos ou sessão no banco: o usuário aceita os termos dentro do app após autenticar.
+
+### Diagnóstico de sessão
+
+O aceite de termos, as batidas (inclusive horário manual) e a troca de senha exigem uma sessão válida do Supabase Auth. Se uma versão antiga da APK exibir “Auth session missing” ou “Sessão não encontrada”, atualize para a APK corrigida; a tela agora confirma a sessão de login antes de avançar e orienta a entrar novamente se ela expirou. Confira também se o e-mail está confirmado, se o perfil correspondente tem `ativo = true` e se o app está usando as variáveis Supabase do ambiente `preview`.
+
 ## Uso
 
 A tela **Hoje** apresenta contador ao vivo, tempo faltante, horário-limite projetado, sequência Entrada → Saída para almoço → Volta do almoço → Saída, registro manual HH:mm e fila offline. O fuso padrão é `America/Bahia`; o almoço pausa a contagem. O limite padrão é 10:00, ajustável pelo usuário para um valor menor; o banco nunca aceita mais de 10:00.
 
 Se a confirmação do alerta crítico chegar depois do limite, o app pede confirmação explícita e grava a saída no último horário permitido, com justificativa visível no Espelho; não grava uma jornada acima do teto. Esse registro é um controle pessoal e não substitui o registro oficial do empregador.
 
-Os avisos usam os marcos configurados no perfil: 8:00, 9:00, 9:30, 9:45, 9:50, 9:55 e limite pessoal. As notificações são locais; Android pode exigir permissão de notificação e permissão de alarmes exatos nas configurações do sistema. A entrega exata em segundo plano depende das permissões e políticas de bateria do aparelho. O modo Expo Go serve para desenvolvimento; teste notificações/alarme exato no APK final.
+Se ainda não houve saída para almoço, o app mostra e agenda um aviso preventivo ao completar 4:00 horas trabalhadas; após registrar a saída para almoço, agenda o retorno segundo os minutos definidos no Perfil. Os alertas de jornada permanecem nos marcos 8:00, 9:00, 9:30, 9:45, 9:50, 9:55 e limite pessoal. As notificações são locais; Android pode exigir permissão de notificação e permissão de alarmes exatos nas configurações do sistema. A entrega exata em segundo plano depende das permissões e políticas de bateria do aparelho. O modo Expo Go serve para desenvolvimento; teste notificações/alarme exato no APK final.
 
 **Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** exporta o histórico em JSON, permite alterar preferências e solicitar a exclusão da conta. A biblioteca e os cálculos principais são locais/offline.
 
 ### Ajustar limite, almoço e tempos dos alertas
 
-No Perfil, cada usuário escolhe limite pessoal de 8h, 9h ou 10h e previsão de almoço de 30, 45, 60 ou 90 minutos. Os marcos padrão (8h, 9h, 9h30, 9h45, 9h50, 9h55 e limite) e a cadência de repetição estão centralizados em `utils/alerts.ts` (`ALERT_THRESHOLDS`); um desenvolvedor pode ajustá-los ali e na agenda local em `services/notification-service.ts`, atualizando `tests/alerts.test.ts` junto. O banco continua impondo o teto de 600 minutos trabalhados mesmo se alguém alterar apenas a interface.
+No Perfil, cada usuário escolhe limite pessoal de 8h, 9h ou 10h e previsão de almoço de 30, 45, 60 ou 90 minutos. O lembrete de pausa padrão aos 240 minutos está separado em `LUNCH_REMINDER_MINUTES`; os marcos de jornada (8h, 9h, 9h30, 9h45, 9h50, 9h55 e limite) e a cadência de repetição estão centralizados em `utils/alerts.ts` (`ALERT_THRESHOLDS`). Um desenvolvedor deve manter a agenda em `services/notification-service.ts` e os testes correspondentes atualizados. O banco continua impondo o teto de 600 minutos trabalhados mesmo se alguém alterar apenas a interface.
 
 ## Gerar APK para instalação direta (EAS)
 
@@ -120,6 +126,8 @@ Antes do build, abra **Expo Dashboard → projeto Olha o Ponto → Environment v
 O build pode ser iniciado pela aba **Builds** do projeto EAS conectado ao GitHub ou pela EAS CLI autenticada. A configuração `extra.eas.projectId` já aponta ao projeto novo; não execute `eas project:init` nem selecione outro projeto.
 
 O identificador Android configurado é `space.manus.olhaponto.t099013940753689`. Ao concluir, abra o link do build no Android para baixar e instalar o APK. Se necessário, permita instalação desta origem em **Configurações → Segurança/Apps**. No Android 13+, conceda notificações e configure **Alarmes e lembretes** se o sistema solicitar.
+
+O perfil `preview` incrementa o versionCode remoto automaticamente para que uma APK de correção possa atualizar a instalação anterior, desde que permaneça assinada com a keystore cadastrada no projeto EAS `olhonoponto`.
 
 Uma distribuição iOS instalável fora do Expo Go exige Apple Developer/assinatura e configuração Apple; não está configurada neste perfil APK.
 

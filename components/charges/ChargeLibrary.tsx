@@ -7,24 +7,24 @@ export type AlertLevel = '8h' | '9h' | '9h30' | '9h45' | '9h50' | '10h';
 export type Charge = { id: string; level: AlertLevel; caption: string; scene: string };
 
 export const chargeCatalog: Charge[] = [
-  { id: 'dev-coffee', level: '8h', caption: 'Só mais um commit… e um gole.', scene: 'dev' },
-  { id: 'cool-coffee', level: '8h', caption: 'Seu café já está em horário de saída.', scene: 'coffee' },
-  { id: 'cat-keyboard', level: '8h', caption: 'O gato encerrou seu expediente por você.', scene: 'cat' },
-  { id: 'bug-server', level: '9h', caption: 'O servidor está quente. Você não precisa estar.', scene: 'server' },
-  { id: 'battery', level: '9h', caption: 'Bateria humana: entrando no modo econômico.', scene: 'battery' },
-  { id: 'hourglass', level: '9h', caption: 'A areia acabou. Sua desculpa também?', scene: 'hourglass' },
-  { id: 'chasing-clock', level: '9h30', caption: 'O relógio veio buscar você. Corre!', scene: 'chase' },
-  { id: 'roots-chair', level: '9h30', caption: 'A cadeira criou raízes. Você não precisa.', scene: 'roots' },
-  { id: 'traffic-light', level: '9h30', caption: 'Sinal verde para ir viver.', scene: 'traffic' },
-  { id: 'rocket-home', level: '9h45', caption: 'Foguete rumo ao sofá: embarque imediato.', scene: 'rocket' },
-  { id: 'go-home-sign', level: '9h45', caption: 'A placa diz o que todo mundo pensa.', scene: 'sign' },
-  { id: 'bus-leaving', level: '9h45', caption: 'O ônibus da vida não espera planilha.', scene: 'bus' },
-  { id: 'robot-boss', level: '9h50', caption: 'CHEFE-ROBÔ: “VAI PRA CASA!”', scene: 'robot' },
-  { id: 'alarm-clock', level: '9h50', caption: 'Alerta: seu pijama sente sua falta.', scene: 'alarm' },
-  { id: 'melting-dev', level: '9h50', caption: 'Até o código está derretendo. Feche tudo.', scene: 'meltdown' },
-  { id: 'pizza-sofa', level: '10h', caption: 'Pizza, sofá, você. A reunião acabou.', scene: 'pizza' },
-  { id: 'fire-server', level: '10h', caption: '🔥 Produção em chamas. Você: fora daqui.', scene: 'fire' },
-  { id: 'clock-champion', level: '10h', caption: 'Fim de expediente! Vitória por nocaute.', scene: 'champion' },
+  { id: 'dev-coffee', level: '8h', caption: 'Jornada regular concluída. Planeje sua saída.', scene: 'dev' },
+  { id: 'cool-coffee', level: '8h', caption: 'Oito horas registradas. Acompanhe o tempo adicional.', scene: 'coffee' },
+  { id: 'cat-keyboard', level: '8h', caption: 'Lembrete: a jornada entrou no período de hora extra.', scene: 'cat' },
+  { id: 'bug-server', level: '9h', caption: 'Você está em hora extra. Acompanhe o limite.', scene: 'server' },
+  { id: 'battery', level: '9h', caption: 'Falta uma hora para o limite diário.', scene: 'battery' },
+  { id: 'hourglass', level: '9h', caption: 'Organize o encerramento da jornada.', scene: 'hourglass' },
+  { id: 'chasing-clock', level: '9h30', caption: 'Faltam 30 minutos para o limite diário.', scene: 'chase' },
+  { id: 'roots-chair', level: '9h30', caption: 'Revise as atividades e prepare a saída.', scene: 'roots' },
+  { id: 'traffic-light', level: '9h30', caption: 'Acompanhe o contador para encerrar a tempo.', scene: 'traffic' },
+  { id: 'rocket-home', level: '9h45', caption: 'Faltam 15 minutos. Finalize o que for possível.', scene: 'rocket' },
+  { id: 'go-home-sign', level: '9h45', caption: 'Prepare-se para registrar a saída dentro do limite.', scene: 'sign' },
+  { id: 'bus-leaving', level: '9h45', caption: 'O limite está próximo. Conclua a jornada em breve.', scene: 'bus' },
+  { id: 'robot-boss', level: '9h50', caption: 'Faltam 10 minutos. Encerre as atividades.', scene: 'robot' },
+  { id: 'alarm-clock', level: '9h50', caption: 'Atenção: o limite diário está a 10 minutos.', scene: 'alarm' },
+  { id: 'melting-dev', level: '9h50', caption: 'Registre a saída assim que concluir as atividades.', scene: 'meltdown' },
+  { id: 'pizza-sofa', level: '10h', caption: 'Limite diário alcançado. Registre a saída.', scene: 'pizza' },
+  { id: 'fire-server', level: '10h', caption: 'O teto da jornada foi atingido. Pare e registre a saída.', scene: 'fire' },
+  { id: 'clock-champion', level: '10h', caption: 'Jornada no limite. A saída deve ser registrada agora.', scene: 'champion' },
 ];
 export const charges = chargeCatalog;
 export const captions = chargeCatalog.reduce<Record<string, string>>((all, charge) => { all[charge.id] = charge.caption; return all; }, {});
@@ -82,14 +82,14 @@ export function ChargeIllustration({ chargeId, size = 240 }: { chargeId: string;
   }, []);
   useEffect(() => {
     if (reduceMotion || intensity === 0) { motion.value = 0; return; }
-    const duration = Math.max(130, 900 - intensity * 145);
+    const duration = Math.max(1100, 1700 - intensity * 90);
     motion.value = withRepeat(withSequence(withTiming(1, { duration, easing: Easing.inOut(Easing.quad) }), withTiming(0, { duration, easing: Easing.inOut(Easing.quad) })), -1, false);
     return () => { motion.value = 0; };
   }, [intensity, motion, reduceMotion]);
   const animatedStyle = useAnimatedStyle(() => {
     if (reduceMotion || intensity === 0) return {};
-    const amount = intensity >= 4 ? 3 : intensity >= 2 ? 1.8 : 0.7;
-    return { transform: [{ translateY: motion.value * amount }, { rotate: `${(motion.value - 0.5) * (intensity >= 4 ? 4 : 1.5)}deg` }] };
+    const amount = intensity >= 4 ? 0.8 : intensity >= 2 ? 0.55 : 0.3;
+    return { transform: [{ translateY: motion.value * amount }] };
   }, [intensity, reduceMotion]);
   const style: ViewStyle = { width: size, height: size, alignItems: 'center', justifyContent: 'center' };
   return <View accessible accessibilityRole="image" accessibilityLabel={charge.caption} style={style}><Animated.View style={animatedStyle}><Svg width={size} height={size} viewBox="0 0 120 120"><Illustration scene={charge.scene} /></Svg></Animated.View></View>;

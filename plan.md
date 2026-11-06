@@ -33,6 +33,16 @@ A identidade combina um utilitário de produtividade acolhedor com um mascote de
 
 O mascote relógio sorridente, o arco de progresso que muda de cor conforme o limite se aproxima e os banners de alerta são os elementos de assinatura. Inter será a fonte principal com fallback do sistema; os números de tempo terão destaque forte e os textos auxiliares permanecerão legíveis. Microinterações e feedback tátil serão discretos durante a jornada normal e mais intensos nos níveis finais. A voz será clara, bem-humorada e protetora, por exemplo: “Seu tempo, mais em dia.” e “Jornada normal completa. A partir daqui é hora extra!”.
 
+## Correções pós-instalação da primeira APK
+
+Após o teste da primeira APK, priorizar a confiabilidade da sessão Supabase: usar a sessão retornada pelo login como fonte de verdade, restaurá-la de forma segura quando necessário e não navegar para Termos, Home ou ações protegidas sem uma sessão válida. O aceite deve gravar versão e data/hora no perfil do mesmo usuário autenticado; batidas automáticas/manuais e troca de senha devem usar essa sessão e apresentar uma instrução clara de reautenticação se ela realmente expirou. O fuso/horário manual nunca substitui autenticação.
+
+Espelho e Resumo devem encerrar o carregamento em todos os caminhos, inclusive sessão ausente, falha inesperada e mudança de mês; apresentar erro recuperável com tentativa novamente e diferenciar indisponibilidade/cache de um mês realmente sem registros. Manter o uso das políticas RLS existentes sem alterar os dados do administrador nem conceder acesso ampliado.
+
+Complementar os alertas locais com um lembrete de pausa ao completar 4 horas trabalhadas se o almoço ainda não tiver começado, preservar os níveis existentes de 8 a 10 horas e ativar o lembrete de retorno após a duração de almoço configurada. Recalcular/cancelar as notificações após batidas, edições, preferências ou logout. Moderar as animações e textos dos alertas para um tom mais sóbrio, sem alterar o limite rígido de 10:00 nem o botão crítico de saída.
+
+Na tela Sobre, declarar expressamente que o app acompanha apenas registros pessoais do ponto da empresa e não substitui o registro original/oficial, identificar o criador como Marcos Henrique Edington Santos e manter o aviso informativo sobre a jornada. A APK corrigida deve incrementar o versionCode Android para instalar sobre a APK anterior.
+
 ## Repositório e entrega
 
 O projeto Mobile Dev mantém seu repositório canônico gerenciado e não permite trocar o canônico para GitHub. Uma cópia do código está no repositório público existente `olhaoponto/olhaoponto`, publicado após confirmação explícita e preservando o arquivo preexistente; não foi criado outro repositório nem usado force-push. O projeto Expo EAS conecta somente a esse repositório, sem acesso aos projetos Expo `vivacondo` e `herois-plus-app`. O `.env` e qualquer credencial são excluídos do Git e do ZIP. A entrega inclui ZIP para VS Code, README em português, código, `.env.example` e configuração de build.

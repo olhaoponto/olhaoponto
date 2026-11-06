@@ -14,13 +14,19 @@ export default function TermsScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const profile = useAppStore((state) => state.profile);
+  const session = useAppStore((state) => state.session);
 
   const handleAccept = async () => {
+    if (!session) { setError('Sua sessão não está ativa. Entre novamente para registrar o aceite.'); return; }
     setLoading(true); setError('');
-    const result = await acceptTerms(TERMS_VERSION);
-    if (result.error || !result.data) { setError(result.error || 'Não foi possível registrar seu aceite.'); setLoading(false); return; }
-    useAppStore.getState().setProfile(result.data);
-    router.replace('/(tabs)');
+    try {
+      const result = await acceptTerms(TERMS_VERSION);
+      if (result.error || !result.data) { setError(result.error || 'Não foi possível registrar seu aceite.'); return; }
+      useAppStore.getState().setProfile(result.data);
+      router.replace('/(tabs)');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível registrar o aceite. Tente novamente.');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -52,8 +58,10 @@ export default function TermsScreen() {
         <View style={[styles.checkbox, { borderColor: accepted ? colors.deepTeal : colors.border, backgroundColor: accepted ? colors.deepTeal : 'transparent' }]}>{accepted ? <AppText variant="small" color="#FFFFFF">✓</AppText> : null}</View>
         <AppText variant="small" style={{ flex: 1 }}>Li e aceito os Termos de Uso e a Política de Privacidade.</AppText>
       </Pressable>
+      {!session ? <AppText variant="small" color={colors.error}>Sua sessão não está ativa. Entre novamente para continuar.</AppText> : null}
       {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}
-      <ActionButton title="Aceitar e continuar" onPress={handleAccept} loading={loading} disabled={!accepted || !profile} />
+      <ActionButton title="Aceitar e continuar" onPress={handleAccept} loading={loading} disabled={!accepted || !profile || !session} />
+      {!session ? <ActionButton title="Voltar ao login" variant="outline" onPress={() => router.replace('/login')} /> : null}
     </ScreenShell>
   );
 }

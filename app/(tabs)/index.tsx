@@ -9,6 +9,7 @@ import { useAppStore } from '@/store/app-store';
 import { loadEntriesByDate, insertTimeEntry, syncPendingEntries } from '@/services/time-entry-service';
 import { prepareLocalNotifications } from '@/services/notification-service';
 import { calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
+import { LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
 import type { TimeEntry } from '@/types/app';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 
@@ -48,6 +49,7 @@ export default function HomeScreen() {
   const workedMinutes = calculateWorkedMinutes(todayEntries, now);
   const remainingMinutes = Math.max(0, limit - workedMinutes);
   const lunchInProgress = todayEntries.some((entry) => entry.tipo === 'saida_almoco') && !todayEntries.some((entry) => entry.tipo === 'volta_almoco');
+  const lunchStarted = todayEntries.some((entry) => entry.tipo === 'saida_almoco');
   const ended = todayEntries.some((entry) => entry.tipo === 'saida');
   const progress = Math.min(1, workedMinutes / Math.max(1, limit));
   const alertColor = ended ? colors.teal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : workedMinutes >= 540 ? colors.coral : workedMinutes >= 480 ? colors.warning : colors.teal;
@@ -132,6 +134,7 @@ export default function HomeScreen() {
         {workedMinutes >= 480 && workedMinutes < 570 ? <View style={[styles.alertBanner, { backgroundColor: workedMinutes >= 540 ? `${colors.coral}20` : `${colors.warning}2B` }]}><MaterialCommunityIcons name={workedMinutes >= 540 ? 'alert-circle-outline' : 'check-circle-outline'} size={21} color={workedMinutes >= 540 ? colors.error : colors.deepTeal} /><AppText variant="small" style={{ flex: 1, fontWeight: '600' }}>{workedMinutes >= 540 ? 'Você já está em hora extra. Planeje sua saída.' : 'Jornada normal completa. A partir daqui é hora extra!'}</AppText></View> : null}
       </SurfaceCard>
 
+      {workedMinutes >= LUNCH_REMINDER_MINUTES && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou 4 horas. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
       <SurfaceCard>
         <View style={styles.sectionHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Batidas de hoje</AppText><AppText variant="small" color={colors.muted}>Próxima: {nextPunch ? labels[nextPunch] : 'Jornada encerrada'}</AppText></View><StatusPill tone={ended ? 'teal' : 'neutral'}>{todayEntries.length}/4</StatusPill></View>
         <View style={{ gap: 2 }}>{order.map((type, index) => {

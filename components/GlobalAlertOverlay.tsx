@@ -67,7 +67,7 @@ export default function GlobalAlertOverlay() {
   const remainingSeconds = Math.max(0, limit * 60 - workedSeconds);
   const critical = workedMinutes >= 590 || Boolean(activeAlert?.level === 'blocking');
   const urgent = workedMinutes >= 585;
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: urgent ? 0.04 + pulse.value * 0.18 : 0.08, transform: [{ scale: urgent ? 0.94 + pulse.value * 0.18 : 1 }] }));
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: urgent ? 0.04 + pulse.value * 0.05 : 0.05, transform: [{ scale: urgent ? 0.99 + pulse.value * 0.02 : 1 }] }));
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -114,7 +114,7 @@ export default function GlobalAlertOverlay() {
     if (Platform.OS !== 'web') {
       if (shouldKeepAwake) void activateKeepAwakeAsync('olhaponto-critical-alert').catch(() => undefined);
       else void deactivateKeepAwake('olhaponto-critical-alert').catch(() => undefined);
-      if (shouldKeepAwake && profile?.preferencias_alerta?.vibracao !== false) Vibration.vibrate([0, 650, 350, 650], true);
+      if (shouldKeepAwake && profile?.preferencias_alerta?.vibracao !== false) Vibration.vibrate([0, 300, 1200], true);
       else Vibration.cancel();
     }
     return () => {
@@ -126,7 +126,7 @@ export default function GlobalAlertOverlay() {
   }, [session, profile, workedMinutes, activeAlert?.level, completed]);
 
   useEffect(() => {
-    if (urgent) pulse.value = withRepeat(withTiming(1, { duration: 760 }), -1, true);
+    if (urgent) pulse.value = withRepeat(withTiming(1, { duration: 1600 }), -1, true);
     else { cancelAnimation(pulse); pulse.value = 0; }
     return () => cancelAnimation(pulse);
   }, [urgent, pulse]);

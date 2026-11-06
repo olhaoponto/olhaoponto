@@ -60,7 +60,7 @@ const config: ExpoConfig = {
   owner: "edingtonmaquine",
   name: env.appName,
   slug: env.appSlug,
-  version: "1.0.0",
+  version: "1.0.1",
   extra: {
     ...publicRuntime,
     eas: {

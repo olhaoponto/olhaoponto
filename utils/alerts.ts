@@ -1,5 +1,8 @@
 import { DEFAULT_DAILY_LIMIT_MINUTES, formatMinutesHHMM } from './work-time';
 
+/** Aviso preventivo para planejar o intervalo quando a saída para almoço ainda não foi registrada. */
+export const LUNCH_REMINDER_MINUTES = 240;
+
 export interface AlertThreshold {
   minutes: number;
   label: string;

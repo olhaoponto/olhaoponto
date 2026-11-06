@@ -4,12 +4,14 @@ import type { Profile, TimeEntry } from '../types/app';
 
 export interface AppState {
   session: Session | null;
+  sessionInitialized: boolean;
   profile: Profile | null;
   entries: TimeEntry[];
   loading: boolean;
   offline: boolean;
   error: string | null;
   setSession: (session: Session | null) => void;
+  setSessionInitialized: (initialized: boolean) => void;
   setProfile: (profile: Profile | null) => void;
   setEntries: (entries: TimeEntry[]) => void;
   upsertEntry: (entry: TimeEntry) => void;
@@ -19,10 +21,11 @@ export interface AppState {
   setError: (error: string | null) => void;
   reset: () => void;
 }
-const initial = { session: null, profile: null, entries: [], loading: false, offline: false, error: null };
+const initial = { session: null, sessionInitialized: false, profile: null, entries: [], loading: false, offline: false, error: null };
 export const useAppStore = create<AppState>((set) => ({
   ...initial,
-  setSession: (session) => set({ session }),
+  setSession: (session) => set({ session, sessionInitialized: true }),
+  setSessionInitialized: (sessionInitialized) => set({ sessionInitialized }),
   setProfile: (profile) => set({ profile }),
   setEntries: (entries) => set({ entries }),
   upsertEntry: (entry) => set((state) => ({ entries: [...state.entries.filter((row) => row.id !== entry.id), entry] })),

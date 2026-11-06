@@ -1,11 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { PunchType, TimeEntry } from '../types/app';
+import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
 
 export interface ServiceResult<T> { data: T | null; error: string | null; }
 export type TimeEntryInput = Pick<TimeEntry, 'tipo'> & Partial<Pick<TimeEntry, 'registrado_em' | 'horario_informado_manual' | 'editado' | 'justificativa'>> & { user_id?: never; data?: never };
-const friendly = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir a operação.';
+const friendly = (error: unknown) => {
+  const message = error instanceof Error ? error.message : 'Não foi possível concluir a operação.';
+  return /auth session missing|authsessionmissingerror|session missing/i.test(message) ? SESSION_REQUIRED_MESSAGE : message;
+};
 const cacheKey = (id: string) => `olhaponto:${id}:time-entries`;
 const pendingKey = (id: string) => `olhaponto:${id}:pending-time-entries`;
 const zone = 'America/Bahia';
@@ -26,11 +30,9 @@ function uuidV4(): string {
 }
 
 async function currentUserId(): Promise<string> {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionData.session?.user) return sessionData.session.user.id;
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) throw new Error(error ? friendly(error) : sessionError ? friendly(sessionError) : 'Sessão não encontrada.');
-  return data.user.id;
+  const auth = await getAuthenticatedSession();
+  if (!auth.session) throw new Error(auth.error || SESSION_REQUIRED_MESSAGE);
+  return auth.session.user.id;
 }
 
 type Query = (userId: string) => PromiseLike<{ data: TimeEntry[] | null; error: { message: string } | null }>;

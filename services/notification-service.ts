@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { ALERT_THRESHOLDS } from '../utils/alerts';
+import { ALERT_THRESHOLDS, LUNCH_REMINDER_MINUTES } from '../utils/alerts';
 import { calculateWorkedSeconds, formatMinutesHHMM, type TimeEntry } from '../utils/work-time';
 
 Notifications.setNotificationHandler({
@@ -85,6 +85,20 @@ export async function scheduleDayNotifications(
   const lunchOut = entries.find((entry) => entry.tipo === 'saida_almoco');
   const lunchIn = entries.find((entry) => entry.tipo === 'volta_almoco');
   const finalOut = entries.find((entry) => entry.tipo === 'saida');
+  const workedSeconds = calculateWorkedSeconds(entries, now);
+
+  if (!lunchOut && !finalOut && workedSeconds < LUNCH_REMINDER_MINUTES * 60) {
+    const reminderAt = new Date(now.getTime() + (LUNCH_REMINDER_MINUTES * 60 - workedSeconds) * 1000);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Lembrete de pausa',
+        body: 'Você já trabalhou 4 horas. Se ainda não fez o intervalo, registre a saída para almoço no relógio da empresa e no app.',
+        sound: soundEnabled ? 'default' : false,
+        data: { type: 'lunch-start', level: '8h' satisfies AlertRouteLevel, minutes: LUNCH_REMINDER_MINUTES, user_id: userId },
+      },
+      trigger: makeTrigger(reminderAt, channelId),
+    });
+  }
 
   if (lunchOut && !lunchIn && !finalOut) {
     const lunchAt = new Date(lunchOut.registrado_em).getTime();
@@ -105,7 +119,6 @@ export async function scheduleDayNotifications(
 
   if (finalOut || !lunchIn && lunchOut) return;
 
-  const workedSeconds = calculateWorkedSeconds(entries, now);
   const thresholds = new Set<number>();
   for (const item of ALERT_THRESHOLDS) if (item.minutes <= limitMinutes) thresholds.add(item.minutes);
   thresholds.add(Math.max(1, limitMinutes));

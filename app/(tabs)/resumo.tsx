@@ -3,7 +3,8 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { addMonths, subMonths } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AppText, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
+import { useRouter } from 'expo-router';
+import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { loadEntriesByMonth } from '@/services/time-entry-service';
 import { calculateDailyTotals, calculatePeriodTotals, formatMinutesHHMM, getBahiaDate } from '@/utils/work-time';
@@ -15,29 +16,49 @@ const weekday = (date: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: Z
 
 export default function ResumoScreen() {
   const colors = useAppColors();
+  const router = useRouter();
   const session = useAppStore((state) => state.session);
+  const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const entries = useAppStore((state) => state.entries);
   const setEntries = useAppStore((state) => state.setEntries);
   const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [syncNotice, setSyncNotice] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const userId = session?.user.id;
+  const authUnavailable = sessionInitialized && !userId;
+  const reportLoading = !sessionInitialized || (!authUnavailable && loading);
+  const visibleError = authUnavailable ? 'Sua sessão não está ativa. Entre novamente para consultar o resumo.' : error;
 
   useEffect(() => {
-    if (!userId) return;
     let active = true;
-    void loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`)).then((result) => {
+    if (!sessionInitialized || !userId) return () => { active = false; };
+    void (async () => {
+      await Promise.resolve();
       if (!active) return;
-      if (result.data) setEntries(result.data);
-      if (result.error && !result.data?.length) setError('Não foi possível sincronizar os dados do período.');
-      setLoading(false);
-    });
+      setLoading(true); setError(''); setSyncNotice('');
+      try {
+        const result = await loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`));
+        if (!active) return;
+        if (result.data) setEntries(result.data);
+        if (result.error && result.data?.length) {
+          setSyncNotice('Sem conexão com o Supabase. Exibindo os registros salvos neste aparelho; tente sincronizar novamente.');
+          setError('');
+        } else if (result.error) {
+          setError(result.error.toLowerCase().includes('sessão') ? result.error : 'Não foi possível carregar este mês. Confira sua conexão e tente novamente.');
+          setSyncNotice('');
+        } else { setError(''); setSyncNotice(''); }
+      } catch {
+        if (active) { setError('Não foi possível carregar este mês. Confira sua conexão e tente novamente.'); setSyncNotice(''); }
+      } finally { if (active) setLoading(false); }
+    })();
     return () => { active = false; };
-  }, [month, userId, setEntries]);
+  }, [month, userId, sessionInitialized, retryCount, setEntries]);
 
   const changeMonth = (amount: -1 | 1) => {
     const next = formatInTimeZone(amount < 0 ? subMonths(new Date(`${month}-15T12:00:00Z`), 1) : addMonths(new Date(`${month}-15T12:00:00Z`), 1), ZONE, 'yyyy-MM');
-    setLoading(true); setError(''); setMonth(next);
+    setLoading(true); setError(''); setSyncNotice(''); setMonth(next);
   };
 
   const periodEntries = useMemo(() => entries.filter((entry) => entry.data.startsWith(month)), [entries, month]);
@@ -61,8 +82,10 @@ export default function ResumoScreen() {
         <AppText variant="subtitle" style={{ textTransform: 'capitalize', flex: 1, textAlign: 'center' }}>{labelMonth(month)}</AppText>
         <Pressable onPress={() => changeMonth(1)} accessibilityRole="button" accessibilityLabel="Próximo mês"><MaterialCommunityIcons name="chevron-right" size={25} color={colors.deepTeal} /></Pressable>
       </SurfaceCard>
-      {loading ? <ActivityIndicator color={colors.deepTeal} /> : null}
-      {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}
+      {reportLoading ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}><ActivityIndicator color={colors.deepTeal} /><AppText variant="small" color={colors.muted}>Carregando dados de {labelMonth(month)}…</AppText></View> : null}
+      {syncNotice && !authUnavailable ? <AppText variant="small" color={colors.coral}>{syncNotice}</AppText> : null}
+      {visibleError ? <SurfaceCard tone="soft" style={{ gap: 10 }}><AppText variant="body" color={colors.error}>{visibleError}</AppText>{!authUnavailable ? <ActionButton title="Tentar novamente" variant="outline" onPress={() => { setLoading(true); setError(''); setRetryCount((value) => value + 1); }} /> : null}{visibleError.toLowerCase().includes('sessão') ? <ActionButton title="Voltar ao login" onPress={() => router.replace('/login')} /> : null}</SurfaceCard> : null}
+      {!reportLoading && !visibleError ? <>
       <View style={styles.cards}>
         <SurfaceCard style={[styles.metricCard, { backgroundColor: colors.deepTeal, borderColor: colors.deepTeal }]}><MaterialCommunityIcons name="clock-outline" size={22} color="#D4F4EC" /><AppText variant="tiny" color="#D4F4EC">Horas trabalhadas</AppText><AppText variant="title" color="#FFFFFF">{formatMinutesHHMM(totals.workedMinutes)}</AppText><AppText variant="tiny" color="#D4F4EC">em {completedDays.length} dia(s) com registros</AppText></SurfaceCard>
         <SurfaceCard style={styles.metricCard}><MaterialCommunityIcons name="chart-line" size={22} color={colors.coral} /><AppText variant="tiny" color={colors.muted}>Média por dia registrado</AppText><AppText variant="title" color={colors.foreground}>{formatMinutesHHMM(average)}</AppText><AppText variant="tiny" color={colors.muted}>dias sem batida não entram na média</AppText></SurfaceCard>
@@ -85,6 +108,7 @@ export default function ResumoScreen() {
         {recent.length ? recent.map((day) => <View key={day.date} style={[styles.recentRow, { borderBottomColor: colors.border }]}><View style={{ flex: 1, gap: 2 }}><AppText variant="body" style={{ fontWeight: '600' }}>{labelShortDate(day.date)}</AppText><AppText variant="tiny" color={colors.muted}>{weekday(day.date)}</AppText></View><View style={{ alignItems: 'flex-end', gap: 2 }}><AppText variant="subtitle">{day.workedHHMM}</AppText><AppText variant="tiny" color={day.overtimeMinutes ? colors.coral : colors.muted}>{day.overtimeMinutes ? `+${day.overtimeHHMM} extras` : 'sem extra acima de 8h'}</AppText></View></View>) : <AppText variant="small" color={colors.muted}>O resumo aparece assim que você registrar sua primeira batida.</AppText>}
       </SurfaceCard>
       <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>O banco é uma estimativa baseada nas horas acima de 8h em cada dia. Consulte o espelho oficial da empresa para conferência.</AppText></SurfaceCard>
+      </> : null}
     </ScreenShell>
   );
 }

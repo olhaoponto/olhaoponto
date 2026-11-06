@@ -23,13 +23,16 @@ export default function ChangePasswordScreen() {
     if (!isStrongPassword(password)) { setError('Use 12 caracteres ou mais, com maiúscula, minúscula, número e símbolo.'); return; }
     if (password !== confirmation) { setError('As senhas não coincidem.'); return; }
     setLoading(true);
-    const changed = await changePassword(password);
-    if (changed.error) { setError(changed.error); setLoading(false); return; }
-    const profile = await getProfile();
-    if (profile.data) useAppStore.getState().setProfile(profile.data);
-    setLoading(false);
-    if (!profile.data?.aceite_termos_em) router.replace('/terms');
-    else router.replace('/(tabs)');
+    try {
+      const changed = await changePassword(password);
+      if (changed.error) { setError(changed.error); return; }
+      const profile = await getProfile();
+      if (profile.data) useAppStore.getState().setProfile(profile.data);
+      if (!profile.data?.aceite_termos_em) router.replace('/terms');
+      else router.replace('/(tabs)');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível trocar a senha. Tente novamente.');
+    } finally { setLoading(false); }
   };
 
   return (

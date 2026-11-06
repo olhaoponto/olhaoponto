@@ -30,10 +30,9 @@ export const unstable_settings = { anchor: '(tabs)' };
 function SessionBridge() {
   useEffect(() => {
     let alive = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (alive) useAppStore.getState().setSession(data.session);
-    }).catch(() => undefined);
+    let eventVersion = 0;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      eventVersion += 1;
       const state = useAppStore.getState();
       if (!session) {
         state.setProfile(null);
@@ -47,6 +46,13 @@ function SessionBridge() {
       }
       state.setSession(session);
     });
+    const initialVersion = eventVersion;
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!alive) return;
+      const state = useAppStore.getState();
+      if (eventVersion === initialVersion) state.setSession(error ? null : data.session);
+      else state.setSessionInitialized(true);
+    }).catch(() => { if (alive) useAppStore.getState().setSessionInitialized(true); });
     return () => { alive = false; subscription.unsubscribe(); };
   }, []);
   return null;
@@ -55,7 +61,7 @@ function SessionBridge() {
 function AppStack() {
   const router = useRouter();
   const profile = useAppStore((state) => state.profile);
-  const pendingNotification = useRef<{ type: 'work-alert' | 'lunch-return'; level: string; userId?: string } | null>(null);
+  const pendingNotification = useRef<{ type: 'work-alert' | 'lunch-return' | 'lunch-start'; level: string; userId?: string } | null>(null);
   const handledNotification = useRef('');
   const [notificationVersion, setNotificationVersion] = useState(0);
   const { colorScheme, setColorScheme } = useThemeContext();
@@ -70,7 +76,7 @@ function AppStack() {
       if (handledNotification.current === dedupeKey) return;
       handledNotification.current = dedupeKey;
       const data = request.content.data as { type?: string; level?: string; user_id?: string };
-      if (data.type !== 'work-alert' && data.type !== 'lunch-return') return;
+      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-start') return;
       const currentUserId = useAppStore.getState().profile?.id;
       if (currentUserId && data.user_id && currentUserId !== data.user_id) return;
       pendingNotification.current = { type: data.type, level: data.level ?? '8h', userId: data.user_id };

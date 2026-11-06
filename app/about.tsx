@@ -7,10 +7,14 @@ export default function AboutScreen() {
   const router = useRouter();
   return (
     <ScreenShell contentStyle={{ gap: 16, paddingTop: 20 }}>
-      <PageHeading eyebrow="Olha o Ponto" title="Sobre o aplicativo" subtitle="Uma ajuda amigável para acompanhar sua jornada." right={<MaterialCommunityIcons name="clock-time-four-outline" size={28} color={colors.deepTeal} />} />
+      <PageHeading eyebrow="Olha o Ponto" title="Sobre o aplicativo" subtitle="Acompanhe seus próprios horários com clareza." right={<MaterialCommunityIcons name="clock-time-four-outline" size={28} color={colors.deepTeal} />} />
       <SurfaceCard>
-        <AppText variant="subtitle">Por que este app existe</AppText>
-        <AppText variant="body">Aplicativo criado por Marcos Edington, com o objetivo de alertar o usuário para não passar do limite de 10:00 horas trabalhadas.</AppText>
+        <AppText variant="subtitle">Finalidade</AppText>
+        <AppText variant="body">O Olha o Ponto serve apenas para acompanhar seus próprios horários registrados no ponto da empresa e ajudar você a observar o limite diário da jornada.</AppText>
+      </SurfaceCard>
+      <SurfaceCard>
+        <AppText variant="subtitle">Sobre a criação</AppText>
+        <AppText variant="body">Aplicativo idealizado e criado por Marcos Henrique Edington Santos para alertar o usuário e ajudar a evitar que ultrapasse 10:00 horas trabalhadas no dia.</AppText>
       </SurfaceCard>
       <SurfaceCard tone="soft">
         <AppText variant="subtitle">Entenda o limite em linguagem simples</AppText>
@@ -19,9 +23,9 @@ export default function AboutScreen() {
       </SurfaceCard>
       <SurfaceCard>
         <AppText variant="subtitle">Importante</AppText>
-        <AppText variant="body">Este conteúdo é apenas informativo, não é orientação jurídica e não avalia regras coletivas, escalas especiais ou um caso concreto. O app é um controle pessoal e não substitui o registro oficial da empresa. Se tiver dúvidas sobre sua jornada, converse com o empregador ou procure profissional qualificado.</AppText>
+        <AppText variant="body">Este conteúdo é apenas informativo, não é orientação jurídica e não avalia regras coletivas, escalas especiais ou um caso concreto. O aplicativo é somente um acompanhamento pessoal e não substitui o relógio, o sistema ou o registro original/oficial de ponto da empresa. Se tiver dúvidas sobre sua jornada, converse com o empregador ou procure profissional qualificado.</AppText>
       </SurfaceCard>
-      <SurfaceCard style={{ alignItems: 'center', gap: 5 }}><AppText variant="tiny" color={colors.muted}>VERSÃO</AppText><AppText variant="subtitle">1.0.0</AppText><AppText variant="tiny" color={colors.muted}>Dados protegidos e acesso controlado.</AppText></SurfaceCard>
+      <SurfaceCard style={{ alignItems: 'center', gap: 5 }}><AppText variant="tiny" color={colors.muted}>VERSÃO</AppText><AppText variant="subtitle">1.0.1</AppText><AppText variant="tiny" color={colors.muted}>Dados protegidos e acesso controlado.</AppText></SurfaceCard>
       <ActionButton title="Termos de uso e política de privacidade" variant="outline" onPress={() => router.push('/terms')} />
     </ScreenShell>
   );

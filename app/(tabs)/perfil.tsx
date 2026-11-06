@@ -108,10 +108,13 @@ export default function PerfilScreen() {
     if (!isStrong(newPassword)) { setError('Use 12 caracteres ou mais, com maiúscula, minúscula, número e símbolo.'); return; }
     if (newPassword !== confirmPassword) { setError('As senhas não coincidem.'); return; }
     setSaving(true);
-    const result = await changePassword(newPassword);
-    setSaving(false);
-    if (result.error) { setError(result.error); return; }
-    setPasswordModal(false); setNewPassword(''); setConfirmPassword(''); setMessage('Senha alterada com sucesso.');
+    try {
+      const result = await changePassword(newPassword);
+      if (result.error) { setError(result.error); return; }
+      setPasswordModal(false); setNewPassword(''); setConfirmPassword(''); setMessage('Senha alterada com sucesso.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a senha. Tente novamente.');
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {

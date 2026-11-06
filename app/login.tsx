@@ -19,36 +19,54 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     setLoading(true); setError(''); setMessage('');
-    const result = await login(email, password);
-    if (result.error || !result.data) { setError(result.error || 'Não foi possível entrar.'); setLoading(false); return; }
-    const profileResult = await getProfile(result.data.user.id);
-    const profile = profileResult.data;
-    if (!profile) {
-      setError(profileResult.error || 'Não foi possível carregar seu perfil. Tente novamente.');
-      await supabase.auth.signOut(); setLoading(false); return;
-    }
-    if (!profile.ativo) {
-      await supabase.auth.signOut(); setError('Esta conta está desativada. Fale com a administração.'); setLoading(false); return;
-    }
-    const { data: sessionData } = await supabase.auth.getSession();
-    useAppStore.getState().setSession(sessionData.session);
-    useAppStore.getState().setProfile(profile);
-    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') localStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
-    else await AsyncStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
-    setLoading(false);
-    if (profile.senha_provisoria || result.data.user.user_metadata?.senha_provisoria === true) router.replace('/change-password');
-    else if (!profile.aceite_termos_em) router.replace('/terms');
-    else router.replace('/(tabs)');
+    try {
+      const result = await login(email, password);
+      if (result.error || !result.data) { setError(result.error || 'Não foi possível entrar.'); return; }
+      const { user, session } = result.data;
+      if (!session?.access_token || session.user.id !== user.id) {
+        await supabase.auth.signOut({ scope: 'local' });
+        useAppStore.getState().setSession(null);
+        setError('Não foi possível confirmar sua sessão. Entre novamente.');
+        return;
+      }
+      useAppStore.getState().setSession(session);
+      const profileResult = await getProfile(user.id);
+      const profile = profileResult.data;
+      if (!profile) {
+        await supabase.auth.signOut({ scope: 'local' });
+        useAppStore.getState().setSession(null);
+        useAppStore.getState().setProfile(null);
+        setError(profileResult.error || 'Não foi possível carregar seu perfil. Confira a conexão e tente novamente.');
+        return;
+      }
+      if (!profile.ativo) {
+        await supabase.auth.signOut({ scope: 'local' });
+        useAppStore.getState().setSession(null);
+        useAppStore.getState().setProfile(null);
+        setError('Esta conta está desativada. Fale com a administração.');
+        return;
+      }
+      useAppStore.getState().setProfile(profile);
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') localStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
+      else await AsyncStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
+      if (profile.senha_provisoria || user.user_metadata?.senha_provisoria === true) router.replace('/change-password');
+      else if (!profile.aceite_termos_em) router.replace('/terms');
+      else router.replace('/(tabs)');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível concluir o acesso. Confira sua conexão e tente novamente.');
+    } finally { setLoading(false); }
   };
 
   const handleRecover = async () => {
     setError(''); setMessage('');
     if (!email.trim()) { setError('Informe seu e-mail para receber as instruções de recuperação.'); return; }
     setLoading(true);
-    const result = await recoverPassword(email);
-    setLoading(false);
-    if (result.error) setError(result.error);
-    else setMessage('Se houver uma conta associada a esse e-mail, enviaremos as instruções para trocar a senha.');
+    try {
+      const result = await recoverPassword(email);
+      if (result.error) setError(result.error);
+      else setMessage('Se houver uma conta associada a esse e-mail, enviaremos as instruções para trocar a senha.');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível solicitar a recuperação. Tente novamente.'); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -71,7 +89,7 @@ export default function LoginScreen() {
         {error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
         {message ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{message}</AppText> : null}
         <ActionButton title="Entrar" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} />
-        <ActionButton title="Esqueci minha senha" variant="outline" onPress={handleRecover} disabled={!email.trim()} />
+        <ActionButton title="Esqueci minha senha" variant="outline" onPress={handleRecover} disabled={!email.trim() || loading} />
       </SurfaceCard>
       <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center', maxWidth: 320, alignSelf: 'center' }}>Acesso privado. Não há cadastro aberto neste aplicativo.</AppText>
     </ScreenShell>
