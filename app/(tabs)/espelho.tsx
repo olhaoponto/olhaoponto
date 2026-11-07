@@ -4,7 +4,7 @@ import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { getDaysInMonth, subMonths, addMonths } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { deleteTimeEntry, insertTimeEntry, loadEntriesByMonth, updateTimeEntry } from '@/services/time-entry-service';
 import { exportCsv, exportPdf } from '@/services/export-service';
@@ -26,6 +26,7 @@ export default function EspelhoScreen() {
   const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const entries = useAppStore((state) => state.entries);
   const setEntries = useAppStore((state) => state.setEntries);
+  const upsertEntry = useAppStore((state) => state.upsertEntry);
   const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState('');
@@ -98,12 +99,13 @@ export default function EspelhoScreen() {
     const candidateRows = monthEntries.map((entry) => entry.id === selected.id ? { ...entry, registrado_em: timestamp, data: selected.data, horario_informado_manual: true, editado: true, justificativa: reason.trim() } : entry).filter((entry) => entry.data === selected.data);
     const validation = validateEntries(candidateRows, new Date(), profile?.limite_minutos ?? 600);
     if (!validation.valid) { setNotice(validation.message || 'A edição não é válida para a sequência do dia.'); return; }
-    setSaving(true); setNotice('');
+    setSaving(true); setNotice(''); setError('');
     const result = await updateTimeEntry(selected.id, { registrado_em: timestamp, horario_informado_manual: true, editado: true, justificativa: reason.trim() });
     setSaving(false);
     if (result.error || !result.data) { setNotice(result.error || 'Não foi possível salvar a edição.'); return; }
-    setEntries(monthEntries.map((entry) => entry.id === selected.id ? result.data! : entry));
+    upsertEntry(result.data);
     setSelected(null);
+    setNotice('Batida atualizada com sucesso.');
   };
 
   const confirmDelete = async () => {
@@ -206,9 +208,9 @@ export default function EspelhoScreen() {
       <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>Este espelho é um controle pessoal e não substitui o documento oficial do empregador. Edições exigem justificativa; para preservar a sequência, exclua batidas da última para a primeira.</AppText></SurfaceCard>
 
       <Modal visible={Boolean(selected)} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
-        <View style={styles.modalBackdrop}><SurfaceCard style={styles.modalCard}><View style={styles.modalHeading}><AppText variant="subtitle">Editar batida</AppText><Pressable onPress={() => setSelected(null)} accessibilityRole="button"><MaterialCommunityIcons name="close" size={23} color={colors.muted} /></Pressable></View><AppText variant="small" color={colors.muted}>{selected ? `${LABELS[selected.tipo]} · ${selected.data}` : ''}</AppText><TextField label="Novo horário (HH:mm)" value={editTime} onChangeText={setEditTime} keyboardType="numbers-and-punctuation" maxLength={5} /><TextField label="Justificativa" value={reason} onChangeText={setReason} multiline placeholder="Ex.: esquecimento ao registrar no app" style={{ minHeight: 78, textAlignVertical: 'top' }} />{notice ? <AppText variant="small" color={colors.error}>{notice}</AppText> : null}<ActionButton title="Salvar edição" onPress={saveEdit} loading={saving} /><ActionButton title="Excluir batida" variant="danger" onPress={() => { setDeleteTarget(selected); setSelected(null); }} /><ActionButton title="Cancelar" variant="outline" onPress={() => setSelected(null)} /></SurfaceCard></View>
+        <KeyboardModalContent><SurfaceCard style={styles.modalCard}><View style={styles.modalHeading}><AppText variant="subtitle">Editar batida</AppText><Pressable onPress={() => setSelected(null)} accessibilityRole="button"><MaterialCommunityIcons name="close" size={23} color={colors.muted} /></Pressable></View><AppText variant="small" color={colors.muted}>{selected ? `${LABELS[selected.tipo]} · ${selected.data}` : ''}</AppText><TextField label="Novo horário (HH:mm)" value={editTime} onChangeText={setEditTime} keyboardType="numbers-and-punctuation" maxLength={5} /><TextField label="Justificativa" value={reason} onChangeText={setReason} multiline placeholder="Ex.: esquecimento ao registrar no app" style={{ minHeight: 78, textAlignVertical: 'top' }} />{notice ? <AppText variant="small" color={colors.error}>{notice}</AppText> : null}<ActionButton title="Salvar edição" onPress={saveEdit} loading={saving} /><ActionButton title="Excluir batida" variant="danger" onPress={() => { setDeleteTarget(selected); setSelected(null); }} /><ActionButton title="Cancelar" variant="outline" onPress={() => setSelected(null)} /></SurfaceCard></KeyboardModalContent>
       </Modal>
-      <Modal visible={Boolean(deleteTarget)} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}><View style={styles.modalBackdrop}><SurfaceCard style={styles.modalCard}><AppText variant="title">Excluir esta batida?</AppText><AppText variant="body" color={colors.muted}>{deleteTarget ? `${LABELS[deleteTarget.tipo]} às ${timeLabel(deleteTarget.registrado_em)} em ${deleteTarget.data}.` : ''} Esta ação não pode ser desfeita.</AppText><ActionButton title="Excluir definitivamente" variant="danger" onPress={confirmDelete} loading={saving} /><ActionButton title="Manter batida" variant="outline" onPress={() => setDeleteTarget(null)} /></SurfaceCard></View></Modal>
+      <Modal visible={Boolean(deleteTarget)} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}><KeyboardModalContent><SurfaceCard style={styles.modalCard}><AppText variant="title">Excluir esta batida?</AppText><AppText variant="body" color={colors.muted}>{deleteTarget ? `${LABELS[deleteTarget.tipo]} às ${timeLabel(deleteTarget.registrado_em)} em ${deleteTarget.data}.` : ''} Esta ação não pode ser desfeita.</AppText><ActionButton title="Excluir definitivamente" variant="danger" onPress={confirmDelete} loading={saving} /><ActionButton title="Manter batida" variant="outline" onPress={() => setDeleteTarget(null)} /></SurfaceCard></KeyboardModalContent></Modal>
     </ScreenShell>
   );
 }

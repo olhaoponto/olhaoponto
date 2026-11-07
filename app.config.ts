@@ -67,7 +67,7 @@ const config: ExpoConfig = {
       projectId: "97f93ccd-6d20-4ebd-9b52-f9bb7e4ab41a",
     },
   },
-  orientation: "portrait",
+  orientation: "default",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
@@ -79,6 +79,7 @@ const config: ExpoConfig = {
       }
   },
   android: {
+    softwareKeyboardLayoutMode: "resize",
     adaptiveIcon: {
       backgroundColor: "#FAF8EF",
       foregroundImage: "./assets/images/android-icon-foreground.png",

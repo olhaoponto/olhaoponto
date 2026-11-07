@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppStore } from '@/store/app-store';
 import { calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, safeClockOutTimestamp, validatePunch } from '@/utils/work-time';
 import { getCurrentAlert } from '@/utils/alerts';
+import { getActiveWorkSchedule } from '@/utils/work-schedules';
 import { chooseCharge, ChargeIllustration, type AlertLevel, type Charge } from '@/components/charges';
 import { insertTimeEntry } from '@/services/time-entry-service';
 import { scheduleDayNotifications } from '@/services/notification-service';
@@ -58,7 +59,9 @@ export default function GlobalAlertOverlay() {
   const todayEntries = useMemo(() => entries.filter((entry) => entry.data === today), [entries, today]);
   const completed = todayEntries.some((entry) => entry.tipo === 'saida');
   const limit = profile?.limite_minutos ?? 600;
-  const lunchMinutes = profile?.almoco_minutos ?? 60;
+  const activeSchedule = useMemo(() => getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [profile?.preferencias_alerta, profile?.almoco_minutos]);
+  const lunchMinutes = activeSchedule.lunch_minutes;
+  const lunchReturnWarningMinutes = typeof profile?.preferencias_alerta?.lunch_return_warning_minutes === 'number' ? profile.preferencias_alerta.lunch_return_warning_minutes : 5;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = Math.floor(workedSeconds / 60);
   const activeAlert = getCurrentAlert(workedMinutes, limit);
@@ -81,12 +84,15 @@ export default function GlobalAlertOverlay() {
       userId: session.user.id,
       limitMinutes: limit,
       lunchMinutes,
+      lunchReturnWarningMinutes,
+      workSchedule: activeSchedule,
+      timeZone: profile.fuso || zone,
       enabled: profile.preferencias_alerta?.enabled !== false,
       soundEnabled: profile.preferencias_alerta?.som !== false,
       vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
       now: new Date(),
     }).catch(() => undefined);
-  }, [session, profile, limit, lunchMinutes, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
+  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, activeSchedule, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
 
   useEffect(() => {
     if (!key || !session || !profile) return;

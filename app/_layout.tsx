@@ -1,11 +1,11 @@
 import '@/global.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack, useRouter, type ErrorBoundaryProps } from 'expo-router';
+import { Redirect, Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import '@/lib/_core/nativewind-pressable';
 import { ThemeProvider, useThemeContext } from '@/lib/theme-provider';
 import { SafeAreaFrameContext, SafeAreaInsetsContext, SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -15,17 +15,18 @@ import { initManusRuntime, subscribeSafeAreaInsets } from '@/lib/_core/manus-run
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { supabase } from '@/services/supabase';
 import { useAppStore } from '@/store/app-store';
 import { SchemeColors } from '@/constants/theme';
 import GlobalAlertOverlay from '@/components/GlobalAlertOverlay';
+import { getAuthRouteRedirect, isRouteProtected } from '@/utils/auth-route';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
-
-export const unstable_settings = { anchor: '(tabs)' };
+type AppNotificationType = 'work-alert' | 'lunch-return' | 'lunch-start' | 'shift-complete';
 
 function SessionBridge() {
   useEffect(() => {
@@ -60,12 +61,22 @@ function SessionBridge() {
 
 function AppStack() {
   const router = useRouter();
+  const segments = useSegments() as string[];
+  const routeRoot = segments[0] ?? 'index';
+  const session = useAppStore((state) => state.session);
+  const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const profile = useAppStore((state) => state.profile);
-  const pendingNotification = useRef<{ type: 'work-alert' | 'lunch-return' | 'lunch-start'; level: string; userId?: string } | null>(null);
+  const protectedRoute = isRouteProtected(routeRoot);
+  const routeRedirect = getAuthRouteRedirect({ routeRoot, sessionUserId: session?.user.id, profile });
+  const homeRoute = routeRoot === '(tabs)' && (segments[1] === 'index' || segments.length === 1);
+  const pendingNotification = useRef<{ type: AppNotificationType; level: string; userId?: string } | null>(null);
   const handledNotification = useRef('');
   const [notificationVersion, setNotificationVersion] = useState(0);
   const { colorScheme, setColorScheme } = useThemeContext();
-  const preferredTheme = profile?.preferencias_alerta?.tema;
+  const preferredTheme = typeof profile?.preferencias_alerta?.tema === 'string' ? profile.preferencias_alerta.tema : null;
+  useEffect(() => {
+    void ScreenOrientation.lockAsync(homeRoute ? ScreenOrientation.OrientationLock.DEFAULT : ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
+  }, [homeRoute]);
   useEffect(() => {
     if (preferredTheme === 'dark' || preferredTheme === 'light') setColorScheme(preferredTheme);
   }, [preferredTheme, setColorScheme]);
@@ -76,7 +87,7 @@ function AppStack() {
       if (handledNotification.current === dedupeKey) return;
       handledNotification.current = dedupeKey;
       const data = request.content.data as { type?: string; level?: string; user_id?: string };
-      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-start') return;
+      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-start' && data.type !== 'shift-complete') return;
       const currentUserId = useAppStore.getState().profile?.id;
       if (currentUserId && data.user_id && currentUserId !== data.user_id) return;
       pendingNotification.current = { type: data.type, level: data.level ?? '8h', userId: data.user_id };
@@ -94,12 +105,17 @@ function AppStack() {
     if (pending.userId && pending.userId !== profile.id) return;
     router.push({ pathname: '/alert', params: { level: pending.level, type: pending.type } });
   }, [notificationVersion, profile?.id, router]);
+
+  if (protectedRoute && !sessionInitialized) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#0B6A63" /></View>;
+  }
+  if (routeRedirect) return <Redirect href={routeRedirect} />;
+
   return (
     <>
-      <SessionBridge />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: SchemeColors[colorScheme].background } }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
+        <Stack.Screen name="login" options={{ gestureEnabled: false }} />
         <Stack.Screen name="terms" />
         <Stack.Screen name="change-password" />
         <Stack.Screen name="auth/reset-password" />
@@ -107,6 +123,7 @@ function AppStack() {
         <Stack.Screen name="alert" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="admin/index" />
         <Stack.Screen name="about" />
+        <Stack.Screen name="bank-hours" />
       </Stack>
       <GlobalAlertOverlay />
       <StatusBar style="auto" />
@@ -144,7 +161,7 @@ export default function RootLayout() {
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}><AppStack /></QueryClientProvider>
+        <QueryClientProvider client={queryClient}><SessionBridge /><AppStack /></QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>
   );

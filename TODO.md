@@ -101,3 +101,23 @@
 
 - [x] A APK Android inicial foi gerada no projeto Expo EAS `olhonoponto` e a pessoa usuária confirmou que a baixou; o repositório público autorizado é `olhaoponto/olhaoponto`, sem incluir segredos.
 - [ ] Nova APK corrigida: sincronizar somente o código/arte autorizado em `olhaoponto/olhaoponto`, preservar o arquivo preexistente `inicio.txt` e os projetos Expo `vivacondo` e `herois`; gerar a APK pelo perfil `preview` no ambiente `preview`, com `android.buildType=apk` e versionCode incrementado para atualização sobre a versão instalada. Entregar o link/arquivo do build corrigido e um ZIP-fonte sem `.env`, chaves, `.git`, `node_modules` ou caches.
+
+
+## 10. Melhorias solicitadas — implementação autorizada
+
+O usuário autorizou a aplicação da migração, o envio da branch de trabalho ao repositório existente e uma nova APK de teste; a migração já foi aplicada ao projeto autorizado. A publicação da branch e a build permanecem em andamento até confirmação das respectivas plataformas.
+
+- [x] **Corrigir edição de batida no Espelho.** Ao abrir o lápis, o usuário pode editar o horário da batida; ao tocar em “Salvar edição”, o sistema deve persistir a alteração e refletir o horário atualizado no Espelho, mantendo justificativa obrigatória e validações de ordem, data, horário futuro e limite diário. A ação de salvar não pode ficar inacessível atrás do teclado.
+- [x] **Manter campos visíveis com o teclado aberto.** Ao digitar senha no login ou qualquer outro campo editável, o teclado não pode cobrir o campo em edição nem os controles necessários para concluir a ação; as telas e modais com formulários devem poder rolar/ajustar-se ao teclado em Android e iPhone.
+- [x] **Bloquear acesso sem autenticação.** Voltar na tela de login, navegação do sistema ou deep link não pode abrir Hoje, Espelho, Resumo, Perfil, Administração ou qualquer outra rota protegida sem sessão Supabase válida. Sem sessão, encaminhar ao login; tratar a sessão ainda inicializando sem exibir conteúdo protegido.
+- [x] **Banco de horas total com saldo externo.** Criar uma opção acessível para visualizar saldo acumulado: saldo estimado pelo app (horas acima de 8h/dia em todo o histórico) somado a ajustes externos informados pelo usuário. Permitir registrar crédito/débito em horas e minutos com motivo, mostrar o histórico dos ajustes e calcular o saldo total sem sobrescrever o cálculo do app. Aplicar acesso somente aos dados do próprio usuário; migration `balance_adjustments` aplicada com RLS ao projeto autorizado.
+- [x] **Configuração de jornadas no Perfil.** Permitir criar/selecionar uma ou mais jornadas com nome, horário de início/fim, duração do almoço e dias da semana. Oferecer como jornada padrão inicial 08:00–18:00, com 60 minutos de almoço, de segunda a sexta. Preservar o limite pessoal e o teto rígido de 10 horas trabalhadas; a duração do intervalo não conta como tempo trabalhado.
+- [x] **Aviso antes do retorno do almoço e ao completar a jornada.** Para uma saída ao almoço às 12:00 e 60 minutos configurados, avisar cinco minutos antes das 13:00; se a saída for 12:01 ou 12:10, calcular cinco minutos antes de 13:01 ou 13:10, respectivamente. O alerta de jornada completa usa o horário final fixo da jornada escolhida (por exemplo, 18:00 para a jornada 08:00–18:00) e deve existir além do alerta de limite de horas trabalhadas.
+- [x] **Contador em paisagem somente em Hoje.** Quando o usuário girar o aparelho na rota Hoje, apresentar uma visualização ampla dedicada ao cartão “Seu Contador Hoje”, com o tempo/jornada em andamento, pausa ou encerramento; esconder os demais conteúdos e a barra de abas nessa visualização. Manter as demais telas em retrato.
+
+### Publicação da branch e build de teste
+
+- [x] Adicionar e documentar a migração local necessária para ajustes externos do banco de horas, com RLS; aplicar ao Supabase autorizado somente após consentimento explícito.
+- [x] Atualizar README e testes relevantes das regras de jornadas, notificações, banco de horas e sessão.
+- [ ] Enviar commit da branch `work/improvements-nov-2026` ao repositório GitHub existente e confirmar o ref remoto; não mesclar à `main` sem autorização separada.
+- [ ] Iniciar e acompanhar a APK Android pelo projeto Expo/EAS existente e perfil `preview`; entregar o link do build após a conclusão, sem criar projeto Expo novo.

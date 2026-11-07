@@ -7,11 +7,11 @@ Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios ho
 - Expo SDK 57 / React Native / Expo Router / TypeScript.
 - Supabase Auth, Postgres, RLS e Edge Functions; projeto existente `duqytmwhlrjqduzscgpa`.
 - Supabase client usando as variáveis `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY`; sessão nativa em SecureStore e sessão Web em localStorage.
-- `expo-notifications` para notificações locais; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho.
+- `expo-notifications` para notificações locais; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho; `expo-screen-orientation` para o contador em paisagem apenas na tela Hoje.
 - `date-fns`/`date-fns-tz`, Zustand, React Native Reanimated, SVG e charges Lottie/SVG locais.
-- `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo/Perfil, alertas, Sobre e Administração.
-- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações e exportação.
-- `utils/`: cálculo de jornada, validação e níveis de alerta.
+- `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo/Perfil, alertas, Sobre, Administração e Banco de horas.
+- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações, ajustes externos do banco e exportação.
+- `utils/`: cálculo de jornada, validação, jornadas configuráveis, saldo acumulado e níveis de alerta.
 - `components/charges/`: biblioteca local de 18 variações de charges.
 - `supabase/migrations/`: schema versionado; `supabase/functions/`: funções de conta com validação no servidor.
 
@@ -52,6 +52,8 @@ O Supabase já existente contém as tabelas `public.profiles` e `public.time_ent
 No projeto existente, o cadastro público (“Allow new users to sign up”) foi desligado no Supabase Auth. O login continua ativo; o app usa a API Supabase com a chave anon e as políticas RLS negam acesso às tabelas a visitantes anônimos. Cada pessoa autenticada acessa somente seus registros. Um administrador pode gerenciar perfis, mas não consulta batidas de outras pessoas. Mudanças na configuração do Auth feitas pelo Dashboard não são controladas por SQL migration; confira a opção após importar/recriar um projeto.
 
 Para reaplicar migrações em outra cópia Supabase, após autenticar a CLI:
+
+**A migração `20261107150000_balance_adjustments.sql` foi aplicada, com autorização explícita, ao projeto existente `duqytmwhlrjqduzscgpa` como migration remota `20261107152710`. A tabela `balance_adjustments` usa RLS e permite ao usuário ativo consultar e inserir apenas os próprios lançamentos.**
 
 ```bash
 pnpm dlx supabase login
@@ -104,7 +106,9 @@ Se a confirmação do alerta crítico chegar depois do limite, o app pede confir
 
 Se ainda não houve saída para almoço, o app mostra e agenda um aviso preventivo ao completar 4:00 horas trabalhadas; após registrar a saída para almoço, agenda o retorno segundo os minutos definidos no Perfil. Os alertas de jornada permanecem nos marcos 8:00, 9:00, 9:30, 9:45, 9:50, 9:55 e limite pessoal. As notificações são locais; Android pode exigir permissão de notificação e permissão de alarmes exatos nas configurações do sistema. A entrega exata em segundo plano depende das permissões e políticas de bateria do aparelho. O modo Expo Go serve para desenvolvimento; teste notificações/alarme exato no APK final.
 
-**Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** exporta o histórico em JSON, permite alterar preferências e solicitar a exclusão da conta. A biblioteca e os cálculos principais são locais/offline.
+**Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** exporta o histórico em JSON, permite alterar preferências, configurar jornadas semanais e solicitar a exclusão da conta. A tela **Banco de horas** soma as horas extras estimadas pelo app em todo o histórico com créditos/débitos externos acompanhados de motivo; esses lançamentos são auditáveis e protegidos por RLS. A biblioteca e os cálculos principais são locais/offline.
+
+Na jornada selecionada, o aviso de retorno do almoço é programado cinco minutos antes da saída registrada + duração do intervalo. Um aviso adicional é programado para o horário final fixo da jornada. A tela Hoje pode exibir apenas o contador em paisagem; as outras abas permanecem em retrato.
 
 ### Ajustar limite, almoço e tempos dos alertas
 

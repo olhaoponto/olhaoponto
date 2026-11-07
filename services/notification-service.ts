@@ -2,6 +2,8 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { ALERT_THRESHOLDS, LUNCH_REMINDER_MINUTES } from '../utils/alerts';
 import { calculateWorkedSeconds, formatMinutesHHMM, type TimeEntry } from '../utils/work-time';
+import { getScheduleEndAt } from '../utils/work-schedules';
+import type { WorkSchedule } from '../types/app';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -62,9 +64,9 @@ export async function cancelDayNotifications(): Promise<void> {
 /** Recalcula agenda toda vez que o usuário bate ponto ou edita um horário. */
 export async function scheduleDayNotifications(
   entries: readonly TimeEntry[],
-  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
+  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; workSchedule?: WorkSchedule; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
 ): Promise<void> {
-  const { userId, limitMinutes = 600, lunchMinutes = 60, enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, workSchedule, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
   await cancelDayNotifications();
   if (!enabled || entries.length === 0) return;
   const channelId = `work-alerts-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
@@ -87,6 +89,22 @@ export async function scheduleDayNotifications(
   const finalOut = entries.find((entry) => entry.tipo === 'saida');
   const workedSeconds = calculateWorkedSeconds(entries, now);
 
+  if (!finalOut && workSchedule) {
+    const scheduledEnd = start.data ? getScheduleEndAt(start.data, workSchedule, timeZone) : null;
+    if (scheduledEnd) {
+      const fireAt = scheduledEnd > now ? scheduledEnd : new Date(now.getTime() + 1000);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Jornada programada completa',
+          body: `Sua jornada está prevista para terminar às ${workSchedule.end_time}. Registre a saída no horário da empresa e no app.`,
+          sound: soundEnabled ? 'default' : false,
+          data: { type: 'shift-complete', level: '8h' satisfies AlertRouteLevel, user_id: userId, minutes: 0 },
+        },
+        trigger: makeTrigger(fireAt, channelId),
+      });
+    }
+  }
+
   if (!lunchOut && !finalOut && workedSeconds < LUNCH_REMINDER_MINUTES * 60) {
     const reminderAt = new Date(now.getTime() + (LUNCH_REMINDER_MINUTES * 60 - workedSeconds) * 1000);
     await Notifications.scheduleNotificationAsync({
@@ -102,18 +120,20 @@ export async function scheduleDayNotifications(
 
   if (lunchOut && !lunchIn && !finalOut) {
     const lunchAt = new Date(lunchOut.registrado_em).getTime();
-    const reminderAt = new Date(lunchAt + Math.max(0, lunchMinutes) * 60_000);
-    if (reminderAt > now) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Hora de voltar do almoço',
-          body: 'Seu intervalo terminou. Registre a volta para retomar o contador.',
-          sound: soundEnabled ? 'default' : false,
-          data: { type: 'lunch-return', level: '8h' satisfies AlertRouteLevel, user_id: userId },
-        },
-        trigger: makeTrigger(reminderAt, channelId),
-      });
-    }
+    const returnAt = lunchAt + Math.max(0, lunchMinutes) * 60_000;
+    const warningAt = returnAt - Math.max(0, lunchReturnWarningMinutes) * 60_000;
+    const reminderAt = warningAt > now.getTime() ? new Date(warningAt) : new Date(now.getTime() + 1000);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: reminderAt.getTime() < returnAt ? 'O almoço está quase no fim' : 'Hora de voltar do almoço',
+        body: reminderAt.getTime() < returnAt
+          ? `Seu intervalo termina às ${new Intl.DateTimeFormat('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' }).format(new Date(returnAt))}. Prepare-se para registrar a volta.`
+          : 'Seu intervalo previsto terminou. Registre a volta para retomar o contador.',
+        sound: soundEnabled ? 'default' : false,
+        data: { type: 'lunch-return', level: '8h' satisfies AlertRouteLevel, user_id: userId },
+      },
+      trigger: makeTrigger(reminderAt, channelId),
+    });
     return;
   }
 

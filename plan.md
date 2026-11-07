@@ -46,3 +46,21 @@ Na tela Sobre, declarar expressamente que o app acompanha apenas registros pesso
 ## Repositório e entrega
 
 O projeto Mobile Dev mantém seu repositório canônico gerenciado e não permite trocar o canônico para GitHub. Uma cópia do código está no repositório público existente `olhaoponto/olhaoponto`, publicado após confirmação explícita e preservando o arquivo preexistente; não foi criado outro repositório nem usado force-push. O projeto Expo EAS conecta somente a esse repositório, sem acesso aos projetos Expo `vivacondo` e `herois-plus-app`. O `.env` e qualquer credencial são excluídos do Git e do ZIP. A entrega inclui ZIP para VS Code, README em português, código, `.env.example` e configuração de build.
+
+
+## Melhorias solicitadas em novembro de 2026
+
+### Escopo funcional aprovado
+
+1. Corrigir a edição de batidas no Espelho para que Salvar persista e atualize a tela; garantir que campos e ações permaneçam acessíveis quando o teclado estiver aberto; e impedir qualquer rota protegida de renderizar sem sessão Supabase válida, inclusive após Voltar na tela de login.
+2. Adicionar saldo de banco de horas externo sem substituir o saldo estimado pelo aplicativo. O saldo total será a soma das horas extras calculadas pelo aplicativo em todo o histórico com lançamentos externos manuais. Cada ajuste terá sinal (crédito/débito), motivo e data; os ajustes ficarão auditáveis e sujeitos a RLS do próprio usuário. Os dados antigos permanecem intactos.
+3. Configurar no Perfil uma ou mais jornadas com nome, início, fim, duração do almoço e dias da semana, com seleção da jornada ativa. A jornada inicial padrão será 08:00–18:00, almoço de 60 minutos, de segunda a sexta; não muda o teto rígido de 10:00 trabalhadas. O alerta de conclusão usa o horário final fixo configurado para o dia selecionado, independentemente de atraso na entrada. O retorno do almoço usa o horário real da saída para almoço + duração configurada e alerta cinco minutos antes.
+4. Em Hoje, liberar orientação paisagem apenas quando essa rota estiver ativa e mostrar então uma visualização ampla dedicada ao contador ao vivo; esconder o restante da tela e a barra de abas nessa orientação. Manter as demais telas em retrato. A visualização continua mostrando jornada em andamento/pausa/encerrada e o tempo trabalhado.
+
+### Persistência e integrações
+
+As jornadas e a antecedência do aviso ficarão na coluna JSONB de preferências já existente no perfil, preservando compatibilidade com perfis atuais e sem mudar os dados de terceiros. O banco de horas externo usa a tabela versionada `balance_adjustments`, com RLS e acesso do próprio usuário. Após autorização explícita, a migração foi aplicada somente ao projeto Supabase existente `duqytmwhlrjqduzscgpa`, sem apagar nem reescrever dados existentes; o histórico remoto registra `20261107152710 / balance_adjustments`.
+
+### Limites de execução
+
+Trabalhar somente na cópia autorizada de `olhaoponto/olhaoponto`; não criar repositório, projeto Supabase nem projeto Expo. O usuário autorizou posteriormente a aplicação desta migração, o envio da branch de trabalho ao repositório existente e a criação de uma nova APK para teste. Preservar package/bundle ID, projectId EAS, scheme e credenciais existentes; nunca ler ou incluir `.env`/segredos no código ou nos artefatos.

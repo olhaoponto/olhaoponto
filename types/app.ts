@@ -1,10 +1,31 @@
 export type UserRole = 'admin' | 'user';
 export type PunchType = 'entrada' | 'saida_almoco' | 'volta_almoco' | 'saida';
 
+export interface WorkSchedule {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  lunch_minutes: number;
+  /** Weekday numbers follow JavaScript: Sunday 0 through Saturday 6. */
+  work_days: number[];
+}
+
+export interface BalanceAdjustment {
+  id: string;
+  user_id: string;
+  saldo_minutos: number;
+  motivo: string;
+  criado_em: string;
+}
+
 export interface AlertPreferences {
   enabled?: boolean;
   before_minutes?: number;
-  [key: string]: boolean | number | string | null | undefined;
+  work_schedules?: WorkSchedule[];
+  active_work_schedule_id?: string;
+  lunch_return_warning_minutes?: number;
+  [key: string]: unknown;
 }
 
 export interface Profile {

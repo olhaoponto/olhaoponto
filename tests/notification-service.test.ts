@@ -19,6 +19,7 @@ vi.mock('expo-notifications', () => ({
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 import { scheduleDayNotifications } from '../services/notification-service';
+import { DEFAULT_WORK_SCHEDULE } from '../utils/work-schedules';
 
 type ScheduledRequest = { content: { data?: { type?: string } }; trigger?: { date?: Date } };
 const at = (value: string) => new Date(value).toISOString();
@@ -55,7 +56,7 @@ describe('scheduleDayNotifications', () => {
     expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T12:00:00-03:00'));
   });
 
-  it('agenda a volta após o intervalo configurado e não agenda lembrete para iniciar almoço', async () => {
+  it('avisa cinco minutos antes do retorno calculado a partir da saída real para almoço', async () => {
     await scheduleDayNotifications([entry('entrada', '08:00'), entry('saida_almoco', '11:30')], {
       userId: 'user-1',
       lunchMinutes: 60,
@@ -64,7 +65,18 @@ describe('scheduleDayNotifications', () => {
 
     const scheduled = requests();
     const reminder = scheduled.find((request) => request.content.data?.type === 'lunch-return');
-    expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T12:30:00-03:00'));
+    expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T12:25:00-03:00'));
     expect(scheduled.some((request) => request.content.data?.type === 'lunch-start')).toBe(false);
+  });
+
+  it('agenda o aviso de jornada completa no horário final fixo mesmo que a entrada tenha sido atrasada', async () => {
+    await scheduleDayNotifications([entry('entrada', '08:10')], {
+      userId: 'user-1',
+      workSchedule: DEFAULT_WORK_SCHEDULE,
+      now: new Date('2026-11-05T17:00:00-03:00'),
+    });
+
+    const reminder = requests().find((request) => request.content.data?.type === 'shift-complete');
+    expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T18:00:00-03:00'));
   });
 });

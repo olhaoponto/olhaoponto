@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as Network from 'expo-network';
 import * as Haptics from 'expo-haptics';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -11,6 +11,7 @@ import { prepareLocalNotifications } from '@/services/notification-service';
 import { calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
 import { LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
 import type { TimeEntry } from '@/types/app';
+import { getActiveWorkSchedule, getScheduleEndAt } from '@/utils/work-schedules';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 
 const ZONE = 'America/Bahia';
@@ -40,11 +41,14 @@ export default function HomeScreen() {
   const [success, setSuccess] = useState('');
   const [celebrated, setCelebrated] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<{ granted: boolean; exactAlarms: boolean } | null>(null);
+  const { width, height } = useWindowDimensions();
+  const landscape = Platform.OS !== 'web' && width > height;
   const today = getBahiaDate(now);
   const todayEntries = useMemo(() => storeEntries.filter((entry) => entry.data === today), [storeEntries, today]);
   const nextPunch = getNextPunch(todayEntries);
   const limit = profile?.limite_minutos ?? 600;
-  const lunchMinutes = profile?.almoco_minutos ?? 60;
+  const activeSchedule = getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60);
+  const lunchMinutes = activeSchedule.lunch_minutes;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = calculateWorkedMinutes(todayEntries, now);
   const remainingMinutes = Math.max(0, limit - workedMinutes);
@@ -54,6 +58,8 @@ export default function HomeScreen() {
   const progress = Math.min(1, workedMinutes / Math.max(1, limit));
   const alertColor = ended ? colors.teal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : workedMinutes >= 540 ? colors.coral : workedMinutes >= 480 ? colors.warning : colors.teal;
   const eta = projectEndTime(todayEntries, limit, lunchMinutes);
+  const scheduledEnd = todayEntries.some((entry) => entry.tipo === 'entrada') ? getScheduleEndAt(today, activeSchedule, profile?.fuso || ZONE) : null;
+  const shiftComplete = Boolean(!ended && scheduledEnd && now >= scheduledEnd);
   const dateLabel = friendlyDate(now);
 
   const refreshDay = useCallback(async () => {
@@ -118,6 +124,22 @@ export default function HomeScreen() {
   const pendingCount = todayEntries.filter((entry) => Boolean((entry as TimeEntry & { _pending?: boolean })._pending)).length;
   const name = profile?.nome?.trim().split(/\s+/)[0] || 'por aí';
 
+  if (landscape) {
+    return (
+      <ScreenShell scroll={false} edges={[]} contentStyle={styles.landscapeShell}>
+        <View style={styles.landscapeWrap}>
+          <SurfaceCard style={[styles.landscapeTimerCard, { borderColor: `${alertColor}75` }]}>
+            <AppText variant="tiny" color={colors.muted} style={{ letterSpacing: 1.4, textTransform: 'uppercase' }}>Seu contador hoje</AppText>
+            <AppText variant="hero" style={[styles.landscapeClock, { color: alertColor }]} accessibilityLabel={`Tempo trabalhado ${elapsed(workedSeconds)}`}>{elapsed(workedSeconds)}</AppText>
+            <View style={styles.landscapeDetails}><StatusPill tone={ended ? 'teal' : lunchInProgress ? 'yellow' : shiftComplete ? 'danger' : 'teal'}>{ended ? 'FINALIZADO' : lunchInProgress ? 'PAUSADO · ALMOÇO' : shiftComplete ? 'JORNADA PREVISTA CONCLUÍDA' : 'AO VIVO'}</StatusPill><AppText variant="subtitle">{formatMinutesHHMM(workedMinutes)} trabalhadas</AppText></View>
+            <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: alertColor }]} /></View>
+            <AppText variant="small" color={colors.muted}>{ended && timeFor('saida') ? `Saída registrada às ${localTime(timeFor('saida')!.registrado_em)}` : `Jornada ${activeSchedule.start_time}–${activeSchedule.end_time} · almoço ${activeSchedule.lunch_minutes} min`}</AppText>
+          </SurfaceCard>
+        </View>
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell contentStyle={styles.page}>
       <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<View style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="subtitle" color={colors.deepTeal}>{(profile?.nome || 'OP').split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></View>} />
@@ -132,6 +154,7 @@ export default function HomeScreen() {
         <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: alertColor }]} /></View>
         <View style={styles.etaRow}><MaterialCommunityIcons name="flag-checkered" size={18} color={colors.deepTeal} /><AppText variant="small" style={{ flex: 1 }}>{ended ? 'Saída registrada' : 'Horário-limite de saída projetado'}</AppText><AppText variant="subtitle" color={colors.deepTeal}>{ended && timeFor('saida') ? localTime(timeFor('saida')!.registrado_em) : projectedLabel}</AppText></View>
         {workedMinutes >= 480 && workedMinutes < 570 ? <View style={[styles.alertBanner, { backgroundColor: workedMinutes >= 540 ? `${colors.coral}20` : `${colors.warning}2B` }]}><MaterialCommunityIcons name={workedMinutes >= 540 ? 'alert-circle-outline' : 'check-circle-outline'} size={21} color={workedMinutes >= 540 ? colors.error : colors.deepTeal} /><AppText variant="small" style={{ flex: 1, fontWeight: '600' }}>{workedMinutes >= 540 ? 'Você já está em hora extra. Planeje sua saída.' : 'Jornada normal completa. A partir daqui é hora extra!'}</AppText></View> : null}
+        {shiftComplete ? <View style={[styles.alertBanner, { backgroundColor: `${colors.coral}20` }]}><MaterialCommunityIcons name="calendar-check-outline" size={21} color={colors.error} /><AppText variant="small" style={{ flex: 1, fontWeight: '700' }}>Sua jornada programada terminou às {activeSchedule.end_time}. Registre a saída no relógio da empresa e no aplicativo.</AppText></View> : null}
       </SurfaceCard>
 
       {workedMinutes >= LUNCH_REMINDER_MINUTES && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou 4 horas. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
@@ -160,6 +183,11 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   page: { gap: 18, paddingTop: 18 },
+  landscapeShell: { justifyContent: 'center', paddingHorizontal: 22, paddingVertical: 8 },
+  landscapeWrap: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  landscapeTimerCard: { width: '100%', maxWidth: 860, alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14, gap: 8 },
+  landscapeClock: { fontSize: 70, lineHeight: 82, fontVariant: ['tabular-nums'], letterSpacing: -1.8, textAlign: 'center', marginVertical: -4 },
+  landscapeDetails: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   offlineBanner: { paddingHorizontal: 13, paddingVertical: 11, borderRadius: 17, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   timerCard: { padding: 20, gap: 17 },

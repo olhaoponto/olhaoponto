@@ -91,6 +91,7 @@ export default function ResumoScreen() {
         <SurfaceCard style={styles.metricCard}><MaterialCommunityIcons name="chart-line" size={22} color={colors.coral} /><AppText variant="tiny" color={colors.muted}>Média por dia registrado</AppText><AppText variant="title" color={colors.foreground}>{formatMinutesHHMM(average)}</AppText><AppText variant="tiny" color={colors.muted}>dias sem batida não entram na média</AppText></SurfaceCard>
         <SurfaceCard style={styles.metricCard}><MaterialCommunityIcons name="wallet-outline" size={22} color={colors.deepTeal} /><AppText variant="tiny" color={colors.muted}>Banco estimado</AppText><AppText variant="title" color={colors.deepTeal}>{formatMinutesHHMM(totals.overtimeMinutes)}</AppText><AppText variant="tiny" color={colors.muted}>extras acima de 8h no dia</AppText></SurfaceCard>
       </View>
+      <ActionButton title="Ver banco de horas acumulado" variant="outline" onPress={() => router.push('/bank-hours')} icon={<MaterialCommunityIcons name="wallet-plus-outline" size={20} color={colors.deepTeal} />} />
       <SurfaceCard style={{ gap: 18 }}>
         <View style={{ gap: 4 }}><AppText variant="subtitle">Últimos 7 dias</AppText><AppText variant="small" color={colors.muted}>Horas registradas em cada dia.</AppText></View>
         {weekly.length ? <View style={styles.chart}>
