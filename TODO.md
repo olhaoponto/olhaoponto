@@ -105,7 +105,7 @@
 
 ## 10. Melhorias solicitadas — implementação autorizada
 
-O usuário autorizou a aplicação da migração, o envio da branch de trabalho ao repositório existente e uma nova APK de teste; a migração já foi aplicada ao projeto autorizado. A publicação da branch e a build permanecem em andamento até confirmação das respectivas plataformas.
+O usuário autorizou a aplicação da migração, o envio da branch de trabalho ao repositório existente e uma nova APK de teste. A migração remota e o push da branch estão concluídos; a APK permanece pendente porque My Browser ainda reporta o conector desabilitado nesta sessão, inclusive após duas tentativas de retomada.
 
 - [x] **Corrigir edição de batida no Espelho.** Ao abrir o lápis, o usuário pode editar o horário da batida; ao tocar em “Salvar edição”, o sistema deve persistir a alteração e refletir o horário atualizado no Espelho, mantendo justificativa obrigatória e validações de ordem, data, horário futuro e limite diário. A ação de salvar não pode ficar inacessível atrás do teclado.
 - [x] **Manter campos visíveis com o teclado aberto.** Ao digitar senha no login ou qualquer outro campo editável, o teclado não pode cobrir o campo em edição nem os controles necessários para concluir a ação; as telas e modais com formulários devem poder rolar/ajustar-se ao teclado em Android e iPhone.
@@ -119,5 +119,5 @@ O usuário autorizou a aplicação da migração, o envio da branch de trabalho 
 
 - [x] Adicionar e documentar a migração local necessária para ajustes externos do banco de horas, com RLS; aplicar ao Supabase autorizado somente após consentimento explícito.
 - [x] Atualizar README e testes relevantes das regras de jornadas, notificações, banco de horas e sessão.
-- [ ] Enviar commit da branch `work/improvements-nov-2026` ao repositório GitHub existente e confirmar o ref remoto; não mesclar à `main` sem autorização separada.
-- [ ] Iniciar e acompanhar a APK Android pelo projeto Expo/EAS existente e perfil `preview`; entregar o link do build após a conclusão, sem criar projeto Expo novo.
+- [x] Enviar o commit `f3fc571` da branch `work/improvements-nov-2026` ao repositório GitHub existente e confirmar o ref remoto; não mesclar à `main` sem autorização separada.
+- [ ] Iniciar e acompanhar a APK Android pelo projeto Expo/EAS existente e perfil `preview`; entregar o link do build após a conclusão, sem criar projeto Expo novo. Pendente: habilitação efetiva do conector My Browser para acessar o Expo.dev autenticado.
