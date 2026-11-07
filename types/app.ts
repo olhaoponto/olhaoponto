@@ -1,5 +1,13 @@
 export type UserRole = 'admin' | 'user';
 export type PunchType = 'entrada' | 'saida_almoco' | 'volta_almoco' | 'saida';
+export type Workday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type DayStatus = 'working' | 'rest' | 'absence' | 'medical_leave';
+
+export interface WorkScheduleDayOverride {
+  start_time?: string;
+  end_time?: string;
+  lunch_minutes?: number;
+}
 
 export interface WorkSchedule {
   id: string;
@@ -9,6 +17,16 @@ export interface WorkSchedule {
   lunch_minutes: number;
   /** Weekday numbers follow JavaScript: Sunday 0 through Saturday 6. */
   work_days: number[];
+  /** Hours inside this same schedule can differ on a particular weekday. */
+  day_overrides?: Partial<Record<Workday, WorkScheduleDayOverride>>;
+}
+
+export interface DayStatusRecord {
+  user_id: string;
+  data: string;
+  status: DayStatus;
+  atualizado_em: string;
+  _pending?: boolean;
 }
 
 export interface BalanceAdjustment {
@@ -26,6 +44,7 @@ export interface AlertPreferences {
   active_work_schedule_id?: string;
   lunch_return_warning_minutes?: number;
   rotacao_contador?: boolean;
+  horario_almoco_previsto?: string;
   [key: string]: unknown;
 }
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { adminCreateUser, adminResetPassword, adminSetUserStatus, listProfiles } from '@/services/auth-service';
 import { useAppStore } from '@/store/app-store';
 import type { Profile } from '@/types/app';
@@ -10,7 +10,6 @@ import type { Profile } from '@/types/app';
 const isStrong = (value: string) => value.length >= 12 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
 
 export default function AdminScreen() {
-  const router = useRouter();
   const colors = useAppColors();
   const current = useAppStore((state) => state.profile);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -81,11 +80,12 @@ export default function AdminScreen() {
   };
 
   if (!current || current.role !== 'admin' || !current.ativo) {
-    return <ScreenShell><AppText variant="title">Acesso restrito</AppText><AppText variant="body" color={colors.muted}>Somente administradores ativos podem gerenciar contas.</AppText><ActionButton title="Voltar" onPress={() => router.replace('/(tabs)')} /></ScreenShell>;
+    return <ScreenShell contentStyle={styles.page}><TabNavigationCard /><AppText variant="title">Acesso restrito</AppText><AppText variant="body" color={colors.muted}>Somente administradores ativos podem gerenciar contas.</AppText></ScreenShell>;
   }
 
   return (
     <ScreenShell contentStyle={styles.page}>
+      <TabNavigationCard />
       <PageHeading eyebrow="Acesso administrativo" title="Contas de usuários" subtitle="Gerencie apenas identidade e acesso — nunca as batidas." right={<MaterialCommunityIcons name="account-cog-outline" size={28} color={colors.deepTeal} />} />
       <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>A administração pode ver nomes, e-mails e status das contas, mas não pode consultar os registros de ponto de outras pessoas. Cada usuário recebe uma senha provisória e deve trocá-la ao entrar.</AppText></SurfaceCard>
       {success ? <AppText variant="small" color={colors.deepTeal}>{success}</AppText> : null}
@@ -108,7 +108,6 @@ export default function AdminScreen() {
         <View style={{ flex: 1, gap: 4 }}><View style={styles.userName}><AppText variant="subtitle" style={{ flex: 1 }}>{item.nome}</AppText><StatusPill tone={item.ativo ? 'teal' : 'danger'}>{item.ativo ? 'ATIVO' : 'INATIVO'}</StatusPill></View><AppText variant="small" color={colors.muted}>{item.email}</AppText><AppText variant="tiny" color={colors.muted}>{item.role === 'admin' ? 'Administrador' : 'Usuário'}{item.senha_provisoria ? ' · troca de senha pendente' : ''}</AppText></View>
         <View style={styles.actions}><Pressable onPress={() => { setError(''); setResetTarget(item); }} accessibilityRole="button" accessibilityLabel={`Redefinir senha de ${item.nome}`} style={[styles.iconButton, { backgroundColor: `${colors.teal}20` }]}><MaterialCommunityIcons name="key-change" size={19} color={colors.deepTeal} /></Pressable>{item.id !== current.id ? <Pressable onPress={() => { setError(''); setStatusTarget(item); }} accessibilityRole="button" accessibilityLabel={item.ativo ? `Desativar ${item.nome}` : `Ativar ${item.nome}`} style={[styles.iconButton, { backgroundColor: item.ativo ? `${colors.error}18` : `${colors.teal}20` }]}><MaterialCommunityIcons name={item.ativo ? 'account-cancel-outline' : 'account-check-outline'} size={19} color={item.ativo ? colors.error : colors.deepTeal} /></Pressable> : null}</View>
       </SurfaceCard>)}
-      <ActionButton title="Voltar ao aplicativo" variant="outline" onPress={() => router.replace('/(tabs)')} />
 
       <Modal visible={Boolean(resetTarget)} transparent animationType="fade" onRequestClose={() => setResetTarget(null)}><View style={styles.backdrop}><SurfaceCard style={styles.modalCard}><AppText variant="subtitle">Redefinir senha</AppText><AppText variant="small" color={colors.muted}>{resetTarget?.nome} terá que criar uma senha pessoal no próximo login.</AppText><TextField label="Nova senha provisória" value={resetPassword} onChangeText={setResetPassword} secureTextEntry autoCapitalize="none" autoComplete="new-password" /><AppText variant="tiny" color={colors.muted}>Mínimo de 12 caracteres, com maiúscula, minúscula, número e símbolo.</AppText>{error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}<ActionButton title="Redefinir senha" onPress={resetUserPassword} loading={busy} disabled={!resetPassword} /><ActionButton title="Cancelar" variant="outline" onPress={() => setResetTarget(null)} /></SurfaceCard></View></Modal>
       <Modal visible={Boolean(statusTarget)} transparent animationType="fade" onRequestClose={() => setStatusTarget(null)}><View style={styles.backdrop}><SurfaceCard style={styles.modalCard}><AppText variant="subtitle">{statusTarget?.ativo ? 'Desativar conta?' : 'Ativar conta?'}</AppText><AppText variant="body" color={colors.muted}>{statusTarget?.ativo ? 'A pessoa perderá acesso ao aplicativo.' : 'A pessoa poderá voltar a entrar com sua conta.'}</AppText>{error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}<ActionButton title={statusTarget?.ativo ? 'Confirmar desativação' : 'Confirmar ativação'} variant={statusTarget?.ativo ? 'danger' : 'primary'} onPress={setUserStatus} loading={busy} /><ActionButton title="Cancelar" variant="outline" onPress={() => setStatusTarget(null)} /></SurfaceCard></View></Modal>

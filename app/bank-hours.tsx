@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActionButton, AppText, BackNavigationButton, PageHeading, ScreenShell, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
 import { addBalanceAdjustment, loadBalanceAdjustments } from '@/services/bank-hours-service';
 import { loadAllEntries } from '@/services/time-entry-service';
@@ -119,7 +120,7 @@ export default function BankHoursScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <BackNavigationButton label="Voltar ao resumo" onPress={() => router.replace('/(tabs)/resumo')} />
+      <TabNavigationCard active="resumo" />
       <PageHeading eyebrow="Saldo pessoal" title="Banco de horas" subtitle="Saldo estimado pelo app somado aos ajustes informados por você." right={<MaterialCommunityIcons name="wallet-plus-outline" size={27} color={colors.deepTeal} />} />
       <ActionButton title={formOpen ? 'Fechar lançamento' : 'Adicionar saldo existente'} onPress={() => { setFormOpen((open) => !open); setError(''); }} icon={<MaterialCommunityIcons name={formOpen ? 'close' : 'plus'} size={21} color="#FFFFFF" />} />
       {loading ? <View style={styles.loading}><ActivityIndicator color={colors.deepTeal} /><AppText variant="small" color={colors.muted}>Conferindo seu histórico…</AppText></View> : null}
@@ -151,7 +152,6 @@ export default function BankHoursScreen() {
         <AppText variant="subtitle">Histórico de ajustes externos</AppText>
         {!adjustments.length ? <AppText variant="small" color={colors.muted}>Ainda não há ajustes externos registrados.</AppText> : adjustments.map((adjustment) => <View key={adjustment.id} style={[styles.adjustmentRow, { borderBottomColor: colors.border }]}><View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '600' }}>{adjustment.motivo}</AppText><AppText variant="tiny" color={colors.muted}>{labelDate(adjustment.criado_em)}</AppText></View><AppText variant="subtitle" color={adjustment.saldo_minutos >= 0 ? colors.deepTeal : colors.error}>{signedTime(adjustment.saldo_minutos)}</AppText></View>)}
       </SurfaceCard>
-      <ActionButton title="Voltar ao resumo" variant="outline" onPress={() => router.replace('/(tabs)/resumo')} />
     </ScreenShell>
   );
 }

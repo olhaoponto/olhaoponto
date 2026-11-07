@@ -8,6 +8,9 @@ import { useAppStore } from '@/store/app-store';
 import { calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, safeClockOutTimestamp, validatePunch } from '@/utils/work-time';
 import { getCurrentAlert } from '@/utils/alerts';
 import { getWorkScheduleForDate } from '@/utils/work-schedules';
+import { getCivilWeekday } from '@/utils/day-status';
+import { loadDayStatuses } from '@/services/day-status-service';
+import type { DayStatusRecord } from '@/types/app';
 import { chooseCharge, ChargeIllustration, type AlertLevel, type Charge } from '@/components/charges';
 import { insertTimeEntry } from '@/services/time-entry-service';
 import { scheduleDayNotifications } from '@/services/notification-service';
@@ -51,6 +54,7 @@ export default function GlobalAlertOverlay() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [pendingTime, setPendingTime] = useState('');
+  const [dayStatus, setDayStatus] = useState<DayStatusRecord | null>(null);
   const [confirmCappedExit, setConfirmCappedExit] = useState(false);
   const pulse = useSharedValue(0);
   const lastKey = useRef('');
@@ -59,7 +63,13 @@ export default function GlobalAlertOverlay() {
   const todayEntries = useMemo(() => entries.filter((entry) => entry.data === today), [entries, today]);
   const completed = todayEntries.some((entry) => entry.tipo === 'saida');
   const limit = profile?.limite_minutos ?? 600;
-  const activeSchedule = useMemo(() => getWorkScheduleForDate(profile?.preferencias_alerta, today, profile?.almoco_minutos ?? 60), [profile?.preferencias_alerta, profile?.almoco_minutos, today]);
+  const activeSchedule = useMemo(() => {
+    const schedule = getWorkScheduleForDate(profile?.preferencias_alerta, today, profile?.almoco_minutos ?? 60);
+    const weekday = getCivilWeekday(today);
+    return dayStatus?.status === 'working' && weekday >= 0 && !schedule.work_days.includes(weekday)
+      ? { ...schedule, work_days: [...schedule.work_days, weekday] }
+      : schedule;
+  }, [profile?.preferencias_alerta, profile?.almoco_minutos, today, dayStatus]);
   const lunchMinutes = activeSchedule.lunch_minutes;
   const lunchReturnWarningMinutes = typeof profile?.preferencias_alerta?.lunch_return_warning_minutes === 'number' ? profile.preferencias_alerta.lunch_return_warning_minutes : 5;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
@@ -77,6 +87,15 @@ export default function GlobalAlertOverlay() {
     const listener = AppState.addEventListener('change', () => setNow(new Date()));
     return () => { clearInterval(timer); listener.remove(); };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!session?.user.id) { void Promise.resolve().then(() => { if (active) setDayStatus(null); }); return () => { active = false; }; }
+    void loadDayStatuses(today, today).then((result) => {
+      if (active) setDayStatus(result.data?.[0] ?? null);
+    });
+    return () => { active = false; };
+  }, [session?.user.id, today, todayEntries.length]);
 
   useEffect(() => {
     if (!session || !profile) return;

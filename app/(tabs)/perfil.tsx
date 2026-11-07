@@ -4,13 +4,14 @@ import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActionButton, AppText, BackNavigationButton, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { changePassword, deleteAccount, logout, updateEmail, updateProfile } from '@/services/auth-service';
 import { exportJson } from '@/services/export-service';
 import { loadAllEntries, syncPendingEntries } from '@/services/time-entry-service';
 import { useAppStore } from '@/store/app-store';
 import { useThemeContext } from '@/lib/theme-provider';
-import type { AlertPreferences, WorkSchedule } from '@/types/app';
+import type { AlertPreferences, WorkSchedule, WorkScheduleDayOverride, Workday } from '@/types/app';
 import { DEFAULT_WORK_SCHEDULE, getActiveWorkSchedule, getExpectedWorkMinutes, getWorkSchedules, validateWorkSchedule } from '@/utils/work-schedules';
 
 const isStrong = (value: string) => value.length >= 12 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
@@ -37,6 +38,7 @@ export default function PerfilScreen() {
   const [scheduleModal, setScheduleModal] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
   const [draftSchedule, setDraftSchedule] = useState<WorkSchedule>({ ...DEFAULT_WORK_SCHEDULE, id: 'schedule-draft' });
+  const [plannedLunchTime, setPlannedLunchTime] = useState('12:00');
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
   const schedules = getWorkSchedules(prefs, profile?.almoco_minutos ?? 60);
   const activeSchedule = getActiveWorkSchedule(prefs, profile?.almoco_minutos ?? 60);
@@ -44,10 +46,13 @@ export default function PerfilScreen() {
   const profileId = profile?.id;
   const profileName = profile?.nome || '';
   const profileEmail = profile?.email || '';
+  const savedLunchTime = typeof prefs.horario_almoco_previsto === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(prefs.horario_almoco_previsto) ? prefs.horario_almoco_previsto : '12:00';
 
   // Draft fields follow profile changes from Auth; user edits remain local until Save.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setName(profileName); setEmail(profileEmail); }, [profileId, profileName, profileEmail]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setPlannedLunchTime(savedLunchTime); }, [profileId, savedLunchTime]);
   useEffect(() => { if (profileId) void AsyncStorage.getItem(`olhaponto:${profileId}:biometric`).then((value) => setBiometricEnabled(value === 'true')).catch(() => setBiometricEnabled(false)); }, [profileId]);
 
   const savePreferences = async (patch: Partial<AlertPreferences>, columns: Record<string, number> = {}) => {
@@ -84,13 +89,26 @@ export default function PerfilScreen() {
   };
 
   const saveActiveLunchMinutes = async (value: number) => {
-    const nextSchedules = schedules.map((schedule) => schedule.id === activeSchedule.id ? { ...schedule, lunch_minutes: value } : schedule);
+    const nextSchedules = schedules.map((schedule) => {
+      if (schedule.id !== activeSchedule.id) return schedule;
+      const friday = schedule.day_overrides?.[5];
+      const day_overrides = friday && friday.lunch_minutes === schedule.lunch_minutes
+        ? { ...schedule.day_overrides, 5: { ...friday, lunch_minutes: value } }
+        : schedule.day_overrides;
+      return { ...schedule, lunch_minutes: value, day_overrides };
+    });
     await savePreferences({ work_schedules: nextSchedules }, { almoco_minutos: value });
   };
 
+  const savePlannedLunchTime = async () => {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedLunchTime)) { setError('Informe o horário previsto do almoço no formato HH:mm.'); return; }
+    await savePreferences({ horario_almoco_previsto: plannedLunchTime });
+  };
+
   const openScheduleEditor = (schedule?: WorkSchedule) => {
-    setDraftSchedule(schedule ? { ...schedule, work_days: [...schedule.work_days] } : {
+    setDraftSchedule(schedule ? { ...schedule, work_days: [...schedule.work_days], day_overrides: schedule.day_overrides ? { ...schedule.day_overrides } : undefined } : {
       ...DEFAULT_WORK_SCHEDULE,
+      day_overrides: undefined,
       id: `schedule-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: `Jornada ${schedules.length + 1}`,
       lunch_minutes: profile?.almoco_minutos ?? 60,
@@ -189,7 +207,7 @@ export default function PerfilScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <BackNavigationButton label="Voltar ao Hoje" onPress={() => router.replace('/(tabs)/index')} />
+      <TabNavigationCard active="perfil" />
       <PageHeading eyebrow="Suas preferências" title="Perfil" subtitle="Conta e controles pessoais." right={<View style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="title" color={colors.deepTeal}>{profile.nome.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></View>} />
       <SurfaceCard style={styles.identityCard}><View style={{ flex: 1, gap: 4 }}><AppText variant="subtitle">{profile.nome}</AppText><AppText variant="small" color={colors.muted}>{profile.email}</AppText></View><StatusPill tone={profile.role === 'admin' ? 'yellow' : 'teal'}>{roleLabel.toUpperCase()}</StatusPill></SurfaceCard>
       {message ? <AppText variant="small" color={colors.deepTeal}>{message}</AppText> : null}
@@ -211,6 +229,8 @@ export default function PerfilScreen() {
         <AppText variant="small" color={colors.muted}>Duração prevista do almoço</AppText>
         <View style={styles.choices}>{[30, 45, 60, 90].map((value) => <Pressable key={value} onPress={() => saveActiveLunchMinutes(value)} accessibilityRole="button" accessibilityState={{ selected: activeSchedule.lunch_minutes === value }} style={[styles.choice, { borderColor: activeSchedule.lunch_minutes === value ? colors.deepTeal : colors.border, backgroundColor: activeSchedule.lunch_minutes === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={activeSchedule.lunch_minutes === value ? colors.deepTeal : colors.foreground}>{value} min</AppText></Pressable>)}</View>
         <AppText variant="tiny" color={colors.muted}>O almoço selecionado na jornada ativa é usado para projetar a saída e calcular o aviso de retorno; o intervalo real não conta como hora trabalhada.</AppText>
+        <TextField label="Horário previsto para sair ao almoço (HH:mm)" value={plannedLunchTime} onChangeText={setPlannedLunchTime} keyboardType="numbers-and-punctuation" maxLength={5} placeholder="12:00" />
+        <ActionButton title="Salvar horário previsto" variant="outline" onPress={savePlannedLunchTime} loading={saving} />
       </SurfaceCard>
 
       <SurfaceCard style={{ gap: 12 }}>
@@ -222,7 +242,8 @@ export default function PerfilScreen() {
           return <View key={schedule.id} style={[styles.scheduleRow, { borderColor: selected ? colors.deepTeal : colors.border, backgroundColor: selected ? `${colors.teal}12` : colors.input }]}>
             <Pressable style={{ flex: 1, gap: 4 }} onPress={() => void selectSchedule(schedule)} accessibilityRole="button" accessibilityState={{ selected }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><AppText variant="small" style={{ fontWeight: '700' }}>{schedule.name}</AppText>{selected ? <StatusPill tone="teal">ATIVA</StatusPill> : null}</View>
-              <AppText variant="small" color={colors.muted}>{schedule.start_time}–{schedule.end_time} · {schedule.lunch_minutes} min almoço · {formatLimit(getExpectedWorkMinutes(schedule))} líquidas</AppText>
+              <AppText variant="small" color={colors.muted}>{scheduleDescription(schedule)}</AppText>
+              <AppText variant="tiny" color={colors.muted}>{scheduleDurationDescription(schedule)}</AppText>
               <AppText variant="tiny" color={colors.muted}>{days}</AppText>
             </Pressable>
             <Pressable onPress={() => openScheduleEditor(schedule)} accessibilityRole="button" accessibilityLabel={`Editar ${schedule.name}`} style={styles.editSchedule}><MaterialCommunityIcons name="pencil-outline" size={18} color={colors.deepTeal} /></Pressable>
@@ -274,8 +295,20 @@ export default function PerfilScreen() {
           <AppText variant="small" color={colors.muted}>Dias de trabalho</AppText>
           <View style={styles.choices}>{['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((label, day) => {
             const selected = draftSchedule.work_days.includes(day);
-            return <Pressable key={day} onPress={() => setDraftSchedule((current) => ({ ...current, work_days: selected ? current.work_days.filter((value) => value !== day) : [...current.work_days, day].sort((a, b) => a - b) }))} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.choice, { borderColor: selected ? colors.deepTeal : colors.border, backgroundColor: selected ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={selected ? colors.deepTeal : colors.foreground}>{label}</AppText></Pressable>;
+            return <Pressable key={day} onPress={() => setDraftSchedule((current) => toggleWorkDay(current, day))} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.choice, { borderColor: selected ? colors.deepTeal : colors.border, backgroundColor: selected ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={selected ? colors.deepTeal : colors.foreground}>{label}</AppText></Pressable>;
           })}</View>
+          {draftSchedule.work_days.includes(5) ? <View style={{ gap: 9, paddingTop: 4 }}>
+            <PreferenceSwitch label="Horário diferente na sexta-feira" value={Boolean(draftSchedule.day_overrides?.[5])} onChange={(enabled) => setDraftSchedule((current) => toggleFridayOverride(current, enabled))} />
+            {draftSchedule.day_overrides?.[5] ? <>
+              <AppText variant="tiny" color={colors.muted}>A sexta continua dentro desta mesma jornada ativa.</AppText>
+              <View style={styles.timeFields}>
+                <TextField label="Início de sexta" value={draftSchedule.day_overrides[5].start_time ?? draftSchedule.start_time} onChangeText={(value) => setDraftSchedule((current) => updateFridayOverride(current, 'start_time', value))} keyboardType="numbers-and-punctuation" maxLength={5} />
+                <TextField label="Fim de sexta" value={draftSchedule.day_overrides[5].end_time ?? draftSchedule.end_time} onChangeText={(value) => setDraftSchedule((current) => updateFridayOverride(current, 'end_time', value))} keyboardType="numbers-and-punctuation" maxLength={5} />
+              </View>
+              <AppText variant="tiny" color={colors.muted}>Almoço na sexta-feira</AppText>
+              <View style={styles.choices}>{[30, 45, 60, 90, 120].map((value) => <Pressable key={value} onPress={() => setDraftSchedule((current) => updateFridayOverride(current, 'lunch_minutes', value))} accessibilityRole="button" accessibilityState={{ selected: (draftSchedule.day_overrides?.[5]?.lunch_minutes ?? draftSchedule.lunch_minutes) === value }} style={[styles.choice, { borderColor: (draftSchedule.day_overrides?.[5]?.lunch_minutes ?? draftSchedule.lunch_minutes) === value ? colors.deepTeal : colors.border, backgroundColor: (draftSchedule.day_overrides?.[5]?.lunch_minutes ?? draftSchedule.lunch_minutes) === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small">{value} min</AppText></Pressable>)}</View>
+            </> : null}
+          </View> : null}
           {scheduleError ? <AppText variant="small" color={colors.error}>{scheduleError}</AppText> : null}
           <ActionButton title="Salvar jornada" onPress={saveSchedule} loading={saving} />
           <ActionButton title="Cancelar" variant="outline" onPress={() => setScheduleModal(false)} />
@@ -289,6 +322,44 @@ export default function PerfilScreen() {
 }
 
 function formatLimit(minutes: number) { return `${Math.floor(minutes / 60)}h${minutes % 60 ? String(minutes % 60).padStart(2, '0') : ''}`; }
+const weekdayLabels: Record<number, string> = { 0: 'Dom', 1: 'Seg', 2: 'Ter', 3: 'Qua', 4: 'Qui', 5: 'Sex', 6: 'Sáb' };
+function formatWorkDays(days: number[]) {
+  const ordered = [...days].sort((a, b) => a - b);
+  if (ordered.length >= 3 && ordered.every((day, index) => index === 0 || day === ordered[index - 1] + 1)) return `${weekdayLabels[ordered[0]]}–${weekdayLabels[ordered[ordered.length - 1]]}`;
+  return ordered.map((day) => weekdayLabels[day]).join(', ');
+}
+function scheduleDescription(schedule: WorkSchedule) {
+  const friday = schedule.day_overrides?.[5];
+  const otherDays = schedule.work_days.filter((day) => day !== 5);
+  const sections = otherDays.length ? [`${formatWorkDays(otherDays)} ${schedule.start_time}–${schedule.end_time}`] : [];
+  if (schedule.work_days.includes(5)) sections.push(`Sex ${friday?.start_time ?? schedule.start_time}–${friday?.end_time ?? schedule.end_time}`);
+  const fridayLunch = friday?.lunch_minutes ?? schedule.lunch_minutes;
+  const lunch = friday && fridayLunch !== schedule.lunch_minutes ? `${schedule.lunch_minutes} min almoço nos outros dias · ${fridayLunch} min sexta` : `${schedule.lunch_minutes} min almoço`;
+  return `${sections.join(' · ')} · ${lunch}`;
+}
+function scheduleDurationDescription(schedule: WorkSchedule) {
+  const friday = schedule.day_overrides?.[5];
+  if (!friday || !schedule.work_days.includes(5)) return `${formatLimit(getExpectedWorkMinutes(schedule))} líquidas`;
+  const base = { ...schedule, day_overrides: undefined };
+  const fridaySchedule = { ...schedule, ...friday, day_overrides: undefined };
+  return `${formatLimit(getExpectedWorkMinutes(base))} nos demais dias · ${formatLimit(getExpectedWorkMinutes(fridaySchedule))} na sexta`;
+}
+function toggleWorkDay(schedule: WorkSchedule, day: number): WorkSchedule {
+  const selected = schedule.work_days.includes(day);
+  const work_days = selected ? schedule.work_days.filter((value) => value !== day) : [...schedule.work_days, day].sort((a, b) => a - b);
+  const day_overrides = { ...schedule.day_overrides };
+  if (selected) delete day_overrides[day as Workday];
+  return { ...schedule, work_days, day_overrides: Object.keys(day_overrides).length ? day_overrides : undefined };
+}
+function toggleFridayOverride(schedule: WorkSchedule, enabled: boolean): WorkSchedule {
+  if (!enabled) { const day_overrides = { ...schedule.day_overrides }; delete day_overrides[5]; return { ...schedule, day_overrides: Object.keys(day_overrides).length ? day_overrides : undefined }; }
+  const end = schedule.end_time <= '17:00' ? schedule.end_time : '17:00';
+  return { ...schedule, day_overrides: { ...schedule.day_overrides, 5: { start_time: schedule.start_time, end_time: end, lunch_minutes: schedule.lunch_minutes } } };
+}
+function updateFridayOverride(schedule: WorkSchedule, field: keyof WorkScheduleDayOverride, value: string | number): WorkSchedule {
+  const current = schedule.day_overrides?.[5] ?? { start_time: schedule.start_time, end_time: '17:00', lunch_minutes: schedule.lunch_minutes };
+  return { ...schedule, day_overrides: { ...schedule.day_overrides, 5: { ...current, [field]: value } } };
+}
 function PreferenceSwitch({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void | Promise<void> }) {
   const colors = useAppColors();
   return <View style={styles.switchRow}><AppText variant="small" style={{ flex: 1 }}>{label}</AppText><Switch value={value} onValueChange={onChange} trackColor={{ false: colors.border, true: colors.teal }} thumbColor={value ? colors.deepTeal : '#F2F5F3'} accessibilityRole="switch" accessibilityState={{ checked: value }} /></View>;

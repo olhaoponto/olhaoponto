@@ -2,15 +2,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppText, useAppColors } from '@/components/ui';
+import { APP_TAB_ROUTES, type AppTabKey } from '@/utils/app-routes';
 
-const items = [
-  { key: 'index', label: 'HOJE', icon: 'clock-time-four-outline' as const },
-  { key: 'espelho', label: 'ESPELHO', icon: 'calendar-month-outline' as const },
-  { key: 'resumo', label: 'RESUMO', icon: 'chart-box-outline' as const },
-  { key: 'perfil', label: 'PERFIL', icon: 'account-circle-outline' as const },
-] as const;
+const items: { key: AppTabKey; label: string; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }[] = [
+  { key: 'index', label: 'HOJE', icon: 'clock-time-four-outline' },
+  { key: 'espelho', label: 'ESPELHO', icon: 'calendar-month-outline' },
+  { key: 'resumo', label: 'RESUMO', icon: 'chart-box-outline' },
+  { key: 'perfil', label: 'PERFIL', icon: 'account-circle-outline' },
+];
 
-export function TabNavigationCard({ active = 'index' }: { active?: (typeof items)[number]['key'] }) {
+export function TabNavigationCard({ active = 'index' }: { active?: AppTabKey }) {
   const colors = useAppColors();
   const router = useRouter();
   return (
@@ -20,7 +21,7 @@ export function TabNavigationCard({ active = 'index' }: { active?: (typeof items
         return (
           <Pressable
             key={item.key}
-            onPress={() => router.replace(`/(tabs)/${item.key}` as never)}
+            onPress={() => router.replace(APP_TAB_ROUTES[item.key])}
             accessibilityRole="tab"
             accessibilityLabel={item.label}
             accessibilityState={{ selected }}

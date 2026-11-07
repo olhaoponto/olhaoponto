@@ -1,12 +1,14 @@
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
 
 export default function AboutScreen() {
   const colors = useAppColors();
   const router = useRouter();
   return (
     <ScreenShell contentStyle={{ gap: 16, paddingTop: 20 }}>
+      <TabNavigationCard />
       <PageHeading eyebrow="Olha o Ponto" title="Sobre o aplicativo" subtitle="Acompanhe seus próprios horários com clareza." right={<MaterialCommunityIcons name="clock-time-four-outline" size={28} color={colors.deepTeal} />} />
       <SurfaceCard>
         <AppText variant="subtitle">Finalidade</AppText>

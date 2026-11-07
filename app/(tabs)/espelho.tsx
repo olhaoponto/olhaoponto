@@ -4,7 +4,8 @@ import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { getDaysInMonth, subMonths, addMonths } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActionButton, AppText, BackNavigationButton, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
 import { deleteTimeEntry, insertTimeEntry, loadEntriesByMonth, updateTimeEntry } from '@/services/time-entry-service';
 import { exportCsv, exportPdf } from '@/services/export-service';
@@ -158,7 +159,7 @@ export default function EspelhoScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <BackNavigationButton label="Voltar ao Hoje" onPress={() => router.replace('/(tabs)/index')} />
+      <TabNavigationCard active="espelho" />
       <PageHeading eyebrow="Seu histórico pessoal" title="Espelho de ponto" subtitle="Horários que você registrou no app." right={<MaterialCommunityIcons name="calendar-month-outline" size={27} color={colors.deepTeal} />} />
       <SurfaceCard style={styles.monthCard}>
         <View style={styles.monthControls}>

@@ -4,7 +4,8 @@ import { addMonths, subMonths } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActionButton, AppText, BackNavigationButton, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
 import { loadEntriesByMonth } from '@/services/time-entry-service';
 import { calculateDailyTotals, calculatePeriodTotals, formatMinutesHHMM, getBahiaDate } from '@/utils/work-time';
@@ -76,7 +77,7 @@ export default function ResumoScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <BackNavigationButton label="Voltar ao Hoje" onPress={() => router.replace('/(tabs)/index')} />
+      <TabNavigationCard active="resumo" />
       <PageHeading eyebrow="Uma visão tranquila" title="Resumo" subtitle="Como está seu ritmo neste mês." right={<MaterialCommunityIcons name="chart-box-outline" size={27} color={colors.deepTeal} />} />
       <SurfaceCard style={styles.monthCard}>
         <Pressable onPress={() => changeMonth(-1)} accessibilityRole="button" accessibilityLabel="Mês anterior"><MaterialCommunityIcons name="chevron-left" size={25} color={colors.deepTeal} /></Pressable>

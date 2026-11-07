@@ -47,13 +47,17 @@ pnpm ios                   # Expo Go/dev run para iOS configurado no ambiente
 
 ## Supabase e segurança
 
-O Supabase já existente contém as tabelas `public.profiles` e `public.time_entries`, RLS, trigger de perfil, índices, constraint de batida única diária e trigger de validação de cronologia, fuso/dia e limite hard de 10h. As migrações aplicadas estão versionadas em `supabase/migrations/`.
+O Supabase já existente contém as tabelas `public.profiles`, `public.time_entries`, `public.balance_adjustments` e `public.day_statuses`, com RLS, triggers, índices, constraint de batida única diária e validação de cronologia, fuso/dia e limite hard de 10h. As migrações aplicadas estão versionadas em `supabase/migrations/`.
 
 No projeto existente, o cadastro público (“Allow new users to sign up”) foi desligado no Supabase Auth. O login continua ativo; o app usa a API Supabase com a chave anon e as políticas RLS negam acesso às tabelas a visitantes anônimos. Cada pessoa autenticada acessa somente seus registros. Um administrador pode gerenciar perfis, mas não consulta batidas de outras pessoas. Mudanças na configuração do Auth feitas pelo Dashboard não são controladas por SQL migration; confira a opção após importar/recriar um projeto.
 
 Para reaplicar migrações em outra cópia Supabase, após autenticar a CLI:
 
 **A migração `20261107150000_balance_adjustments.sql` foi aplicada, com autorização explícita, ao projeto existente `duqytmwhlrjqduzscgpa` como migration remota `20261107152710`. A tabela `balance_adjustments` usa RLS e permite ao usuário ativo consultar e inserir apenas os próprios lançamentos.**
+
+**A migração `20261107193404_day_statuses.sql` foi aplicada ao mesmo projeto como migration remota `20261107193404`. A tabela `day_statuses` guarda somente o status pessoal do dia, não exige diagnóstico/documento médico e tem RLS ativa: cada usuário autenticado ativo só pode consultar, inserir ou atualizar o próprio status. Não há política de leitura administrativa.**
+
+**A migração `20261107193956_harden_security_definer_permissions.sql` restringiu ao próprio backend as funções `SECURITY DEFINER` usadas por triggers, retirou a execução de funções internas das roles `anon` e `PUBLIC`, e manteve `is_active_user()`/`is_admin()` disponíveis a usuários autenticados por serem usadas nas políticas RLS.**
 
 ```bash
 pnpm dlx supabase login
@@ -100,15 +104,15 @@ O aceite de termos, as batidas (inclusive horário manual) e a troca de senha ex
 
 ## Uso
 
-A tela **Hoje** apresenta contador ao vivo, tempo faltante, horário-limite projetado, sequência Entrada → Saída para almoço → Volta do almoço → Saída, registro manual HH:mm e fila offline. O fuso padrão é `America/Bahia`; o almoço pausa a contagem. O limite padrão é 10:00, ajustável pelo usuário para um valor menor; o banco nunca aceita mais de 10:00. A jornada sugerida é 08:00–18:00 de segunda a quinta e 08:00–17:00 na sexta, sempre com uma hora de almoço; o Perfil permite editar ou adicionar jornadas. Os alertas de fim usam a jornada civil correspondente ao dia.
+A tela **Hoje** apresenta contador ao vivo, tempo faltante, horário-limite projetado, sequência Entrada → Saída para almoço → Volta do almoço → Saída, registro manual HH:mm e fila offline. O fuso padrão é `America/Bahia`; o almoço pausa a contagem. O limite padrão é 10:00, ajustável pelo usuário para um valor menor; o banco nunca aceita mais de 10:00. A jornada sugerida é um único perfil ativo: 08:00–18:00 de segunda a quinta e 08:00–17:00 na sexta, sempre com uma hora de almoço; o Perfil permite editar ou adicionar jornadas. Os alertas de fim usam a jornada civil correspondente ao dia. Em sábado/domingo sem batidas, o app pergunta se a pessoa vai trabalhar ou descansar; folga, falta/ausência e atestado pausam o contador e não são convertidos em horas negativas.
 
 Se a confirmação do alerta crítico chegar depois do limite, o app pede confirmação explícita e grava a saída no último horário permitido, com justificativa visível no Espelho; não grava uma jornada acima do teto. Esse registro é um controle pessoal e não substitui o registro oficial do empregador.
 
 Se ainda não houve saída para almoço, o app mostra e agenda um aviso preventivo ao completar 4:00 horas trabalhadas; após registrar a saída para almoço, agenda o retorno segundo os minutos definidos no Perfil. Os alertas de jornada permanecem nos marcos 8:00, 9:00, 9:30, 9:45, 9:50, 9:55 e limite pessoal. As notificações são locais; Android pode exigir permissão de notificação e permissão de alarmes exatos nas configurações do sistema. A entrega exata em segundo plano depende das permissões e políticas de bateria do aparelho. O modo Expo Go serve para desenvolvimento; teste notificações/alarme exato no APK final.
 
-**Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** exporta o histórico em JSON, permite alterar preferências, configurar jornadas semanais, desabilitar a rotação do contador, consultar opções a partir do avatar na tela Hoje e solicitar a exclusão da conta. A tela **Banco de horas** soma as horas extras estimadas pelo app em todo o histórico com créditos/débitos externos acompanhados de motivo; esses lançamentos são auditáveis e protegidos por RLS. A biblioteca e os cálculos principais são locais/offline.
+**Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** exporta o histórico em JSON, permite alterar preferências, configurar jornadas semanais (incluindo a exceção de sexta dentro da jornada ativa), escolher o horário previsto do almoço, desabilitar a rotação do contador, consultar opções a partir do avatar na tela Hoje e solicitar a exclusão da conta. A tela **Banco de horas** soma as horas extras estimadas pelo app em todo o histórico com créditos/débitos externos acompanhados de motivo; esses lançamentos são auditáveis e protegidos por RLS. A missão semanal opcional mostra progresso por registros organizados ou situação indicada, não por presença ou horas trabalhadas. Quando há diferença semanal estimada abaixo da escala, orienta a conferir o espelho e combinar com o RH; não recomenda horas extras.
 
-Na jornada selecionada, o aviso de retorno do almoço é programado cinco minutos antes da saída registrada + duração do intervalo. Um aviso adicional é programado para o horário final fixo da jornada. A tela Hoje pode exibir apenas o contador em paisagem se a opção de rotação estiver habilitada; as outras abas permanecem em retrato. A navegação principal aparece em um cartão no topo da tela Hoje; as telas Espelho, Resumo, Perfil e Banco de horas têm retorno próprio.
+Na jornada selecionada, o aviso de retorno do almoço é programado cinco minutos antes da saída registrada + duração do intervalo. Um aviso adicional é programado para o horário final fixo da jornada. A tela Hoje pode exibir apenas o contador em paisagem se a opção de rotação estiver habilitada; as outras abas permanecem em retrato. O cartão HOJE | ESPELHO | RESUMO | PERFIL permanece nas quatro telas principais e no Banco de horas; os links usam destinos tipados do Expo Router e não dependem de botões separados de “voltar”. O aviso ao colega é preparado no compartilhamento nativo do sistema: o usuário escolhe contato/canal e confirma, sem leitura de contatos nem envio automático pelo app.
 
 ### Ajustar limite, almoço e tempos dos alertas
 
@@ -123,7 +127,7 @@ pnpm dlx eas-cli login
 pnpm dlx eas-cli build -p android --profile preview
 ```
 
-O novo projeto EAS está em `https://expo.dev/accounts/edingtonmaquine/projects/olhonoponto`; `app.config.ts` associa este código a `owner: edingtonmaquine` e ao `projectId` `97f93ccd-6d20-4ebd-9b52-f9bb7e4ab41a`. O repositório conectado é somente `olhaoponto/olhaoponto`; o acesso do Expo GitHub App foi limitado a esse repositório. O projeto não está vinculado aos projetos Expo `vivacondo` ou `herois-plus-app`.
+O projeto EAS existente e autorizado está em `https://expo.dev/accounts/edingtonmaquine/projects/olhonoponto`; `app.config.ts` associa este código a `owner: edingtonmaquine` e ao `projectId` `97f93ccd-6d20-4ebd-9b52-f9bb7e4ab41a`. O repositório conectado é somente `olhaoponto/olhaoponto`; o acesso do Expo GitHub App foi limitado a esse repositório. Não crie outro projeto Expo nem vincule este código aos projetos `vivacondo` ou `herois-plus-app`.
 
 Antes do build, abra **Expo Dashboard → projeto Olha o Ponto → Environment variables** e cadastre no ambiente `preview` `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` com os valores do `.env` local. O arquivo `.env` é ignorado e não é enviado ao Git; por isso, essas variáveis de cliente precisam existir no ambiente remoto da EAS. Use o tipo **Plain text**: ambas são configuração pública do cliente; a anon/publishable key ficará embutida no app. Nunca cadastre `service_role` como variável `EXPO_PUBLIC_*`.
 
@@ -137,7 +141,7 @@ Uma distribuição iOS instalável fora do Expo Go exige Apple Developer/assinat
 
 ## Privacidade
 
-O app coleta apenas nome, e-mail, preferências e batidas inseridas pelo usuário. A administração não recebe dados de batidas. Termos/Política de Privacidade informam as finalidades e direitos; aceite é gravado com versão e data. O usuário pode exportar seus dados, editar horários e apagar sua conta. Cache e fila offline são separados por usuário; se houver batidas pendentes, o app exige conexão e sincronização antes de concluir o logout, para não perder registros. Notificações de jornada são locais ao dispositivo. Não grave segredos ou dados pessoais em logs.
+O app coleta nome, e-mail, preferências, batidas inseridas e a situação do dia (trabalho, folga, ausência ou atestado). O status do dia é pessoal, não pede diagnóstico e as policies RLS limitam a leitura/edição ao próprio usuário ativo; administradores não recebem esse conteúdo. A administração não recebe dados de batidas. Termos/Política de Privacidade informam as finalidades e direitos; aceite é gravado com versão e data. O usuário pode exportar seus dados, editar horários e apagar sua conta. Cache e fila offline são separados por usuário; se houver batidas pendentes, o app exige conexão e sincronização antes de concluir o logout, para não perder registros. Notificações de jornada são locais ao dispositivo; o app não lê contatos e o envio de mensagens só ocorre depois de escolha e confirmação no compartilhamento do sistema. Não grave segredos ou dados pessoais em logs.
 
 ## Observações
 
