@@ -25,6 +25,7 @@ export interface AlertPreferences {
   work_schedules?: WorkSchedule[];
   active_work_schedule_id?: string;
   lunch_return_warning_minutes?: number;
+  rotacao_contador?: boolean;
   [key: string]: unknown;
 }
 

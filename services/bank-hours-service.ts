@@ -7,7 +7,7 @@ export interface ServiceResult<T> { data: T | null; error: string | null; }
 function friendly(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Não foi possível carregar o banco de horas.';
   if (/balance_adjustments|PGRST205|schema cache/i.test(message) && /does not exist|not found|schema cache|relation/i.test(message)) {
-    return 'O histórico de saldo externo ainda não está disponível no Supabase. A migração desta funcionalidade está no repositório e precisa ser aplicada pelo responsável.';
+    return 'O histórico de saldo externo não está disponível no servidor agora. Tente novamente ou fale com o suporte do aplicativo.';
   }
   return /auth session missing|authsessionmissingerror|session missing/i.test(message) ? SESSION_REQUIRED_MESSAGE : message;
 }

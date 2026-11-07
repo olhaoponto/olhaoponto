@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, BackNavigationButton, PageHeading, ScreenShell, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { addBalanceAdjustment, loadBalanceAdjustments } from '@/services/bank-hours-service';
 import { loadAllEntries } from '@/services/time-entry-service';
@@ -11,6 +11,11 @@ import { formatMinutesHHMM } from '@/utils/work-time';
 import type { BalanceAdjustment } from '@/types/app';
 
 type Direction = 'credito' | 'debito';
+function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs = 15_000): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error(message)), timeoutMs); });
+  return Promise.race([promise, deadline]).finally(() => { if (timeout) clearTimeout(timeout); });
+}
 const labelDate = (value: string) => {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeZone: 'America/Bahia' }).format(date) : 'Data indisponível';
@@ -35,13 +40,19 @@ export default function BankHoursScreen() {
   const [minutes, setMinutes] = useState('');
   const [reason, setReason] = useState('');
   const [retryCount, setRetryCount] = useState(0);
+  const requestVersion = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!session?.user.id) return;
+    if (!session?.user.id) { setLoading(false); setComplete(false); setError('Sua sessão não está ativa. Entre novamente para consultar o banco de horas.'); return; }
+    const requestId = ++requestVersion.current;
     setLoading(true);
     setError('');
     try {
-      const [entriesResult, adjustmentResult] = await Promise.all([loadAllEntries(), loadBalanceAdjustments()]);
+      const [entriesResult, adjustmentResult] = await withTimeout(
+        Promise.all([loadAllEntries(), loadBalanceAdjustments()]),
+        'A consulta demorou mais que o esperado. Confira a conexão e tente novamente.',
+      );
+      if (requestId !== requestVersion.current) return;
       if (!entriesResult.data || !adjustmentResult.data) {
         setError(adjustmentResult.error || entriesResult.error || 'Não foi possível consultar o histórico completo do banco de horas.');
         setComplete(false);
@@ -55,17 +66,29 @@ export default function BankHoursScreen() {
         setError('Sem conexão para confirmar todo o histórico. O saldo completo só é exibido após sincronizar os dados.');
       }
     } catch (cause) {
+      if (requestId !== requestVersion.current) return;
       setError(cause instanceof Error ? cause.message : 'Não foi possível consultar o banco de horas.');
       setComplete(false);
     } finally {
-      setLoading(false);
+      if (requestId === requestVersion.current) setLoading(false);
     }
   }, [session?.user.id]);
 
   useEffect(() => {
-    if (sessionInitialized && !session) router.replace('/login');
-    else if (session?.user.id) void Promise.resolve().then(refresh);
-  }, [session, sessionInitialized, router, refresh, retryCount]);
+    let active = true;
+    if (!sessionInitialized) return () => { active = false; requestVersion.current += 1; };
+    if (!session?.user.id) {
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        setLoading(false);
+        setComplete(false);
+        setError('Sua sessão não está ativa. Entre novamente para consultar o banco de horas.');
+      });
+      return () => { active = false; requestVersion.current += 1; };
+    }
+    void Promise.resolve().then(refresh);
+    return () => { active = false; requestVersion.current += 1; };
+  }, [session?.user.id, sessionInitialized, refresh, retryCount]);
 
   const balance = useMemo(() => entries ? calculateBankBalance(entries, adjustments) : null, [entries, adjustments]);
 
@@ -82,7 +105,9 @@ export default function BankHoursScreen() {
     setNotice('');
     const absoluteMinutes = hourValue * 60 + minuteValue;
     const signedMinutes = direction === 'credito' ? absoluteMinutes : -absoluteMinutes;
-    const result = await addBalanceAdjustment(signedMinutes, reason);
+    let result: Awaited<ReturnType<typeof addBalanceAdjustment>>;
+    try { result = await addBalanceAdjustment(signedMinutes, reason); }
+    catch (cause) { setSaving(false); setError(cause instanceof Error ? cause.message : 'Não foi possível registrar o ajuste. Tente novamente.'); return; }
     setSaving(false);
     if (result.error || !result.data) { setError(result.error || 'Não foi possível registrar o ajuste.'); return; }
     setAdjustments((current) => [result.data!, ...current]);
@@ -94,7 +119,9 @@ export default function BankHoursScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
+      <BackNavigationButton label="Voltar ao resumo" onPress={() => router.replace('/(tabs)/resumo')} />
       <PageHeading eyebrow="Saldo pessoal" title="Banco de horas" subtitle="Saldo estimado pelo app somado aos ajustes informados por você." right={<MaterialCommunityIcons name="wallet-plus-outline" size={27} color={colors.deepTeal} />} />
+      <ActionButton title={formOpen ? 'Fechar lançamento' : 'Adicionar saldo existente'} onPress={() => { setFormOpen((open) => !open); setError(''); }} icon={<MaterialCommunityIcons name={formOpen ? 'close' : 'plus'} size={21} color="#FFFFFF" />} />
       {loading ? <View style={styles.loading}><ActivityIndicator color={colors.deepTeal} /><AppText variant="small" color={colors.muted}>Conferindo seu histórico…</AppText></View> : null}
       {!loading && complete && balance ? <>
         <SurfaceCard style={[styles.totalCard, { borderColor: `${colors.teal}70` }]}>
@@ -108,9 +135,8 @@ export default function BankHoursScreen() {
         </SurfaceCard>
         <AppText variant="tiny" color={colors.muted}>O valor estimado usa todos os dias carregados e soma apenas horas acima de 8h por dia. Confira o saldo oficial com sua empresa.</AppText>
       </> : null}
-      {error ? <SurfaceCard tone="soft" style={{ gap: 10 }}><AppText variant="small" color={colors.error}>{error}</AppText><AppText variant="tiny" color={colors.muted}>Para registrar ajustes, o aparelho precisa estar conectado e a migração local desta funcionalidade precisa estar aplicada ao Supabase pelo responsável.</AppText>{!loading ? <ActionButton title="Tentar novamente" variant="outline" onPress={() => setRetryCount((count) => count + 1)} /> : null}</SurfaceCard> : null}
+      {error ? <SurfaceCard tone="soft" style={{ gap: 10 }}><AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText><AppText variant="tiny" color={colors.muted}>O saldo completo só aparece quando o histórico do aplicativo e os ajustes externos são consultados com sucesso.</AppText>{sessionInitialized && !session ? <ActionButton title="Voltar ao login" onPress={() => router.replace('/login')} /> : !loading ? <ActionButton title="Tentar novamente" variant="outline" onPress={() => { setLoading(true); setRetryCount((count) => count + 1); }} /> : null}</SurfaceCard> : null}
       {notice ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{notice}</AppText> : null}
-      <ActionButton title={formOpen ? 'Fechar lançamento' : 'Adicionar saldo externo'} onPress={() => { setFormOpen((open) => !open); setError(''); }} icon={<MaterialCommunityIcons name={formOpen ? 'close' : 'plus'} size={21} color="#FFFFFF" />} />
       {formOpen ? <SurfaceCard style={{ gap: 13 }}>
         <AppText variant="subtitle">Registrar ajuste do banco</AppText>
         <AppText variant="small" color={colors.muted}>Informe o saldo que veio da empresa. Ele será acrescentado (crédito) ou descontado (débito) do total do app; os lançamentos ficam no histórico.</AppText>
@@ -125,7 +151,7 @@ export default function BankHoursScreen() {
         <AppText variant="subtitle">Histórico de ajustes externos</AppText>
         {!adjustments.length ? <AppText variant="small" color={colors.muted}>Ainda não há ajustes externos registrados.</AppText> : adjustments.map((adjustment) => <View key={adjustment.id} style={[styles.adjustmentRow, { borderBottomColor: colors.border }]}><View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '600' }}>{adjustment.motivo}</AppText><AppText variant="tiny" color={colors.muted}>{labelDate(adjustment.criado_em)}</AppText></View><AppText variant="subtitle" color={adjustment.saldo_minutos >= 0 ? colors.deepTeal : colors.error}>{signedTime(adjustment.saldo_minutos)}</AppText></View>)}
       </SurfaceCard>
-      <ActionButton title="Voltar ao resumo" variant="outline" onPress={() => router.back()} />
+      <ActionButton title="Voltar ao resumo" variant="outline" onPress={() => router.replace('/(tabs)/resumo')} />
     </ScreenShell>
   );
 }

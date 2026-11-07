@@ -17,6 +17,7 @@ import {
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { useThemeContext } from '@/lib/theme-provider';
 import { SchemeColors } from '@/constants/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
@@ -87,7 +88,7 @@ export function ScreenShell({
 }) {
   const colors = useAppColors();
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
       <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: colors.background }, style]}>
         {scroll ? (
           <ScrollView
@@ -200,21 +201,26 @@ export function TextField({
   label,
   error,
   style,
+  rightAccessory,
   ...props
-}: TextInputProps & { label?: string; error?: string }) {
+}: TextInputProps & { label?: string; error?: string; rightAccessory?: React.ReactNode }) {
   const colors = useAppColors();
   return (
     <View style={{ gap: 7 }}>
       {label ? <AppText variant="small" style={{ fontWeight: '600' }}>{label}</AppText> : null}
-      <TextInput
-        {...props}
-        placeholderTextColor={colors.muted}
-        style={[
-          styles.input,
-          { color: colors.foreground, borderColor: error ? colors.error : colors.border, backgroundColor: colors.input },
-          style,
-        ]}
-      />
+      <View>
+        <TextInput
+          {...props}
+          placeholderTextColor={colors.muted}
+          style={[
+            styles.input,
+            { color: colors.foreground, borderColor: error ? colors.error : colors.border, backgroundColor: colors.input },
+            rightAccessory ? { paddingRight: 54 } : null,
+            style,
+          ]}
+        />
+        {rightAccessory ? <View style={styles.inputAccessory}>{rightAccessory}</View> : null}
+      </View>
       {error ? <AppText variant="tiny" color={colors.error}>{error}</AppText> : null}
     </View>
   );
@@ -241,6 +247,16 @@ export function PageHeading({
       </View>
       {right}
     </View>
+  );
+}
+
+export function BackNavigationButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const colors = useAppColors();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={styles.backButton}>
+      <MaterialCommunityIcons name="arrow-left" size={19} color={colors.deepTeal} />
+      <AppText variant="small" color={colors.deepTeal} style={{ fontWeight: '700' }}>{label}</AppText>
+    </Pressable>
   );
 }
 
@@ -297,4 +313,6 @@ const styles = StyleSheet.create({
   button: { minHeight: 54, borderRadius: 17, paddingHorizontal: 20, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
   input: { minHeight: 52, borderWidth: 1, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontWeight: '500' },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 3 },
+  inputAccessory: { position: 'absolute', right: 8, top: 0, bottom: 0, minWidth: 40, alignItems: 'center', justifyContent: 'center' },
+  backButton: { alignSelf: 'flex-start', minHeight: 42, paddingHorizontal: 11, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#24B3A210' },
 });

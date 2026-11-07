@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppStore } from '@/store/app-store';
 import { calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, safeClockOutTimestamp, validatePunch } from '@/utils/work-time';
 import { getCurrentAlert } from '@/utils/alerts';
-import { getActiveWorkSchedule } from '@/utils/work-schedules';
+import { getWorkScheduleForDate } from '@/utils/work-schedules';
 import { chooseCharge, ChargeIllustration, type AlertLevel, type Charge } from '@/components/charges';
 import { insertTimeEntry } from '@/services/time-entry-service';
 import { scheduleDayNotifications } from '@/services/notification-service';
@@ -59,7 +59,7 @@ export default function GlobalAlertOverlay() {
   const todayEntries = useMemo(() => entries.filter((entry) => entry.data === today), [entries, today]);
   const completed = todayEntries.some((entry) => entry.tipo === 'saida');
   const limit = profile?.limite_minutos ?? 600;
-  const activeSchedule = useMemo(() => getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [profile?.preferencias_alerta, profile?.almoco_minutos]);
+  const activeSchedule = useMemo(() => getWorkScheduleForDate(profile?.preferencias_alerta, today, profile?.almoco_minutos ?? 60), [profile?.preferencias_alerta, profile?.almoco_minutos, today]);
   const lunchMinutes = activeSchedule.lunch_minutes;
   const lunchReturnWarningMinutes = typeof profile?.preferencias_alerta?.lunch_return_warning_minutes === 'number' ? profile.preferencias_alerta.lunch_return_warning_minutes : 5;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);

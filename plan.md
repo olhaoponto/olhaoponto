@@ -64,3 +64,13 @@ As jornadas e a antecedência do aviso ficarão na coluna JSONB de preferências
 ### Limites de execução
 
 Trabalhar somente na cópia autorizada de `olhaoponto/olhaoponto`; não criar repositório, projeto Supabase nem projeto Expo. O usuário autorizou posteriormente a aplicação desta migração, o envio da branch de trabalho ao repositório existente e a criação de uma nova APK para teste. Preservar package/bundle ID, projectId EAS, scheme e credenciais existentes; nunca ler ou incluir `.env`/segredos no código ou nos artefatos.
+
+
+## Correções e navegação solicitadas em novembro de 2026
+
+1. Jornada padrão: manter 08:00–18:00 com 60 minutos de almoço de segunda a quinta; sexta-feira 08:00–17:00 com o mesmo almoço. Resolver automaticamente a jornada aplicável ao dia, sem alterar jornadas personalizadas. Transformar em memória a preferência legada que seja exatamente o padrão antigo 08:00–18:00 de segunda a sexta, mantendo os IDs/dados do perfil e exibindo a nova divisão.
+2. Banco de horas: tratar explicitamente inicialização de sessão, sessão ausente, falha de rede e consulta travada, encerrar o indicador em todos os caminhos e descartar resultados de tentativas obsoletas. Exibir erro recuperável, permitir tentar novamente e colocar retorno ao Resumo e inclusão do saldo em posições visíveis. Não alterar schema, migrações ou dados do Supabase.
+3. Login/teclado: ajustar o contêiner rolável para a janela que encolhe quando o teclado Android abre e manter ajuste no iOS. Substituir o texto de mostrar/ocultar senha por controle acessível de olho/olho riscado.
+4. Rotação: guardar `rotacao_contador` na preferência JSON existente, habilitada por padrão para compatibilidade; quando desativada, manter a orientação retrato mesmo se o usuário girar o aparelho. Limitar paisagem à tela Hoje e mostrar o controle junto a som, vibração, notificações e biometria.
+5. Navegação: esconder a barra inferior próxima aos controles do aparelho; mostrar um único cartão de navegação HOJE | ESPELHO | RESUMO | PERFIL abaixo da saudação/data em Hoje. Nas telas de destino e em Banco de horas, oferecer retorno explícito à tela apropriada. Tornar a inicial do usuário na Home acionável para abrir um menu compacto com Perfil/Configurações e Sair; logout preserva o fluxo de sincronização pendente já existente.
+6. Limite de escopo: estas alterações são feitas apenas na branch existente `work/improvements-nov-2026`; não atualizar `main`, não alterar o Supabase nem iniciar/acompanhar build EAS. A integração de mensagens a colegas não é executada nesta etapa: não há autorização para listar/compartilhar contatos ou enviar mensagens externas; sugestões de melhorias adicionais podem ser apresentadas para aprovação futura.

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, BackNavigationButton, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { changePassword, deleteAccount, logout, updateEmail, updateProfile } from '@/services/auth-service';
 import { exportJson } from '@/services/export-service';
 import { loadAllEntries, syncPendingEntries } from '@/services/time-entry-service';
@@ -189,6 +189,7 @@ export default function PerfilScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
+      <BackNavigationButton label="Voltar ao Hoje" onPress={() => router.replace('/(tabs)/index')} />
       <PageHeading eyebrow="Suas preferências" title="Perfil" subtitle="Conta e controles pessoais." right={<View style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="title" color={colors.deepTeal}>{profile.nome.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></View>} />
       <SurfaceCard style={styles.identityCard}><View style={{ flex: 1, gap: 4 }}><AppText variant="subtitle">{profile.nome}</AppText><AppText variant="small" color={colors.muted}>{profile.email}</AppText></View><StatusPill tone={profile.role === 'admin' ? 'yellow' : 'teal'}>{roleLabel.toUpperCase()}</StatusPill></SurfaceCard>
       {message ? <AppText variant="small" color={colors.deepTeal}>{message}</AppText> : null}
@@ -214,7 +215,7 @@ export default function PerfilScreen() {
 
       <SurfaceCard style={{ gap: 12 }}>
         <AppText variant="subtitle">Jornadas de trabalho</AppText>
-        <AppText variant="small" color={colors.muted}>Escolha uma jornada para os alertas de início, almoço e fim. A jornada inicial é 08:00–18:00, com 1h de almoço, de segunda a sexta.</AppText>
+        <AppText variant="small" color={colors.muted}>Escolha uma jornada para os alertas de início, almoço e fim. O padrão é 08:00–18:00, com 1h de almoço, de segunda a quinta; na sexta, 08:00–17:00, também com 1h.</AppText>
         {schedules.map((schedule) => {
           const selected = schedule.id === activeSchedule.id;
           const days = schedule.work_days.map((day) => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][day]).join(' · ');
@@ -238,6 +239,8 @@ export default function PerfilScreen() {
         <PreferenceSwitch label="Notificações de jornada" value={prefs.enabled !== false} onChange={(value) => savePreferences({ enabled: value })} />
         <PreferenceSwitch label="Som de alerta" value={prefs.som !== false} onChange={(value) => savePreferences({ som: value })} />
         <PreferenceSwitch label="Vibração" value={prefs.vibracao !== false} onChange={(value) => savePreferences({ vibracao: value })} />
+        <PreferenceSwitch label="Rotação do contador Hoje" value={prefs.rotacao_contador !== false} onChange={(value) => savePreferences({ rotacao_contador: value })} />
+        <AppText variant="tiny" color={colors.muted}>Desative para manter o contador sempre na posição vertical, mesmo ao girar o aparelho. A rotação fica limitada à tela Hoje.</AppText>
         <PreferenceSwitch label="Biometria ao abrir" value={biometricEnabled} onChange={toggleBiometrics} />
         <AppText variant="small" color={colors.muted}>Tema</AppText>
         <View style={styles.choices}>{(['system', 'light', 'dark'] as const).map((theme) => <Pressable key={theme} onPress={() => chooseTheme(theme)} accessibilityRole="button" accessibilityState={{ selected: selectedTheme === theme }} style={[styles.choice, { borderColor: selectedTheme === theme ? colors.deepTeal : colors.border, backgroundColor: selectedTheme === theme ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={selectedTheme === theme ? colors.deepTeal : colors.foreground}>{theme === 'system' ? 'Sistema' : theme === 'light' ? 'Claro' : 'Escuro'}</AppText></Pressable>)}</View>

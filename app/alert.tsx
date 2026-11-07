@@ -5,7 +5,7 @@ import { ActionButton, AppText, ClockMascot, ScreenShell, SurfaceCard, useAppCol
 import { chooseCharge, ChargeIllustration, type AlertLevel } from '@/components/charges';
 import { useAppStore } from '@/store/app-store';
 import { calculateWorkedMinutes, formatMinutesHHMM, getBahiaDate } from '@/utils/work-time';
-import { getActiveWorkSchedule } from '@/utils/work-schedules';
+import { getWorkScheduleForDate } from '@/utils/work-schedules';
 
 function normalize(value: string | string[] | undefined): AlertLevel {
   const candidate = Array.isArray(value) ? value[0] : value;
@@ -22,9 +22,9 @@ export default function AlertScreen() {
   const lunchReturn = params.type === 'lunch-return';
   const lunchStart = params.type === 'lunch-start';
   const shiftComplete = params.type === 'shift-complete';
-  const activeSchedule = getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60);
   const charge = chooseCharge(level);
   const today = getBahiaDate(new Date());
+  const activeSchedule = getWorkScheduleForDate(profile?.preferencias_alerta, today, profile?.almoco_minutos ?? 60);
   const worked = calculateWorkedMinutes(entries.filter((entry) => entry.data === today));
   const limit = profile?.limite_minutos ?? 600;
   const isCritical = level === '10h';

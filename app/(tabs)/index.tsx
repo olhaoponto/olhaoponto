@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, Linking, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppState, Linking, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as Network from 'expo-network';
 import * as Haptics from 'expo-haptics';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -11,8 +11,11 @@ import { prepareLocalNotifications } from '@/services/notification-service';
 import { calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
 import { LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
 import type { TimeEntry } from '@/types/app';
-import { getActiveWorkSchedule, getScheduleEndAt } from '@/utils/work-schedules';
+import { getWorkScheduleForDate, getScheduleEndAt } from '@/utils/work-schedules';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
+import { TabNavigationCard } from '@/components/TabNavigationCard';
+import { useRouter } from 'expo-router';
+import { logout } from '@/services/auth-service';
 
 const ZONE = 'America/Bahia';
 const labels: Record<PunchType, string> = { entrada: 'Entrada', saida_almoco: 'Saída para almoço', volta_almoco: 'Volta do almoço', saida: 'Saída' };
@@ -25,6 +28,7 @@ function friendlyDate(value: Date) { return new Intl.DateTimeFormat('pt-BR', { t
 function localTime(value: string) { return formatInTimeZone(new Date(value), ZONE, 'HH:mm'); }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const colors = useAppColors();
   const profile = useAppStore((state) => state.profile);
   const session = useAppStore((state) => state.session);
@@ -41,13 +45,17 @@ export default function HomeScreen() {
   const [success, setSuccess] = useState('');
   const [celebrated, setCelebrated] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<{ granted: boolean; exactAlarms: boolean } | null>(null);
+  const [accountMenuVisible, setAccountMenuVisible] = useState(false);
+  const [accountMenuError, setAccountMenuError] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
   const { width, height } = useWindowDimensions();
-  const landscape = Platform.OS !== 'web' && width > height;
+  const rotationEnabled = profile?.preferencias_alerta?.rotacao_contador !== false;
+  const landscape = Platform.OS !== 'web' && rotationEnabled && width > height;
   const today = getBahiaDate(now);
   const todayEntries = useMemo(() => storeEntries.filter((entry) => entry.data === today), [storeEntries, today]);
   const nextPunch = getNextPunch(todayEntries);
   const limit = profile?.limite_minutos ?? 600;
-  const activeSchedule = getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60);
+  const activeSchedule = getWorkScheduleForDate(profile?.preferencias_alerta, today, profile?.almoco_minutos ?? 60);
   const lunchMinutes = activeSchedule.lunch_minutes;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = calculateWorkedMinutes(todayEntries, now);
@@ -119,6 +127,23 @@ export default function HomeScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true); setAccountMenuError('');
+    try {
+      const synced = await syncPendingEntries();
+      if (!synced.data || synced.data.failed > 0) {
+        setAccountMenuError(synced.error || 'Há batidas aguardando sincronização. Conecte-se à internet e tente novamente antes de sair.');
+        return;
+      }
+      await logout();
+      setAccountMenuVisible(false);
+      router.replace('/login');
+    } catch (reason) {
+      setAccountMenuError(reason instanceof Error ? reason.message : 'Não foi possível sair agora. Tente novamente.');
+    } finally { setSigningOut(false); }
+  };
+
   const timeFor = (type: PunchType) => todayEntries.find((entry) => entry.tipo === type);
   const projectedLabel = eta ? formatInTimeZone(new Date(eta), profile?.fuso || ZONE, 'HH:mm') : '—';
   const pendingCount = todayEntries.filter((entry) => Boolean((entry as TimeEntry & { _pending?: boolean })._pending)).length;
@@ -142,7 +167,9 @@ export default function HomeScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<View style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="subtitle" color={colors.deepTeal}>{(profile?.nome || 'OP').split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></View>} />
+      <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<Pressable onPress={() => { setAccountMenuError(''); setAccountMenuVisible(true); }} accessibilityRole="button" accessibilityLabel="Abrir configurações e sair da conta" style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="subtitle" color={colors.deepTeal}>{(profile?.nome || 'OP').split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></Pressable>} />
+
+      <TabNavigationCard />
 
       {offline || pendingCount > 0 ? <View style={[styles.offlineBanner, { backgroundColor: `${colors.warning}2B`, borderColor: `${colors.warning}70` }]}><MaterialCommunityIcons name="cloud-off-outline" size={20} color={colors.foreground} /><AppText variant="small" style={{ flex: 1 }}>{pendingCount ? `${pendingCount} batida(s) aguardando sincronização.` : 'Modo offline: mostrando seus dados salvos neste aparelho.'}</AppText><StatusPill tone="yellow">OFFLINE</StatusPill></View> : null}
       {notificationStatus && (!notificationStatus.granted || !notificationStatus.exactAlarms) ? <SurfaceCard tone="soft" style={{ gap: 8 }}><AppText variant="small" color={colors.foreground}>{!notificationStatus.granted ? 'Ative as notificações para receber avisos quando o app estiver fechado.' : 'Notificações estão ativas, mas o Android pode entregar os alarmes com atraso enquanto Alarmes e lembretes não estiver liberado.'}</AppText>{Platform.OS !== 'web' ? <Pressable onPress={() => { void Linking.openSettings().catch(() => undefined); }} accessibilityRole="button"><AppText variant="small" color={colors.deepTeal}>Abrir configurações do aplicativo</AppText></Pressable> : null}</SurfaceCard> : null}
@@ -177,6 +204,17 @@ export default function HomeScreen() {
       {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>O contador está pausado. Lembrete para voltar em {lunchMinutes} minutos.</AppText></View></SurfaceCard> : null}
       <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       <ConfettiBurst visible={celebrated} />
+      <Modal visible={accountMenuVisible} transparent animationType="fade" onRequestClose={() => setAccountMenuVisible(false)}>
+        <View style={styles.accountMenuBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAccountMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Fechar menu da conta" />
+          <SurfaceCard style={styles.accountMenuCard}>
+            <View style={styles.accountMenuHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Sua conta</AppText><AppText variant="small" color={colors.muted}>{profile?.email}</AppText></View><Pressable onPress={() => setAccountMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Fechar menu"><MaterialCommunityIcons name="close" size={22} color={colors.muted} /></Pressable></View>
+            {accountMenuError ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{accountMenuError}</AppText> : null}
+            <ActionButton title="Perfil e configurações" variant="outline" onPress={() => { setAccountMenuVisible(false); router.replace('/(tabs)/perfil'); }} icon={<MaterialCommunityIcons name="cog-outline" size={19} color={colors.deepTeal} />} />
+            <ActionButton title="Sair da conta" variant="outline" onPress={handleSignOut} loading={signingOut} icon={<MaterialCommunityIcons name="logout" size={19} color={colors.deepTeal} />} />
+          </SurfaceCard>
+        </View>
+      </Modal>
     </ScreenShell>
   );
 }
@@ -189,6 +227,9 @@ const styles = StyleSheet.create({
   landscapeClock: { fontSize: 70, lineHeight: 82, fontVariant: ['tabular-nums'], letterSpacing: -1.8, textAlign: 'center', marginVertical: -4 },
   landscapeDetails: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  accountMenuBackdrop: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: '#1024218A' },
+  accountMenuCard: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: 12 },
+  accountMenuHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
   offlineBanner: { paddingHorizontal: 13, paddingVertical: 11, borderRadius: 17, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   timerCard: { padding: 20, gap: 17 },
   timerHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },

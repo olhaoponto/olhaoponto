@@ -69,14 +69,15 @@ function AppStack() {
   const protectedRoute = isRouteProtected(routeRoot);
   const routeRedirect = getAuthRouteRedirect({ routeRoot, sessionUserId: session?.user.id, profile });
   const homeRoute = routeRoot === '(tabs)' && (segments[1] === 'index' || segments.length === 1);
+  const counterRotationEnabled = profile?.preferencias_alerta?.rotacao_contador !== false;
   const pendingNotification = useRef<{ type: AppNotificationType; level: string; userId?: string } | null>(null);
   const handledNotification = useRef('');
   const [notificationVersion, setNotificationVersion] = useState(0);
   const { colorScheme, setColorScheme } = useThemeContext();
   const preferredTheme = typeof profile?.preferencias_alerta?.tema === 'string' ? profile.preferencias_alerta.tema : null;
   useEffect(() => {
-    void ScreenOrientation.lockAsync(homeRoute ? ScreenOrientation.OrientationLock.DEFAULT : ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
-  }, [homeRoute]);
+    void ScreenOrientation.lockAsync(homeRoute && counterRotationEnabled ? ScreenOrientation.OrientationLock.DEFAULT : ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
+  }, [homeRoute, counterRotationEnabled]);
   useEffect(() => {
     if (preferredTheme === 'dark' || preferredTheme === 'light') setColorScheme(preferredTheme);
   }, [preferredTheme, setColorScheme]);
