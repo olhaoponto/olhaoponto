@@ -187,7 +187,7 @@ export default function ConfiguracoesScreen() {
 
       <SurfaceCard>
         <AppText variant="subtitle">Alertas, aparência e segurança</AppText>
-        <PreferenceSwitch label="Aviso preventivo antes do almoço" value={prefs.alerta_pausa_almoco !== false} onChange={(value) => savePreferences({ alerta_pausa_almoco: value })} />
+        <PreferenceSwitch label="Aviso preventivo antes do almoço" value={prefs.alerta_pausa_almoco === true} onChange={(value) => savePreferences({ alerta_pausa_almoco: value })} />
         <TextField label={`Avisar após X minutos de trabalho (${MIN_LUNCH_REMINDER_MINUTES}–${MAX_LUNCH_REMINDER_MINUTES})`} value={customLunchReminderMinutes} onChangeText={setCustomLunchReminderMinutes} keyboardType="number-pad" maxLength={3} placeholder="240" />
         <StatusPill tone="teal">AVISO PREVENTIVO · {savedLunchReminderMinutes} MIN</StatusPill>
         <ActionButton title="Salvar antecedência do aviso de pausa" variant="outline" onPress={saveCustomLunchReminder} loading={saving} />

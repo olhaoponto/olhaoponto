@@ -226,3 +226,14 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 
 
 **Validação desta implementação antes da APK:** `pnpm check` e `pnpm lint` passaram; `pnpm test` passou com 97 testes e 1 teste legado ignorado; `git diff --check` passou; o bundle Android Expo foi exportado para `/tmp` com `--no-bytecode`. A exportação local com bytecode Hermes não é compatível com este sandbox ARM porque o binário `hermesc` instalado é x86_64; não foi gerada APK localmente. A página Expo autenticada do projeto existente foi conferida: a última build anterior é `1.0.1 (8)` / `94d979c`, sem build desta etapa em andamento.
+
+
+## 18. Melhorias visuais e preferências — implementação autorizada em 08/11/2026
+
+- [x] Ocultar temporariamente o cartão “Compartilhar o aplicativo” na tela Hoje por comentário, preservando o componente para reativação futura.
+- [x] Fazer o aviso preventivo antes do almoço nascer desativado quando não houver preferência salva; manter a antecedência editável entre 60 e 480 minutos e permitir ativação manual.
+- [x] Redesenhar a abertura anterior a Hoje com mascote, nome completo sem recorte, composição mais envolvente, movimentos suaves, frases variadas/divertidas e avanço imediato; usar a imagem de referência apenas como inspiração de uma mensagem antes da tela principal, sem copiar a composição ou o personagem.
+- [x] Transformar a missão semanal em um caminho progressivo inspirado em jogos de percurso: mostrar onde a pessoa está, nós concluídos e próximos marcos, mantendo o cálculo atual de dias resolvidos e sem premiar excesso de jornada.
+- [x] Confirmar a Agenda: ao sincronizar e ao cadastrar reuniões com término, ela calcula a faixa de trabalho provável até o fim usando batidas, histórico/entrada prevista e intervalo; avisa quando é possível ou provável exceder 10:00, sem bloquear o calendário. O limite de 10h continua protegido na tela de batidas.
+
+**Estado desta rodada:** nenhuma build Expo será iniciada automaticamente; a validação será local até nova instrução explícita.

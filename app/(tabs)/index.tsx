@@ -23,7 +23,7 @@ import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { useRouter } from 'expo-router';
 import { calculateLunchReturnTimes, getLunchReturnWarningMinutes } from '@/utils/lunch-return';
 import { HomeCommunications } from '@/components/HomeCommunications';
-import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
+// import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
 const labels: Record<PunchType, string> = { entrada: 'Entrada', saida_almoco: 'Saída para almoço', volta_almoco: 'Volta do almoço', saida: 'Saída' };
@@ -251,7 +251,7 @@ Enviado pelo Olha o Ponto.` }); }
           {shiftComplete ? <View style={[styles.alertBanner, { backgroundColor: `${colors.coral}20` }]}><MaterialCommunityIcons name="calendar-check-outline" size={21} color={colors.error} /><AppText variant="small" style={{ flex: 1, fontWeight: '700' }}>Sua jornada programada terminou às {activeSchedule.end_time}. Registre a saída no relógio da empresa e no aplicativo.</AppText></View> : null}
         </SurfaceCard>
 
-          {profile?.preferencias_alerta?.alerta_pausa_almoco !== false && workedMinutes >= lunchReminderMinutes && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou {formatMinutesHHMM(lunchReminderMinutes)}. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
+          {profile?.preferencias_alerta?.alerta_pausa_almoco === true && workedMinutes >= lunchReminderMinutes && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou {formatMinutesHHMM(lunchReminderMinutes)}. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
         <SurfaceCard>
           <View style={styles.sectionHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Batidas de hoje</AppText><AppText variant="small" color={colors.muted}>Próxima: {nextPunch ? labels[nextPunch] : 'Jornada encerrada'}</AppText></View><StatusPill tone={ended ? 'teal' : 'neutral'}>{todayEntries.length}/4</StatusPill></View>
           <View style={{ gap: 2 }}>{order.map((type, index) => {
@@ -282,7 +282,8 @@ Enviado pelo Olha o Ponto.` }); }
       {shouldShowOutcome && error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
       {dayStatusNotice ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{dayStatusNotice}</AppText> : null}
       <HomeCommunications lunchMinutes={lunchMinutes} lunchStarted={lunchStarted} ended={ended} />
-      <AppDownloadShareCard />
+      {/* Compartilhamento da instalação fica oculto temporariamente; o componente permanece preservado para reativação futura. */}
+      {/* <AppDownloadShareCard /> */}
       <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
       <ConfettiBurst visible={celebrated} />
       <Modal visible={dayStatusModal} transparent animationType="fade" onRequestClose={() => setDayStatusModal(false)}>

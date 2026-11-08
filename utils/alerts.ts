@@ -1,7 +1,7 @@
 import type { AlertPreferences } from '../types/app';
 import { DEFAULT_DAILY_LIMIT_MINUTES, formatMinutesHHMM } from './work-time';
 
-/** Aviso preventivo padrão quando a saída para almoço ainda não foi registrada. */
+/** Antecedência guardada quando o usuário personaliza o aviso; a ativação é opt-in. */
 export const LUNCH_REMINDER_MINUTES = 240;
 export const MIN_LUNCH_REMINDER_MINUTES = 60;
 export const MAX_LUNCH_REMINDER_MINUTES = 480;

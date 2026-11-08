@@ -58,6 +58,7 @@ describe('scheduleDayNotifications', () => {
   it('agenda uma notificação às quatro horas se o almoço ainda não começou', async () => {
     await scheduleDayNotifications([entry('entrada', '08:00')], {
       userId: 'user-1',
+      alertPreferences: { alerta_pausa_almoco: true },
       now: new Date('2026-11-05T11:00:00-03:00'),
     });
 
@@ -69,6 +70,7 @@ describe('scheduleDayNotifications', () => {
     await scheduleDayNotifications([entry('entrada', '08:00')], {
       userId: 'user-1',
       lunchReminderMinutes: 180,
+      alertPreferences: { alerta_pausa_almoco: true },
       now: new Date('2026-11-05T10:00:00-03:00'),
     });
     const reminder = requests().find((request) => request.content.data?.type === 'lunch-start');

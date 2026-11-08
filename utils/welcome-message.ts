@@ -20,16 +20,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const messages: Record<MascotTheme, { label: string; lines: string[] }> = {
   base: {
-    label: 'MENSAGEM DO DIA',
-    lines: [
-      'Um passo de cada vez já é progresso. Respeite o seu ritmo.',
-      'Cuidar do seu tempo também faz parte de um bom dia de trabalho.',
-      'Pequenas pausas ajudam a atravessar a jornada com mais leveza.',
-      'Hoje, organize a jornada com calma. Siga com atenção, uma tarefa por vez.',
-      'Seu esforço merece equilíbrio: foco no trabalho e espaço para descansar.',
-      'Uma pausa na hora certa também faz parte de um dia bem cuidado.',
-      'Faça o que está ao seu alcance hoje; o progresso não precisa ser apressado.',
-    ],
+      label: 'MENSAGEM DO DIA',
+      lines: [
+      'O mascote conferiu os ponteiros: hoje a missão é trabalhar bem e voltar para casa no horário.',
+      'Se o dia fosse uma corrida, a pausa seria o pit stop. Abasteça a energia antes de acelerar.',
+      'Seu tempo não é água de torneira: use cada minuto com intenção e guarde alguns para você.',
+      'O relógio está sorrindo, mas continua de olho. Uma tarefa por vez e nenhuma jornada sem fim.',
+      'Hoje vale combo completo: foco, pausa bem feita e saída registrada antes do limite.',
+      'O mascote trouxe um mapa do dia: você não precisa correr para chegar ao descanso.',
+      'Pequenos cuidados fazem uma grande diferença. Até o ponteiro mais apressado precisa respirar.',
+      'Alerta de gentileza: seu futuro eu agradece cada pausa e cada horário respeitado.',
+      'A meta de hoje não é virar super-herói do escritório. É terminar bem e descansar melhor.',
+      'Entre no ritmo: o trabalho tem hora para começar, a pausa tem hora para acontecer e o descanso também.',
+      ],
   },
   christmas: {
     label: 'TEMPO DE NATAL',

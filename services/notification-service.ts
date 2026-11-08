@@ -169,7 +169,7 @@ export async function scheduleDayNotifications(
     }
   }
 
-  if (alertPreferences?.alerta_pausa_almoco !== false && !lunchOut && !finalOut && workedSeconds < pauseReminderMinutes * 60) {
+  if (alertPreferences?.alerta_pausa_almoco === true && !lunchOut && !finalOut && workedSeconds < pauseReminderMinutes * 60) {
     const reminderAt = new Date(now.getTime() + (pauseReminderMinutes * 60 - workedSeconds) * 1000);
     await Notifications.scheduleNotificationAsync({
       content: {
