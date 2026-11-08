@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { adminCreateUser, adminResetPassword, adminSetUserStatus, listProfiles } from '@/services/auth-service';
@@ -86,7 +87,7 @@ export default function AdminScreen() {
   return (
     <ScreenShell contentStyle={styles.page}>
       <TabNavigationCard />
-      <PageHeading eyebrow="Acesso administrativo" title="Contas de usuários" subtitle="Gerencie apenas identidade e acesso — nunca as batidas." right={<MaterialCommunityIcons name="account-cog-outline" size={28} color={colors.deepTeal} />} />
+      <PageHeading eyebrow="Acesso administrativo" title="Contas de usuários" subtitle="Gerencie apenas identidade e acesso — nunca as batidas." right={<AccountMenuButton />} />
       <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>A administração pode ver nomes, e-mails e status das contas, mas não pode consultar os registros de ponto de outras pessoas. Cada usuário recebe uma senha provisória e deve trocá-la ao entrar.</AppText></SurfaceCard>
       {success ? <AppText variant="small" color={colors.deepTeal}>{success}</AppText> : null}
       {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}

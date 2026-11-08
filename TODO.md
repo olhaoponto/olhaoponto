@@ -151,3 +151,19 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 **Validação desta rodada:** `pnpm check`, `pnpm lint`, `pnpm test` (71 testes aprovados, 1 legado ignorado), `git diff --check` e exportação de bundle Android Expo passaram; o build EAS `ea98ab5c` também concluiu com sucesso e disponibilizou uma APK interna.
 
 **Princípio de produto:** a gamificação celebra consistência e descanso; não pressiona a trabalhar doente, faltar à pausa ou fazer hora extra. O aviso ao colega permanece sob controle do usuário; sem integração que leia contatos ou envie mensagens em segundo plano.
+
+
+## 13. Ajustes de almoço e Agenda solicitados em 07/11/2026
+
+- [x] **Retorno calculado pela batida real:** remover a ideia de horário fixo para sair ao almoço (inclusive o campo “Horário previsto para sair ao almoço (HH:mm)” e textos que mostrem 12:00). Quando a pessoa registrar `saida_almoco`, calcular o retorno pela hora registrada mais a duração de almoço da jornada ativa. Exemplo obrigatório: batida às 13:26, duração de 60 min → retorno às 14:26; com antecedência de 5 min, avisar às 14:21. A mesma lógica deve valer para qualquer hora de saída e também após editar a batida.
+- [x] **Antecedência personalizada do aviso:** manter as opções 5, 10 e 15 min e adicionar entrada personalizada para minutos inteiros positivos, aceitando, por exemplo, 2 min. Persistir a preferência e usá-la no lembrete calculado a partir da batida real.
+- [x] **Perfil e Agenda no avatar:** retirar Perfil da barra de navegação das telas principais; o avatar superior direito deve oferecer as rotas “Perfil” e “Agenda”, além de “Sair”. A rota Perfil mantém todas as configurações e funcionalidades existentes.
+- [x] **Agenda de reuniões com lembretes:** permitir criar, listar, editar e excluir reuniões com título, data e hora; programar lembrete local do aplicativo para cada reunião e reagendar/cancelar o lembrete ao editar/excluir. Recalcular notificações sem apagar lembretes de reunião ao atualizar alertas de jornada. Por privacidade, os eventos ficam no armazenamento local do aparelho por usuário, sem sincronizar títulos/detalhes com o Supabase; deixar claro na Agenda que não há sincronização e que eventos/lembretes locais são removidos ao sair da conta.
+- [x] **Validação desta etapa:** adicionar teste de regressão para a conta 13:26 + 60 min = 14:26 e antecedência de 5 min = 14:21, validar opção personalizada de 2 min, executar checks/lint/testes e confirmar que os lembretes da Agenda não são cancelados quando uma batida ou preferência da jornada muda. TypeScript, lint e export Android Expo passaram; 81 testes passaram e 1 teste legado está ignorado; `git diff --check` não apontou problemas.
+
+- [ ] **Publicação e APK desta etapa:** registrar a implementação na branch existente `work/improvements-nov-2026`, enviar ao repositório existente e criar APK Android interna `preview` no projeto Expo existente; não publicar em loja nem tocar em `main`.
+- **Configuração prevista:** Android + perfil `preview`, sem auto-submit. Registrar o ID EAS e status final depois de concluir a build.
+
+
+- [ ] **Publicação e APK desta etapa:** registrar a implementação na branch existente `work/improvements-nov-2026`, enviar ao repositório existente e criar APK Android interna `preview` no projeto Expo existente; não publicar em loja nem tocar em `main`.
+- **Configuração prevista:** Android + perfil `preview`, sem auto-submit. Registrar o ID EAS e status final depois de concluir a build.

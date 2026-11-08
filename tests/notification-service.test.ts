@@ -4,6 +4,9 @@ import type { TimeEntry } from '../types/app';
 const mocks = vi.hoisted(() => ({
   schedule: vi.fn().mockResolvedValue('notification-id'),
   cancelAll: vi.fn().mockResolvedValue(undefined),
+  cancelScheduled: vi.fn().mockResolvedValue(undefined),
+  getScheduled: vi.fn().mockResolvedValue([]),
+  getPermissions: vi.fn().mockResolvedValue({ status: 'granted' }),
   setChannel: vi.fn().mockResolvedValue(undefined),
   setHandler: vi.fn(),
 }));
@@ -12,13 +15,16 @@ vi.mock('expo-notifications', () => ({
   setNotificationHandler: mocks.setHandler,
   scheduleNotificationAsync: mocks.schedule,
   cancelAllScheduledNotificationsAsync: mocks.cancelAll,
+  cancelScheduledNotificationAsync: mocks.cancelScheduled,
+  getAllScheduledNotificationsAsync: mocks.getScheduled,
+  getPermissionsAsync: mocks.getPermissions,
   setNotificationChannelAsync: mocks.setChannel,
-  AndroidImportance: { MAX: 5 },
+  AndroidImportance: { MAX: 5, HIGH: 4 },
   SchedulableTriggerInputTypes: { DATE: 'date' },
 }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
-import { scheduleDayNotifications } from '../services/notification-service';
+import { scheduleDayNotifications, scheduleMeetingNotifications } from '../services/notification-service';
 import { DEFAULT_WORK_SCHEDULE } from '../utils/work-schedules';
 
 type ScheduledRequest = { content: { data?: { type?: string } }; trigger?: { date?: Date } };
@@ -42,6 +48,9 @@ const requests = (): ScheduledRequest[] => mocks.schedule.mock.calls.map(([reque
 beforeEach(() => {
   mocks.schedule.mockClear();
   mocks.cancelAll.mockClear();
+  mocks.cancelScheduled.mockClear();
+  mocks.getScheduled.mockReset().mockResolvedValue([]);
+  mocks.getPermissions.mockReset().mockResolvedValue({ status: 'granted' });
   mocks.setChannel.mockClear();
 });
 
@@ -78,5 +87,31 @@ describe('scheduleDayNotifications', () => {
 
     const reminder = requests().find((request) => request.content.data?.type === 'shift-complete');
     expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T18:00:00-03:00'));
+  });
+
+  it('não cancela lembretes da Agenda ao recalcular alertas de jornada', async () => {
+    mocks.getScheduled.mockResolvedValue([
+      { identifier: 'work-reminder', content: { data: { type: 'lunch-return' } } },
+      { identifier: 'meeting-reminder', content: { data: { type: 'meeting-reminder', user_id: 'user-1' } } },
+    ]);
+
+    await scheduleDayNotifications([], { userId: 'user-1', now: new Date('2026-11-05T12:00:00-03:00') });
+
+    expect(mocks.cancelScheduled).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelScheduled).toHaveBeenCalledWith('work-reminder');
+    expect(mocks.cancelScheduled).not.toHaveBeenCalledWith('meeting-reminder');
+  });
+
+  it('agenda um lembrete local por reunião para o usuário atual', async () => {
+    const result = await scheduleMeetingNotifications([{
+      id: 'meeting-1',
+      title: 'Reunião de equipe',
+      starts_at: '2026-11-07T16:30:00.000Z',
+      reminder_minutes: 5,
+    }], { userId: 'user-1', now: new Date('2026-11-07T16:00:00.000Z') });
+
+    expect(result).toEqual({ permissionGranted: true, scheduledCount: 1 });
+    const reminder = requests().find((request) => request.content.data?.type === 'meeting-reminder');
+    expect(reminder?.trigger?.date).toEqual(new Date('2026-11-07T16:25:00.000Z'));
   });
 });

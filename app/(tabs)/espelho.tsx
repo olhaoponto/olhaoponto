@@ -4,6 +4,7 @@ import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { getDaysInMonth, subMonths, addMonths } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
@@ -160,7 +161,7 @@ export default function EspelhoScreen() {
   return (
     <ScreenShell contentStyle={styles.page}>
       <TabNavigationCard active="espelho" />
-      <PageHeading eyebrow="Seu histórico pessoal" title="Espelho de ponto" subtitle="Horários que você registrou no app." right={<MaterialCommunityIcons name="calendar-month-outline" size={27} color={colors.deepTeal} />} />
+      <PageHeading eyebrow="Seu histórico pessoal" title="Espelho de ponto" subtitle="Horários que você registrou no app." right={<AccountMenuButton />} />
       <SurfaceCard style={styles.monthCard}>
         <View style={styles.monthControls}>
           <Pressable onPress={() => changeMonth(-1)} style={styles.monthArrow} accessibilityRole="button" accessibilityLabel="Mês anterior"><MaterialCommunityIcons name="chevron-left" size={24} color={colors.deepTeal} /></Pressable>

@@ -37,6 +37,13 @@ export interface BalanceAdjustment {
   criado_em: string;
 }
 
+export interface AgendaMeeting {
+  id: string;
+  title: string;
+  starts_at: string;
+  reminder_minutes: number;
+}
+
 export interface AlertPreferences {
   enabled?: boolean;
   before_minutes?: number;

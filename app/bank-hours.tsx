@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
@@ -121,7 +122,7 @@ export default function BankHoursScreen() {
   return (
     <ScreenShell contentStyle={styles.page}>
       <TabNavigationCard active="resumo" />
-      <PageHeading eyebrow="Saldo pessoal" title="Banco de horas" subtitle="Saldo estimado pelo app somado aos ajustes informados por você." right={<MaterialCommunityIcons name="wallet-plus-outline" size={27} color={colors.deepTeal} />} />
+      <PageHeading eyebrow="Saldo pessoal" title="Banco de horas" subtitle="Saldo estimado pelo app somado aos ajustes informados por você." right={<AccountMenuButton />} />
       <ActionButton title={formOpen ? 'Fechar lançamento' : 'Adicionar saldo existente'} onPress={() => { setFormOpen((open) => !open); setError(''); }} icon={<MaterialCommunityIcons name={formOpen ? 'close' : 'plus'} size={21} color="#FFFFFF" />} />
       {loading ? <View style={styles.loading}><ActivityIndicator color={colors.deepTeal} /><AppText variant="small" color={colors.muted}>Conferindo seu histórico…</AppText></View> : null}
       {!loading && complete && balance ? <>

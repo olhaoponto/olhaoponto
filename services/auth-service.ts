@@ -4,6 +4,7 @@ import type { Profile } from '../types/app';
 import { useAppStore } from '../store/app-store';
 import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
+import * as Notifications from 'expo-notifications';
 
 export interface AuthResult<T = void> { data: T | null; error: string | null; }
 
@@ -36,6 +37,7 @@ export async function login(email: string, password: string): Promise<AuthResult
 
 export async function logout(): Promise<AuthResult> {
   const { session } = await getAuthenticatedSession();
+  await Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   useAppStore.getState().setSession(null);
   useAppStore.getState().setProfile(null);

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 
@@ -9,7 +9,7 @@ export default function AboutScreen() {
   return (
     <ScreenShell contentStyle={{ gap: 16, paddingTop: 20 }}>
       <TabNavigationCard />
-      <PageHeading eyebrow="Olha o Ponto" title="Sobre o aplicativo" subtitle="Acompanhe seus próprios horários com clareza." right={<MaterialCommunityIcons name="clock-time-four-outline" size={28} color={colors.deepTeal} />} />
+      <PageHeading eyebrow="Olha o Ponto" title="Sobre o aplicativo" subtitle="Acompanhe seus próprios horários com clareza." right={<AccountMenuButton />} />
       <SurfaceCard>
         <AppText variant="subtitle">Finalidade</AppText>
         <AppText variant="body">O Olha o Ponto serve apenas para acompanhar seus próprios horários registrados no ponto da empresa e ajudar você a observar o limite diário da jornada.</AppText>

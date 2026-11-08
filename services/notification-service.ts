@@ -3,7 +3,9 @@ import { Platform } from 'react-native';
 import { ALERT_THRESHOLDS, LUNCH_REMINDER_MINUTES } from '../utils/alerts';
 import { calculateWorkedSeconds, formatMinutesHHMM, type TimeEntry } from '../utils/work-time';
 import { getScheduleEndAt } from '../utils/work-schedules';
-import type { WorkSchedule } from '../types/app';
+import type { AgendaMeeting, WorkSchedule } from '../types/app';
+import { parseAgendaReminderMinutes } from '../utils/agenda';
+import { calculateLunchReturnTimes } from '../utils/lunch-return';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -36,6 +38,14 @@ export async function prepareLocalNotifications(): Promise<{ granted: boolean; e
       sound: 'default',
       bypassDnd: false,
     });
+    await Notifications.setNotificationChannelAsync('meeting-reminders', {
+      name: 'Lembretes da Agenda',
+      description: 'Avisos locais das reuniões que você cadastrou.',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 120, 300],
+      sound: 'default',
+      bypassDnd: false,
+    });
   }
   let permission = await Notifications.getPermissionsAsync();
   if (permission.status !== 'granted') permission = await Notifications.requestPermissionsAsync();
@@ -58,7 +68,60 @@ function makeTrigger(date: Date, channelId: string): Notifications.DateTriggerIn
 }
 
 export async function cancelDayNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const workTypes = new Set(['shift-complete', 'lunch-start', 'lunch-return', 'work-alert']);
+  const identifiers = scheduled
+    .filter((notification) => workTypes.has(String(notification.content.data?.type ?? '')))
+    .map((notification) => notification.identifier);
+  await Promise.all(identifiers.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
+}
+
+export async function scheduleMeetingNotifications(
+  meetings: readonly AgendaMeeting[],
+  options: { userId: string; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
+): Promise<{ permissionGranted: boolean; scheduledCount: number }> {
+  const { userId, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const oldIdentifiers = scheduled
+    .filter((notification) => notification.content.data?.type === 'meeting-reminder' && notification.content.data?.user_id === userId)
+    .map((notification) => notification.identifier);
+  await Promise.all(oldIdentifiers.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
+
+  const permission = await Notifications.getPermissionsAsync();
+  if (permission.status !== 'granted') return { permissionGranted: false, scheduledCount: 0 };
+
+  const channelId = `meeting-reminders-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(channelId, {
+      name: `Agenda${soundEnabled ? ' com som' : ' silenciosa'}`,
+      description: 'Lembretes locais das suas reuniões.',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: vibrationEnabled ? [0, 300, 120, 300] : [],
+      sound: soundEnabled ? 'default' : null,
+      bypassDnd: false,
+    });
+  }
+
+  let scheduledCount = 0;
+  for (const meeting of meetings) {
+    const startsAt = new Date(meeting.starts_at);
+    const reminderMinutes = parseAgendaReminderMinutes(meeting.reminder_minutes);
+    if (!Number.isFinite(startsAt.getTime()) || startsAt.getTime() <= now.getTime() || reminderMinutes === null) continue;
+    const reminderAt = new Date(startsAt.getTime() - reminderMinutes * 60_000);
+    const fireAt = reminderAt.getTime() > now.getTime() ? reminderAt : new Date(now.getTime() + 1_000);
+    const meetingTime = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(startsAt);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Lembrete de reunião',
+        body: `${meeting.title} começa às ${meetingTime}.`,
+        sound: soundEnabled ? 'default' : false,
+        data: { type: 'meeting-reminder', user_id: userId, event_id: meeting.id },
+      },
+      trigger: makeTrigger(fireAt, channelId),
+    });
+    scheduledCount += 1;
+  }
+  return { permissionGranted: true, scheduledCount };
 }
 
 /** Recalcula agenda toda vez que o usuário bate ponto ou edita um horário. */
@@ -119,10 +182,10 @@ export async function scheduleDayNotifications(
   }
 
   if (lunchOut && !lunchIn && !finalOut) {
-    const lunchAt = new Date(lunchOut.registrado_em).getTime();
-    const returnAt = lunchAt + Math.max(0, lunchMinutes) * 60_000;
-    const warningAt = returnAt - Math.max(0, lunchReturnWarningMinutes) * 60_000;
-    const reminderAt = warningAt > now.getTime() ? new Date(warningAt) : new Date(now.getTime() + 1000);
+    const timing = calculateLunchReturnTimes(lunchOut.registrado_em, lunchMinutes, lunchReturnWarningMinutes);
+    if (!timing) return;
+    const returnAt = timing.returnAt.getTime();
+    const reminderAt = timing.warningAt.getTime() > now.getTime() ? timing.warningAt : new Date(now.getTime() + 1000);
     await Notifications.scheduleNotificationAsync({
       content: {
         title: reminderAt.getTime() < returnAt ? 'O almoço está quase no fim' : 'Hora de voltar do almoço',

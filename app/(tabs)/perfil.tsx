@@ -4,15 +4,17 @@ import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
-import { changePassword, deleteAccount, logout, updateEmail, updateProfile } from '@/services/auth-service';
+import { changePassword, deleteAccount, updateEmail, updateProfile } from '@/services/auth-service';
 import { exportJson } from '@/services/export-service';
-import { loadAllEntries, syncPendingEntries } from '@/services/time-entry-service';
+import { loadAllEntries } from '@/services/time-entry-service';
 import { useAppStore } from '@/store/app-store';
 import { useThemeContext } from '@/lib/theme-provider';
 import type { AlertPreferences, WorkSchedule, WorkScheduleDayOverride, Workday } from '@/types/app';
 import { DEFAULT_WORK_SCHEDULE, getActiveWorkSchedule, getExpectedWorkMinutes, getWorkSchedules, validateWorkSchedule } from '@/utils/work-schedules';
+import { getLunchReturnWarningMinutes, parseLunchReturnWarningMinutes } from '@/utils/lunch-return';
 
 const isStrong = (value: string) => value.length >= 12 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
 
@@ -38,7 +40,7 @@ export default function PerfilScreen() {
   const [scheduleModal, setScheduleModal] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
   const [draftSchedule, setDraftSchedule] = useState<WorkSchedule>({ ...DEFAULT_WORK_SCHEDULE, id: 'schedule-draft' });
-  const [plannedLunchTime, setPlannedLunchTime] = useState('12:00');
+  const [customLunchReturnMinutes, setCustomLunchReturnMinutes] = useState('5');
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
   const schedules = getWorkSchedules(prefs, profile?.almoco_minutos ?? 60);
   const activeSchedule = getActiveWorkSchedule(prefs, profile?.almoco_minutos ?? 60);
@@ -46,13 +48,13 @@ export default function PerfilScreen() {
   const profileId = profile?.id;
   const profileName = profile?.nome || '';
   const profileEmail = profile?.email || '';
-  const savedLunchTime = typeof prefs.horario_almoco_previsto === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(prefs.horario_almoco_previsto) ? prefs.horario_almoco_previsto : '12:00';
+  const savedLunchReturnMinutes = getLunchReturnWarningMinutes(prefs.lunch_return_warning_minutes);
 
   // Draft fields follow profile changes from Auth; user edits remain local until Save.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setName(profileName); setEmail(profileEmail); }, [profileId, profileName, profileEmail]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setPlannedLunchTime(savedLunchTime); }, [profileId, savedLunchTime]);
+  useEffect(() => { setCustomLunchReturnMinutes(String(savedLunchReturnMinutes)); }, [profileId, savedLunchReturnMinutes]);
   useEffect(() => { if (profileId) void AsyncStorage.getItem(`olhaponto:${profileId}:biometric`).then((value) => setBiometricEnabled(value === 'true')).catch(() => setBiometricEnabled(false)); }, [profileId]);
 
   const savePreferences = async (patch: Partial<AlertPreferences>, columns: Record<string, number> = {}) => {
@@ -100,9 +102,10 @@ export default function PerfilScreen() {
     await savePreferences({ work_schedules: nextSchedules }, { almoco_minutos: value });
   };
 
-  const savePlannedLunchTime = async () => {
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(plannedLunchTime)) { setError('Informe o horário previsto do almoço no formato HH:mm.'); return; }
-    await savePreferences({ horario_almoco_previsto: plannedLunchTime });
+  const saveCustomLunchReturnWarning = async () => {
+    const minutes = parseLunchReturnWarningMinutes(customLunchReturnMinutes);
+    if (minutes === null) { setError('Informe um número inteiro entre 1 e 180 minutos.'); return; }
+    await savePreferences({ lunch_return_warning_minutes: minutes });
   };
 
   const openScheduleEditor = (schedule?: WorkSchedule) => {
@@ -189,18 +192,6 @@ export default function PerfilScreen() {
     router.replace('/login');
   };
 
-  const handleLogout = async () => {
-    setSaving(true); setError('');
-    const synced = await syncPendingEntries();
-    if (!synced.data || synced.data.failed > 0) {
-      setSaving(false);
-      setError(synced.error || 'Há batidas aguardando sincronização. Conecte-se à internet e tente novamente antes de sair.');
-      return;
-    }
-    await logout();
-    setSaving(false);
-    router.replace('/login');
-  };
   const roleLabel = profile?.role === 'admin' ? 'Administrador' : 'Usuário';
 
   if (!profile) return <ScreenShell><AppText variant="body">Carregando perfil...</AppText></ScreenShell>;
@@ -208,7 +199,7 @@ export default function PerfilScreen() {
   return (
     <ScreenShell contentStyle={styles.page}>
       <TabNavigationCard active="perfil" />
-      <PageHeading eyebrow="Suas preferências" title="Perfil" subtitle="Conta e controles pessoais." right={<View style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="title" color={colors.deepTeal}>{profile.nome.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></View>} />
+      <PageHeading eyebrow="Suas preferências" title="Perfil" subtitle="Conta e controles pessoais." right={<AccountMenuButton />} />
       <SurfaceCard style={styles.identityCard}><View style={{ flex: 1, gap: 4 }}><AppText variant="subtitle">{profile.nome}</AppText><AppText variant="small" color={colors.muted}>{profile.email}</AppText></View><StatusPill tone={profile.role === 'admin' ? 'yellow' : 'teal'}>{roleLabel.toUpperCase()}</StatusPill></SurfaceCard>
       {message ? <AppText variant="small" color={colors.deepTeal}>{message}</AppText> : null}
       {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}
@@ -226,11 +217,9 @@ export default function PerfilScreen() {
         <AppText variant="subtitle">Limites e almoço</AppText>
         <AppText variant="small" color={colors.muted}>Limite diário pessoal · nunca acima de 10h</AppText>
         <View style={styles.choices}>{[480, 540, 600].map((value) => <Pressable key={value} onPress={() => savePreferences({}, { limite_minutos: value })} accessibilityRole="button" accessibilityState={{ selected: profile.limite_minutos === value }} style={[styles.choice, { borderColor: profile.limite_minutos === value ? colors.deepTeal : colors.border, backgroundColor: profile.limite_minutos === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={profile.limite_minutos === value ? colors.deepTeal : colors.foreground}>{formatLimit(value)}</AppText></Pressable>)}</View>
-        <AppText variant="small" color={colors.muted}>Duração prevista do almoço</AppText>
+        <AppText variant="small" color={colors.muted}>Duração do intervalo de almoço</AppText>
         <View style={styles.choices}>{[30, 45, 60, 90].map((value) => <Pressable key={value} onPress={() => saveActiveLunchMinutes(value)} accessibilityRole="button" accessibilityState={{ selected: activeSchedule.lunch_minutes === value }} style={[styles.choice, { borderColor: activeSchedule.lunch_minutes === value ? colors.deepTeal : colors.border, backgroundColor: activeSchedule.lunch_minutes === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={activeSchedule.lunch_minutes === value ? colors.deepTeal : colors.foreground}>{value} min</AppText></Pressable>)}</View>
-        <AppText variant="tiny" color={colors.muted}>O almoço selecionado na jornada ativa é usado para projetar a saída e calcular o aviso de retorno; o intervalo real não conta como hora trabalhada.</AppText>
-        <TextField label="Horário previsto para sair ao almoço (HH:mm)" value={plannedLunchTime} onChangeText={setPlannedLunchTime} keyboardType="numbers-and-punctuation" maxLength={5} placeholder="12:00" />
-        <ActionButton title="Salvar horário previsto" variant="outline" onPress={savePlannedLunchTime} loading={saving} />
+        <AppText variant="tiny" color={colors.muted}>Depois da batida de saída para almoço, o retorno é calculado pela hora real registrada mais a duração escolhida. Exemplo: saída às 13:26 + 60 min = retorno às 14:26. Não há horário fixo para sair.</AppText>
       </SurfaceCard>
 
       <SurfaceCard style={{ gap: 12 }}>
@@ -256,7 +245,10 @@ export default function PerfilScreen() {
       <SurfaceCard>
         <AppText variant="subtitle">Alertas e aparência</AppText>
         <AppText variant="small" color={colors.muted}>Aviso de retorno antes do fim do almoço</AppText>
-        <View style={styles.choices}>{[5, 10, 15].map((value) => <Pressable key={value} onPress={() => savePreferences({ lunch_return_warning_minutes: value })} accessibilityRole="button" accessibilityState={{ selected: (prefs.lunch_return_warning_minutes ?? 5) === value }} style={[styles.choice, { borderColor: (prefs.lunch_return_warning_minutes ?? 5) === value ? colors.deepTeal : colors.border, backgroundColor: (prefs.lunch_return_warning_minutes ?? 5) === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={(prefs.lunch_return_warning_minutes ?? 5) === value ? colors.deepTeal : colors.foreground}>{value} min antes</AppText></Pressable>)}</View>
+        <View style={styles.choices}>{[5, 10, 15].map((value) => <Pressable key={value} onPress={() => savePreferences({ lunch_return_warning_minutes: value })} accessibilityRole="button" accessibilityState={{ selected: savedLunchReturnMinutes === value }} style={[styles.choice, { borderColor: savedLunchReturnMinutes === value ? colors.deepTeal : colors.border, backgroundColor: savedLunchReturnMinutes === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={savedLunchReturnMinutes === value ? colors.deepTeal : colors.foreground}>{value} min antes</AppText></Pressable>)}</View>
+        <StatusPill tone="teal">AVISO ATUAL · {savedLunchReturnMinutes} MIN ANTES</StatusPill>
+        <TextField label="Ou personalize a antecedência (1 a 180 min)" value={customLunchReturnMinutes} onChangeText={setCustomLunchReturnMinutes} keyboardType="number-pad" maxLength={3} placeholder="Ex.: 2" />
+        <ActionButton title="Salvar antecedência personalizada" variant="outline" onPress={saveCustomLunchReturnWarning} loading={saving} />
         <PreferenceSwitch label="Notificações de jornada" value={prefs.enabled !== false} onChange={(value) => savePreferences({ enabled: value })} />
         <PreferenceSwitch label="Som de alerta" value={prefs.som !== false} onChange={(value) => savePreferences({ som: value })} />
         <PreferenceSwitch label="Vibração" value={prefs.vibracao !== false} onChange={(value) => savePreferences({ vibracao: value })} />
@@ -280,7 +272,6 @@ export default function PerfilScreen() {
         <AppText variant="subtitle" color={colors.error}>Zona de segurança</AppText>
         <AppText variant="small" color={colors.muted}>Apagar minha conta remove seu perfil e todas as batidas e preferências associadas. Essa ação não pode ser desfeita.</AppText>
         <ActionButton title="APAGAR MINHA CONTA" variant="danger" onPress={() => { setDeleteWord(''); setError(''); setDeleteModal(true); }} />
-        <ActionButton title="Sair da conta" variant="outline" onPress={handleLogout} />
       </SurfaceCard>
 
       <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Olha o Ponto · versão 1.0.0</AppText>

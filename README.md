@@ -2,6 +2,12 @@
 
 Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios horários registrados no ponto da empresa, pausar o contador durante o almoço e receber alertas locais antes do limite diário de trabalho. O app é um controle pessoal; não substitui o relógio, sistema ou registro oficial de ponto do empregador. Idealizado e criado por Marcos Henrique Edington Santos.
 
+## Almoço, Agenda e conta
+
+- O retorno do almoço é calculado somente depois da batida real de saída: hora registrada + duração do intervalo da jornada ativa. O aviso usa a antecedência escolhida (5, 10, 15 minutos ou um valor personalizado entre 1 e 180), sem horário fixo para sair.
+- A Agenda permite cadastrar, editar e excluir reuniões com lembretes locais. Títulos e detalhes ficam no armazenamento do aparelho por usuário e não são enviados ao Supabase nem sincronizados entre dispositivos; eventos locais são apagados ao sair da conta por privacidade.
+- O avatar no canto superior direito oferece as rotas Perfil e Agenda e a opção Sair; o cartão principal de navegação mantém Hoje, Espelho e Resumo.
+
 ## Tecnologia e estrutura
 
 - Expo SDK 57 / React Native / Expo Router / TypeScript.
@@ -9,8 +15,8 @@ Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios ho
 - Supabase client usando as variáveis `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY`; sessão nativa em SecureStore e sessão Web em localStorage.
 - `expo-notifications` para notificações locais; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho; `expo-screen-orientation` para o contador em paisagem apenas na tela Hoje.
 - `date-fns`/`date-fns-tz`, Zustand, React Native Reanimated, SVG e charges Lottie/SVG locais.
-- `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo/Perfil, alertas, Sobre, Administração e Banco de horas.
-- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações, ajustes externos do banco e exportação.
+- `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo, Perfil, Agenda, alertas, Sobre, Administração e Banco de horas.
+- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações, Agenda local, ajustes externos do banco e exportação.
 - `utils/`: cálculo de jornada, validação, jornadas configuráveis, saldo acumulado e níveis de alerta.
 - `components/charges/`: biblioteca local de 18 variações de charges.
 - `supabase/migrations/`: schema versionado; `supabase/functions/`: funções de conta com validação no servidor.

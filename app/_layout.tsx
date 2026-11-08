@@ -26,7 +26,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
-type AppNotificationType = 'work-alert' | 'lunch-return' | 'lunch-start' | 'shift-complete';
+type AppNotificationType = 'work-alert' | 'lunch-return' | 'lunch-start' | 'shift-complete' | 'meeting-reminder';
 
 function SessionBridge() {
   useEffect(() => {
@@ -88,7 +88,7 @@ function AppStack() {
       if (handledNotification.current === dedupeKey) return;
       handledNotification.current = dedupeKey;
       const data = request.content.data as { type?: string; level?: string; user_id?: string };
-      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-start' && data.type !== 'shift-complete') return;
+      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-start' && data.type !== 'shift-complete' && data.type !== 'meeting-reminder') return;
       const currentUserId = useAppStore.getState().profile?.id;
       if (currentUserId && data.user_id && currentUserId !== data.user_id) return;
       pendingNotification.current = { type: data.type, level: data.level ?? '8h', userId: data.user_id };
@@ -104,7 +104,8 @@ function AppStack() {
     if (!pending || !profile?.id) return;
     pendingNotification.current = null;
     if (pending.userId && pending.userId !== profile.id) return;
-    router.push({ pathname: '/alert', params: { level: pending.level, type: pending.type } });
+    if (pending.type === 'meeting-reminder') router.push('/agenda');
+    else router.push({ pathname: '/alert', params: { level: pending.level, type: pending.type } });
   }, [notificationVersion, profile?.id, router]);
 
   if (protectedRoute && !sessionInitialized) {
@@ -125,6 +126,7 @@ function AppStack() {
         <Stack.Screen name="admin/index" />
         <Stack.Screen name="about" />
         <Stack.Screen name="bank-hours" />
+        <Stack.Screen name="agenda" />
       </Stack>
       <GlobalAlertOverlay />
       <StatusBar style="auto" />

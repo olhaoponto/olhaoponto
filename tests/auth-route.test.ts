@@ -12,6 +12,7 @@ describe('auth route guard', () => {
   it('protects tabs and detail screens while leaving splash/login/recovery public', () => {
     expect(isRouteProtected('(tabs)')).toBe(true);
     expect(isRouteProtected('admin')).toBe(true);
+    expect(isRouteProtected('agenda')).toBe(true);
     expect(isRouteProtected('login')).toBe(false);
     expect(isRouteProtected('index')).toBe(false);
     expect(isRouteProtected('auth')).toBe(false);
@@ -19,6 +20,7 @@ describe('auth route guard', () => {
 
   it('redirects an unauthenticated back/deep-link to login', () => {
     expect(getAuthRouteRedirect({ routeRoot: '(tabs)' })).toBe('/login');
+    expect(getAuthRouteRedirect({ routeRoot: 'agenda' })).toBe('/login');
     expect(getAuthRouteRedirect({ routeRoot: 'bank-hours', sessionUserId: 'user-1' })).toBe('/');
   });
 

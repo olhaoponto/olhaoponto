@@ -19,8 +19,9 @@ import { DayOutcomeCard } from '@/components/DayOutcomeCard';
 import { getWorkScheduleForDate, getScheduleEndAt } from '@/utils/work-schedules';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
+import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { useRouter } from 'expo-router';
-import { logout } from '@/services/auth-service';
+import { calculateLunchReturnTimes, getLunchReturnWarningMinutes } from '@/utils/lunch-return';
 
 const ZONE = 'America/Bahia';
 const labels: Record<PunchType, string> = { entrada: 'Entrada', saida_almoco: 'Saída para almoço', volta_almoco: 'Volta do almoço', saida: 'Saída' };
@@ -49,9 +50,6 @@ export default function HomeScreen() {
   const [success, setSuccess] = useState('');
   const [celebrated, setCelebrated] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<{ granted: boolean; exactAlarms: boolean } | null>(null);
-  const [accountMenuVisible, setAccountMenuVisible] = useState(false);
-  const [accountMenuError, setAccountMenuError] = useState('');
-  const [signingOut, setSigningOut] = useState(false);
   const [weekEntries, setWeekEntries] = useState<TimeEntry[]>([]);
   const [dayStatuses, setDayStatuses] = useState<DayStatusRecord[]>([]);
   const [dayStatusModal, setDayStatusModal] = useState(false);
@@ -75,6 +73,9 @@ export default function HomeScreen() {
     ? { ...selectedSchedule, work_days: [...selectedSchedule.work_days, weekday] }
     : selectedSchedule;
   const lunchMinutes = activeSchedule.lunch_minutes;
+  const lunchReturnWarningMinutes = getLunchReturnWarningMinutes(profile?.preferencias_alerta?.lunch_return_warning_minutes);
+  const lunchOutEntry = todayEntries.find((entry) => entry.tipo === 'saida_almoco');
+  const lunchReturnTiming = lunchOutEntry ? calculateLunchReturnTimes(lunchOutEntry.registrado_em, lunchMinutes, lunchReturnWarningMinutes) : null;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = calculateWorkedMinutes(todayEntries, now);
   const remainingMinutes = Math.max(0, limit - workedMinutes);
@@ -186,13 +187,8 @@ export default function HomeScreen() {
   };
 
   const shareLunch = async (useCurrentTime: boolean) => {
-    const planned = typeof profile?.preferencias_alerta?.horario_almoco_previsto === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(profile.preferencias_alerta.horario_almoco_previsto)
-      ? profile.preferencias_alerta.horario_almoco_previsto
-      : '12:00';
     const out = timeFor('saida_almoco');
-    const departure = out
-      ? new Date(out.registrado_em)
-      : fromZonedTime(`${today}T${useCurrentTime ? localTime(new Date().toISOString()) : planned}:00`, profile?.fuso || ZONE);
+    const departure = out ? new Date(out.registrado_em) : new Date();
     const returnDate = new Date(departure.getTime() + lunchMinutes * 60_000);
     const departureLabel = localTime(departure.toISOString());
     const returnLabel = localTime(returnDate.toISOString());
@@ -200,7 +196,7 @@ export default function HomeScreen() {
       ? `Já saí para o almoço às ${departureLabel} e volto às ${returnLabel} (${lunchMinutes} min).`
       : useCurrentTime
         ? `Estou indo almoçar agora, às ${departureLabel}. Se você precisar de algo, me avise. Volto por volta das ${returnLabel} (${lunchMinutes} min).`
-        : `Vou almoçar às ${departureLabel} e volto às ${returnLabel} (${lunchMinutes} min).`;
+        : `Se eu sair para o almoço agora, às ${departureLabel}, volto por volta das ${returnLabel} (${lunchMinutes} min).`;
     setSharingLunch(true);
     try { await Share.share({ title: 'Horário de almoço', message: `${message}
 
@@ -209,25 +205,9 @@ Enviado pelo Olha o Ponto.` }); }
     finally { setSharingLunch(false); }
   };
 
-  const handleSignOut = async () => {
-    if (signingOut) return;
-    setSigningOut(true); setAccountMenuError('');
-    try {
-      const synced = await syncPendingEntries();
-      if (!synced.data || synced.data.failed > 0) {
-        setAccountMenuError(synced.error || 'Há batidas aguardando sincronização. Conecte-se à internet e tente novamente antes de sair.');
-        return;
-      }
-      await logout();
-      setAccountMenuVisible(false);
-      router.replace('/login');
-    } catch (reason) {
-      setAccountMenuError(reason instanceof Error ? reason.message : 'Não foi possível sair agora. Tente novamente.');
-    } finally { setSigningOut(false); }
-  };
-
   const timeFor = (type: PunchType) => todayEntries.find((entry) => entry.tipo === type);
   const projectedLabel = eta ? formatInTimeZone(new Date(eta), profile?.fuso || ZONE, 'HH:mm') : '—';
+  const lunchReturnLabel = lunchReturnTiming ? formatInTimeZone(lunchReturnTiming.returnAt, profile?.fuso || ZONE, 'HH:mm') : null;
   const pendingCount = todayEntries.filter((entry) => Boolean((entry as TimeEntry & { _pending?: boolean })._pending)).length;
   const pendingStatusCount = dayStatuses.filter((item) => Boolean(item._pending)).length;
   const name = profile?.nome?.trim().split(/\s+/)[0] || 'por aí';
@@ -250,7 +230,7 @@ Enviado pelo Olha o Ponto.` }); }
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<Pressable onPress={() => { setAccountMenuError(''); setAccountMenuVisible(true); }} accessibilityRole="button" accessibilityLabel="Abrir configurações e sair da conta" style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="subtitle" color={colors.deepTeal}>{(profile?.nome || 'OP').split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></Pressable>} />
+      <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<AccountMenuButton />} />
 
       <TabNavigationCard />
 
@@ -286,13 +266,13 @@ Enviado pelo Olha o Ponto.` }); }
           {todayEntries.length === 0 ? <Pressable onPress={() => setDayStatusModal(true)} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="calendar-alert" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Marcar falta, atestado ou folga</AppText></Pressable> : null}
         </SurfaceCard>
 
-        {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>O contador está pausado. Lembrete para voltar em {lunchMinutes} minutos.</AppText></View></SurfaceCard> : null}
+        {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
         <SurfaceCard style={{ gap: 10 }}>
           <View style={styles.sectionHeading}><MaterialCommunityIcons name="food-apple-outline" size={23} color={colors.deepTeal} /><AppText variant="subtitle" style={{ flex: 1 }}>Combine o horário do almoço</AppText></View>
           <AppText variant="small" color={colors.muted}>Compartilhe pelo WhatsApp, mensagem ou outro app. Você escolhe o contato e confirma o envio; o Olha o Ponto não envia nada sozinho.</AppText>
           <ActionButton title="Avisar que estou saindo para almoçar" variant="secondary" onPress={() => void shareLunch(true)} loading={sharingLunch} icon={<MaterialCommunityIcons name="send-outline" size={18} color="#FFFFFF" />} />
-          <ActionButton title="Compartilhar horário previsto" variant="outline" onPress={() => void shareLunch(false)} loading={sharingLunch} icon={<MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.deepTeal} />} />
-          <AppText variant="tiny" color={colors.muted}>Horário configurado no Perfil: {typeof profile?.preferencias_alerta?.horario_almoco_previsto === 'string' ? profile.preferencias_alerta.horario_almoco_previsto : '12:00'} · intervalo {lunchMinutes} min.</AppText>
+          <ActionButton title="Compartilhar previsão a partir de agora" variant="outline" onPress={() => void shareLunch(false)} loading={sharingLunch} icon={<MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.deepTeal} />} />
+          <AppText variant="tiny" color={colors.muted}>Sem horário fixo: após bater a saída, o retorno é calculado pela hora real registrada mais {lunchMinutes} min de intervalo.</AppText>
         </SurfaceCard>
         <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       </>}
@@ -310,17 +290,6 @@ Enviado pelo Olha o Ponto.` }); }
             <ActionButton title="Falta / ausência" variant="outline" onPress={() => void handleChooseDayStatus('absence')} loading={savingDayStatus} disabled={savingDayStatus || todayEntries.length > 0} />
             <ActionButton title="Atestado" variant="outline" onPress={() => void handleChooseDayStatus('medical_leave')} loading={savingDayStatus} disabled={savingDayStatus || todayEntries.length > 0} />
             <ActionButton title="Cancelar" variant="ghost" onPress={() => setDayStatusModal(false)} disabled={savingDayStatus} />
-          </SurfaceCard>
-        </View>
-      </Modal>
-      <Modal visible={accountMenuVisible} transparent animationType="fade" onRequestClose={() => setAccountMenuVisible(false)}>
-        <View style={styles.accountMenuBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAccountMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Fechar menu da conta" />
-          <SurfaceCard style={styles.accountMenuCard}>
-            <View style={styles.accountMenuHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Sua conta</AppText><AppText variant="small" color={colors.muted}>{profile?.email}</AppText></View><Pressable onPress={() => setAccountMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Fechar menu"><MaterialCommunityIcons name="close" size={22} color={colors.muted} /></Pressable></View>
-            {accountMenuError ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{accountMenuError}</AppText> : null}
-            <ActionButton title="Perfil e configurações" variant="outline" onPress={() => { setAccountMenuVisible(false); router.replace('/(tabs)/perfil'); }} icon={<MaterialCommunityIcons name="cog-outline" size={19} color={colors.deepTeal} />} />
-            <ActionButton title="Sair da conta" variant="outline" onPress={handleSignOut} loading={signingOut} icon={<MaterialCommunityIcons name="logout" size={19} color={colors.deepTeal} />} />
           </SurfaceCard>
         </View>
       </Modal>

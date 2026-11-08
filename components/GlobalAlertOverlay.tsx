@@ -13,8 +13,10 @@ import { loadDayStatuses } from '@/services/day-status-service';
 import type { DayStatusRecord } from '@/types/app';
 import { chooseCharge, ChargeIllustration, type AlertLevel, type Charge } from '@/components/charges';
 import { insertTimeEntry } from '@/services/time-entry-service';
-import { scheduleDayNotifications } from '@/services/notification-service';
+import { scheduleDayNotifications, scheduleMeetingNotifications } from '@/services/notification-service';
+import { loadAgendaMeetings } from '@/services/agenda-service';
 import { ActionButton, AppText, TextField, useAppColors } from '@/components/ui';
+import { getLunchReturnWarningMinutes } from '@/utils/lunch-return';
 
 const zone = 'America/Bahia';
 function formatClock(totalSeconds: number) {
@@ -71,7 +73,7 @@ export default function GlobalAlertOverlay() {
       : schedule;
   }, [profile?.preferencias_alerta, profile?.almoco_minutos, today, dayStatus]);
   const lunchMinutes = activeSchedule.lunch_minutes;
-  const lunchReturnWarningMinutes = typeof profile?.preferencias_alerta?.lunch_return_warning_minutes === 'number' ? profile.preferencias_alerta.lunch_return_warning_minutes : 5;
+  const lunchReturnWarningMinutes = getLunchReturnWarningMinutes(profile?.preferencias_alerta?.lunch_return_warning_minutes);
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = Math.floor(workedSeconds / 60);
   const activeAlert = getCurrentAlert(workedMinutes, limit);
@@ -112,6 +114,21 @@ export default function GlobalAlertOverlay() {
       now: new Date(),
     }).catch(() => undefined);
   }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, activeSchedule, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId || profile?.id !== userId) return;
+    let active = true;
+    void loadAgendaMeetings(userId).then((meetings) => {
+      if (!active) return;
+      return scheduleMeetingNotifications(meetings, {
+        userId,
+        soundEnabled: profile.preferencias_alerta?.som !== false,
+        vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
+      });
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [session?.user.id, profile?.id, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao]);
 
   useEffect(() => {
     if (!key || !session || !profile) return;

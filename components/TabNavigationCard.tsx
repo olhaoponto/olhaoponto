@@ -8,10 +8,9 @@ const items: { key: AppTabKey; label: string; icon: React.ComponentProps<typeof 
   { key: 'index', label: 'HOJE', icon: 'clock-time-four-outline' },
   { key: 'espelho', label: 'ESPELHO', icon: 'calendar-month-outline' },
   { key: 'resumo', label: 'RESUMO', icon: 'chart-box-outline' },
-  { key: 'perfil', label: 'PERFIL', icon: 'account-circle-outline' },
 ];
 
-export function TabNavigationCard({ active = 'index' }: { active?: AppTabKey }) {
+export function TabNavigationCard({ active = 'index' }: { active?: AppTabKey | null }) {
   const colors = useAppColors();
   const router = useRouter();
   return (

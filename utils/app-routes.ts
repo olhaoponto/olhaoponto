@@ -8,4 +8,8 @@ export const APP_TAB_ROUTES = {
   perfil: '/(tabs)/perfil' as Href,
 } as const;
 
+export const APP_ROUTES = {
+  agenda: '/agenda' as Href,
+} as const;
+
 export type AppTabKey = keyof typeof APP_TAB_ROUTES;
