@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppText, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
-import { getDailyWelcome, type MascotTheme } from '@/utils/welcome-message';
+import { getDailyWelcome, getWelcomeMessageStorageKey, type MascotTheme } from '@/utils/welcome-message';
+import { useAppStore } from '@/store/app-store';
 
-const DURATION_MS = 6500;
+const DURATION_MS = 11500;
 const mascotImages: Record<MascotTheme, number> = {
   base: require('../assets/images/mascot/clock-base.png'),
   christmas: require('../assets/images/mascot/clock-christmas.png'),
@@ -14,7 +16,11 @@ const mascotImages: Record<MascotTheme, number> = {
 
 export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
   const colors = useAppColors();
-  const welcome = useMemo(() => getDailyWelcome(new Date()), []);
+  const sessionUserId = useAppStore((state) => state.session?.user.id ?? null);
+  const profile = useAppStore((state) => state.profile);
+  const userId = profile?.ativo === true && profile.id === sessionUserId ? sessionUserId : null;
+  const openedAt = useMemo(() => new Date(), []);
+  const [welcome, setWelcome] = useState(() => getDailyWelcome(openedAt));
   const [progress] = useState(() => new Animated.Value(0));
   const completed = useRef(false);
   const finish = useCallback(() => {
@@ -22,6 +28,37 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
     completed.current = true;
     onContinue();
   }, [onContinue]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadWelcome = async () => {
+      let previousMessage: string | null = null;
+      const storageKey = userId ? getWelcomeMessageStorageKey(userId) : null;
+      if (storageKey) {
+        try {
+          previousMessage = await AsyncStorage.getItem(storageKey);
+        } catch {
+          previousMessage = null;
+        }
+      }
+
+      if (!active) return;
+      const nextWelcome = getDailyWelcome(openedAt, { previousMessage });
+      setWelcome(nextWelcome);
+
+      if (storageKey) {
+        try {
+          await AsyncStorage.setItem(storageKey, nextWelcome.message);
+        } catch {
+          // A storage failure must not block the opening screen or its button.
+        }
+      }
+    };
+
+    void loadWelcome();
+    return () => { active = false; };
+  }, [openedAt, userId]);
 
   useEffect(() => {
     const animation = Animated.timing(progress, { toValue: 1, duration: DURATION_MS, useNativeDriver: false });

@@ -9,5 +9,8 @@ verify_jwt = true
 [functions.admin-set-user-status]
 verify_jwt = true
 
+[functions.admin-session-control]
+verify_jwt = true
+
 [functions.delete-account]
 verify_jwt = true

@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, Pressable, Text, View } from 'react-native';
 import '@/lib/_core/nativewind-pressable';
 import { ThemeProvider, useThemeContext } from '@/lib/theme-provider';
 import { SafeAreaFrameContext, SafeAreaInsetsContext, SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { useAppStore } from '@/store/app-store';
 import { SchemeColors } from '@/constants/theme';
 import GlobalAlertOverlay from '@/components/GlobalAlertOverlay';
 import { getAuthRouteRedirect, isRouteProtected } from '@/utils/auth-route';
+import { checkSessionControl, recordUserPresence } from '@/services/session-control-service';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -73,8 +74,37 @@ function AppStack() {
   const pendingNotification = useRef<{ type: AppNotificationType; level: string; userId?: string } | null>(null);
   const handledNotification = useRef('');
   const [notificationVersion, setNotificationVersion] = useState(0);
+  const [validatedAccessToken, setValidatedAccessToken] = useState('');
   const { colorScheme, setColorScheme } = useThemeContext();
   const preferredTheme = typeof profile?.preferencias_alerta?.tema === 'string' ? profile.preferencias_alerta.tema : null;
+  useEffect(() => {
+    if (!session?.user.id || !session.access_token) return;
+    const userId = session.user.id;
+    const accessToken = session.access_token;
+    let alive = true;
+    let checking = false;
+    let firstCheck = true;
+    const verify = async () => {
+      if (checking || AppState.currentState !== 'active') return;
+      checking = true;
+      const currentSession = useAppStore.getState().session;
+      if (!currentSession || currentSession.user.id !== userId) { checking = false; return; }
+      const result = await checkSessionControl(currentSession);
+      if (!alive) { checking = false; return; }
+      if (result.forced) {
+        await supabase.auth.signOut({ scope: 'local' });
+        router.replace('/login');
+      } else {
+        void recordUserPresence();
+        if (firstCheck) { firstCheck = false; setValidatedAccessToken(accessToken); }
+      }
+      checking = false;
+    };
+    void verify();
+    const timer = setInterval(() => { void verify(); }, 30_000);
+    const listener = AppState.addEventListener('change', (state) => { if (state === 'active') void verify(); });
+    return () => { alive = false; clearInterval(timer); listener.remove(); };
+  }, [session?.user.id, session?.access_token, router]);
   useEffect(() => {
     void ScreenOrientation.lockAsync(homeRoute && counterRotationEnabled ? ScreenOrientation.OrientationLock.DEFAULT : ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
   }, [homeRoute, counterRotationEnabled]);
@@ -112,6 +142,9 @@ function AppStack() {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#0B6A63" /></View>;
   }
   if (routeRedirect) return <Redirect href={routeRedirect} />;
+  if (protectedRoute && session?.access_token && validatedAccessToken !== session.access_token) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#0B6A63" /></View>;
+  }
 
   return (
     <>

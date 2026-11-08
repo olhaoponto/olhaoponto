@@ -1,7 +1,10 @@
+import type { AlertPreferences } from '../types/app';
 import { DEFAULT_DAILY_LIMIT_MINUTES, formatMinutesHHMM } from './work-time';
 
-/** Aviso preventivo para planejar o intervalo quando a saída para almoço ainda não foi registrada. */
+/** Aviso preventivo padrão quando a saída para almoço ainda não foi registrada. */
 export const LUNCH_REMINDER_MINUTES = 240;
+export const MIN_LUNCH_REMINDER_MINUTES = 60;
+export const MAX_LUNCH_REMINDER_MINUTES = 480;
 
 export interface AlertThreshold {
   minutes: number;
@@ -25,6 +28,36 @@ export const ALERT_THRESHOLDS: readonly AlertThreshold[] = [
   { minutes: 595, label: '9h55 trabalhadas', level: 'urgent', repeatEveryMinutes: 1 },
   { minutes: DEFAULT_DAILY_LIMIT_MINUTES, label: 'Limite diário atingido', level: 'blocking', repeatEveryMinutes: null },
 ];
+
+const preferenceByMinute: Record<number, keyof AlertPreferences> = {
+  480: 'alerta_8h',
+  540: 'alerta_9h',
+  570: 'alerta_9h30',
+  585: 'alerta_9h45',
+  590: 'alerta_9h50',
+  595: 'alerta_9h55',
+};
+
+export function getLunchReminderMinutes(value: unknown): number {
+  const minutes = Number(value);
+  return Number.isInteger(minutes) && minutes >= MIN_LUNCH_REMINDER_MINUTES && minutes <= MAX_LUNCH_REMINDER_MINUTES
+    ? minutes
+    : LUNCH_REMINDER_MINUTES;
+}
+
+/** O marco correspondente pode ser desligado; o limite pessoal nunca pode ser silenciado. */
+export function isWorkAlertEnabled(minutes: number, limitMinutes = DEFAULT_DAILY_LIMIT_MINUTES, preferences?: AlertPreferences | null): boolean {
+  if (minutes >= Math.max(1, Math.min(DEFAULT_DAILY_LIMIT_MINUTES, Math.floor(limitMinutes)))) return true;
+  const preference = preferenceByMinute[minutes]
+    ?? (minutes >= 595 ? preferenceByMinute[595]
+      : minutes >= 590 ? preferenceByMinute[590]
+        : minutes >= 585 ? preferenceByMinute[585]
+          : minutes >= 570 ? preferenceByMinute[570]
+            : minutes >= 540 ? preferenceByMinute[540]
+              : minutes >= 480 ? preferenceByMinute[480]
+                : undefined);
+  return preference ? preferences?.[preference] !== false : true;
+}
 
 function blockingThreshold(limitMinutes: number): AlertThreshold {
   return { minutes: limitMinutes, label: 'Limite diário atingido', level: 'blocking', repeatEveryMinutes: null };

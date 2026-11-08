@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session, User } from '@supabase/supabase-js';
-import type { Profile } from '../types/app';
+import type { Profile, UserPresence } from '../types/app';
 import { useAppStore } from '../store/app-store';
 import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
 import * as Notifications from 'expo-notifications';
+import { captureSessionControlBaseline } from './session-control-service';
 
 export interface AuthResult<T = void> { data: T | null; error: string | null; }
 
@@ -28,6 +29,11 @@ export async function login(email: string, password: string): Promise<AuthResult
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return { data: null, error: friendly(error) };
     if (!data.user || !data.session) return { data: null, error: 'O login não iniciou uma sessão válida. Confira sua conexão e tente novamente.' };
+    const control = await captureSessionControlBaseline(data.session);
+    if (control.forced) {
+      await supabase.auth.signOut({ scope: 'local' });
+      return { data: null, error: 'Um administrador solicitou o encerramento desta sessão. Aguarde alguns segundos e entre novamente.' };
+    }
     useAppStore.getState().setSession(data.session);
     return { data: { user: data.user, session: data.session }, error: null };
   } catch (error) {
@@ -133,6 +139,8 @@ async function invoke<T = unknown>(functionName: string, body: Record<string, un
 export const adminCreateUser = (body: { email: string; nome: string; senhaProvisoria: string }) => invoke<{ user_id: string }>('admin-create-user', body);
 export const adminResetPassword = (body: { user_id: string; nova_senha: string }) => invoke('admin-reset-password', body);
 export const adminSetUserStatus = (body: { user_id: string; ativo: boolean }) => invoke('admin-set-user-status', body);
+export const adminListPresence = () => invoke<{ presence: UserPresence[]; activity_window_seconds: number }>('admin-session-control', { action: 'list' });
+export const adminForceUserLogout = (user_id: string) => invoke<{ ok: boolean; forced_logout_at: string; message: string }>('admin-session-control', { action: 'force_logout', user_id });
 
 export async function deleteAccount(confirmation: string): Promise<AuthResult> {
   if (confirmation !== 'APAGAR') return { data: null, error: 'Digite APAGAR para confirmar a exclusão.' };

@@ -10,6 +10,11 @@ export interface DailyWelcome {
   theme: MascotTheme;
 }
 
+export interface WelcomeMessageSelectionOptions {
+  random?: () => number;
+  previousMessage?: string | null;
+}
+
 const TIME_ZONE = 'America/Bahia';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -108,16 +113,27 @@ export function getMascotThemeForDateKey(dateKey: string): MascotTheme {
   return 'base';
 }
 
-function stableIndex(key: string, length: number): number {
-  let hash = 2166136261;
-  for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) % length;
+function randomIndex(random: () => number, length: number): number {
+  const value = random();
+  if (!Number.isFinite(value)) return 0;
+  const normalized = Math.max(0, Math.min(value, 1 - Number.EPSILON));
+  return Math.floor(normalized * length);
 }
 
-export function getDailyWelcome(date: Date = new Date()): DailyWelcome {
+function selectMessage(lines: string[], previousMessage: string | null | undefined, random: () => number): string {
+  if (lines.length === 0) return '';
+  const selectedIndex = randomIndex(random, lines.length);
+  if (lines.length > 1 && previousMessage && lines[selectedIndex] === previousMessage) {
+    return lines[(selectedIndex + 1) % lines.length];
+  }
+  return lines[selectedIndex];
+}
+
+export function getWelcomeMessageStorageKey(userId: string): string {
+  return `olhaponto:${userId}:welcome-message`;
+}
+
+export function getDailyWelcome(date: Date = new Date(), options: WelcomeMessageSelectionOptions = {}): DailyWelcome {
   const dateKey = formatInTimeZone(date, TIME_ZONE, 'yyyy-MM-dd');
   const theme = getMascotThemeForDateKey(dateKey);
   const hour = Number(formatInTimeZone(date, TIME_ZONE, 'H'));
@@ -127,7 +143,7 @@ export function getDailyWelcome(date: Date = new Date()): DailyWelcome {
     dateKey,
     greeting,
     seasonLabel: themeMessages.label,
-    message: themeMessages.lines[stableIndex(dateKey, themeMessages.lines.length)],
+    message: selectMessage(themeMessages.lines, options.previousMessage, options.random ?? Math.random),
     theme,
   };
 }

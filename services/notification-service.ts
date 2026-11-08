@@ -1,9 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { ALERT_THRESHOLDS, LUNCH_REMINDER_MINUTES } from '../utils/alerts';
+import { ALERT_THRESHOLDS, getLunchReminderMinutes, isWorkAlertEnabled } from '../utils/alerts';
 import { calculateWorkedSeconds, formatMinutesHHMM, type TimeEntry } from '../utils/work-time';
 import { getScheduleEndAt } from '../utils/work-schedules';
-import type { AgendaMeeting, WorkSchedule } from '../types/app';
+import type { AlertPreferences, AgendaMeeting, WorkSchedule } from '../types/app';
 import { parseAgendaReminderMinutes } from '../utils/agenda';
 import { calculateLunchReturnTimes } from '../utils/lunch-return';
 
@@ -127,9 +127,10 @@ export async function scheduleMeetingNotifications(
 /** Recalcula agenda toda vez que o usuário bate ponto ou edita um horário. */
 export async function scheduleDayNotifications(
   entries: readonly TimeEntry[],
-  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; workSchedule?: WorkSchedule; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
+  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; lunchReturnEnabled?: boolean; lunchReminderMinutes?: number; alertPreferences?: AlertPreferences | null; workSchedule?: WorkSchedule; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
 ): Promise<void> {
-  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, workSchedule, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  const pauseReminderMinutes = getLunchReminderMinutes(lunchReminderMinutes ?? alertPreferences?.lunch_reminder_minutes);
   await cancelDayNotifications();
   if (!enabled || entries.length === 0) return;
   const channelId = `work-alerts-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
@@ -152,7 +153,7 @@ export async function scheduleDayNotifications(
   const finalOut = entries.find((entry) => entry.tipo === 'saida');
   const workedSeconds = calculateWorkedSeconds(entries, now);
 
-  if (!finalOut && workSchedule) {
+  if (!finalOut && workSchedule && alertPreferences?.alerta_fim_jornada !== false) {
     const scheduledEnd = start.data ? getScheduleEndAt(start.data, workSchedule, timeZone) : null;
     if (scheduledEnd) {
       const fireAt = scheduledEnd > now ? scheduledEnd : new Date(now.getTime() + 1000);
@@ -168,20 +169,20 @@ export async function scheduleDayNotifications(
     }
   }
 
-  if (!lunchOut && !finalOut && workedSeconds < LUNCH_REMINDER_MINUTES * 60) {
-    const reminderAt = new Date(now.getTime() + (LUNCH_REMINDER_MINUTES * 60 - workedSeconds) * 1000);
+  if (alertPreferences?.alerta_pausa_almoco !== false && !lunchOut && !finalOut && workedSeconds < pauseReminderMinutes * 60) {
+    const reminderAt = new Date(now.getTime() + (pauseReminderMinutes * 60 - workedSeconds) * 1000);
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Lembrete de pausa',
-        body: 'Você já trabalhou 4 horas. Se ainda não fez o intervalo, registre a saída para almoço no relógio da empresa e no app.',
+        body: `Você já trabalhou ${formatMinutesHHMM(pauseReminderMinutes)}. Se ainda não fez o intervalo, registre a saída para almoço no relógio da empresa e no app.`,
         sound: soundEnabled ? 'default' : false,
-        data: { type: 'lunch-start', level: '8h' satisfies AlertRouteLevel, minutes: LUNCH_REMINDER_MINUTES, user_id: userId },
+        data: { type: 'lunch-start', level: '8h' satisfies AlertRouteLevel, minutes: pauseReminderMinutes, user_id: userId },
       },
       trigger: makeTrigger(reminderAt, channelId),
     });
   }
 
-  if (lunchOut && !lunchIn && !finalOut) {
+  if (lunchReturnEnabled && lunchOut && !lunchIn && !finalOut) {
     const timing = calculateLunchReturnTimes(lunchOut.registrado_em, lunchMinutes, lunchReturnWarningMinutes);
     if (!timing) return;
     const returnAt = timing.returnAt.getTime();
@@ -208,7 +209,7 @@ export async function scheduleDayNotifications(
   // From 9h50 onward, repeat every minute through the hard limit.
   for (let minute = 590; minute <= Math.min(600, limitMinutes); minute++) thresholds.add(minute);
 
-  const activeThresholds = [...thresholds].filter((minute) => minute * 60 > workedSeconds).sort((a, b) => a - b);
+  const activeThresholds = [...thresholds].filter((minute) => isWorkAlertEnabled(minute, limitMinutes, alertPreferences) && minute * 60 > workedSeconds).sort((a, b) => a - b);
   for (const minute of activeThresholds) {
     const delayMs = minute * 60_000 - workedSeconds * 1000;
     if (delayMs <= 0) continue;

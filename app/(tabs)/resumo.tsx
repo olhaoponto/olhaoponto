@@ -78,8 +78,8 @@ export default function ResumoScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <TabNavigationCard active="resumo" />
       <PageHeading eyebrow="Uma visão tranquila" title="Resumo" subtitle="Como está seu ritmo neste mês." right={<AccountMenuButton />} />
+      <TabNavigationCard active="resumo" />
       <SurfaceCard style={styles.monthCard}>
         <Pressable onPress={() => changeMonth(-1)} accessibilityRole="button" accessibilityLabel="Mês anterior"><MaterialCommunityIcons name="chevron-left" size={25} color={colors.deepTeal} /></Pressable>
         <AppText variant="subtitle" style={{ textTransform: 'capitalize', flex: 1, textAlign: 'center' }}>{labelMonth(month)}</AppText>

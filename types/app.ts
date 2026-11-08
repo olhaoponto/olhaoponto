@@ -29,6 +29,48 @@ export interface DayStatusRecord {
   _pending?: boolean;
 }
 
+export interface UserPresence {
+  user_id: string;
+  last_seen_at: string;
+  active_recently: boolean;
+}
+
+export type BroadcastType = 'maintenance' | 'update' | 'announcement';
+
+export interface BroadcastMessage {
+  id: string;
+  title: string;
+  message: string;
+  message_type: BroadcastType;
+  active: boolean;
+  expires_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LunchColleague {
+  id: string;
+  nome: string;
+}
+
+export type LunchInviteStatus = 'pending' | 'accepted' | 'unavailable' | 'meeting';
+
+export interface LunchInviteSummary {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  sender_name: string;
+  recipient_name: string;
+  lunch_at: string;
+  return_at: string;
+  message: string;
+  status: LunchInviteStatus;
+  response_message: string | null;
+  created_at: string;
+  responded_at: string | null;
+}
+
 export interface BalanceAdjustment {
   id: string;
   user_id: string;
@@ -49,10 +91,22 @@ export interface AgendaMeeting {
 
 export interface AlertPreferences {
   enabled?: boolean;
+  som?: boolean;
+  vibracao?: boolean;
   before_minutes?: number;
   work_schedules?: WorkSchedule[];
   active_work_schedule_id?: string;
   lunch_return_warning_minutes?: number;
+  lunch_reminder_minutes?: number;
+  alerta_pausa_almoco?: boolean;
+  alerta_retorno_almoco?: boolean;
+  alerta_fim_jornada?: boolean;
+  alerta_8h?: boolean;
+  alerta_9h?: boolean;
+  alerta_9h30?: boolean;
+  alerta_9h45?: boolean;
+  alerta_9h50?: boolean;
+  alerta_9h55?: boolean;
   rotacao_contador?: boolean;
   horario_almoco_previsto?: string;
   [key: string]: unknown;

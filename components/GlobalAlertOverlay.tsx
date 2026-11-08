@@ -6,7 +6,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '@/store/app-store';
 import { calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, safeClockOutTimestamp, validatePunch } from '@/utils/work-time';
-import { getCurrentAlert } from '@/utils/alerts';
+import { getCurrentAlert, getLunchReminderMinutes, isWorkAlertEnabled } from '@/utils/alerts';
 import { getWorkScheduleForDate } from '@/utils/work-schedules';
 import { getCivilWeekday } from '@/utils/day-status';
 import { loadDayStatuses } from '@/services/day-status-service';
@@ -73,15 +73,17 @@ export default function GlobalAlertOverlay() {
       : schedule;
   }, [profile?.preferencias_alerta, profile?.almoco_minutos, today, dayStatus]);
   const lunchMinutes = activeSchedule.lunch_minutes;
+  const lunchReminderMinutes = getLunchReminderMinutes(profile?.preferencias_alerta?.lunch_reminder_minutes);
   const lunchReturnWarningMinutes = getLunchReturnWarningMinutes(profile?.preferencias_alerta?.lunch_return_warning_minutes);
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = Math.floor(workedSeconds / 60);
   const activeAlert = getCurrentAlert(workedMinutes, limit);
-  const key = session?.user.id && !completed ? `${session.user.id}:${displayKey(workedMinutes, limit)}` : '';
+  const activeAlertEnabled = Boolean(activeAlert && isWorkAlertEnabled(activeAlert.minutes, limit, profile?.preferencias_alerta));
+  const key = session?.user.id && !completed && activeAlertEnabled ? `${session.user.id}:${displayKey(workedMinutes, limit)}` : '';
   const level = alertLevel(workedMinutes, limit);
   const remainingSeconds = Math.max(0, limit * 60 - workedSeconds);
-  const critical = workedMinutes >= 590 || Boolean(activeAlert?.level === 'blocking');
-  const urgent = workedMinutes >= 585;
+  const critical = activeAlertEnabled && (workedMinutes >= 590 || Boolean(activeAlert?.level === 'blocking'));
+  const urgent = activeAlertEnabled && workedMinutes >= 585;
   const pulseStyle = useAnimatedStyle(() => ({ opacity: urgent ? 0.04 + pulse.value * 0.05 : 0.05, transform: [{ scale: urgent ? 0.99 + pulse.value * 0.02 : 1 }] }));
 
   useEffect(() => {
@@ -106,6 +108,9 @@ export default function GlobalAlertOverlay() {
       limitMinutes: limit,
       lunchMinutes,
       lunchReturnWarningMinutes,
+      lunchReturnEnabled: profile.preferencias_alerta?.alerta_retorno_almoco !== false,
+      lunchReminderMinutes,
+      alertPreferences: profile.preferencias_alerta,
       workSchedule: activeSchedule,
       timeZone: profile.fuso || zone,
       enabled: profile.preferencias_alerta?.enabled !== false,
@@ -113,7 +118,7 @@ export default function GlobalAlertOverlay() {
       vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
       now: new Date(),
     }).catch(() => undefined);
-  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, activeSchedule, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
+  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, lunchReminderMinutes, activeSchedule, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
 
   useEffect(() => {
     const userId = session?.user.id;
@@ -131,7 +136,8 @@ export default function GlobalAlertOverlay() {
   }, [session?.user.id, profile?.id, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao]);
 
   useEffect(() => {
-    if (!key || !session || !profile) return;
+    if (!key) { lastKey.current = ''; return; }
+    if (!session || !profile) return;
     if (lastKey.current === key) return;
     lastKey.current = key;
     const selected = chooseCharge(level, previousCharge.current);
@@ -152,7 +158,7 @@ export default function GlobalAlertOverlay() {
   }, [key, level, session, profile]);
 
   useEffect(() => {
-    const shouldKeepAwake = Boolean(!completed && session && profile && (workedMinutes >= 590 || activeAlert?.level === 'blocking'));
+    const shouldKeepAwake = Boolean(!completed && session && profile && critical);
     if (Platform.OS !== 'web') {
       if (shouldKeepAwake) void activateKeepAwakeAsync('olhaponto-critical-alert').catch(() => undefined);
       else void deactivateKeepAwake('olhaponto-critical-alert').catch(() => undefined);
@@ -165,7 +171,7 @@ export default function GlobalAlertOverlay() {
         Vibration.cancel();
       }
     };
-  }, [session, profile, workedMinutes, activeAlert?.level, completed]);
+  }, [session, profile, critical, completed]);
 
   useEffect(() => {
     if (urgent) pulse.value = withRepeat(withTiming(1, { duration: 1600 }), -1, true);
@@ -224,7 +230,7 @@ export default function GlobalAlertOverlay() {
     setMessage((result.data as typeof result.data & { _pending?: boolean })._pending ? 'Batida anterior guardada neste aparelho. Continue pela próxima etapa.' : 'Batida anterior registrada. Continue pela próxima etapa.');
   };
 
-  if (!session || !profile || !charge || !activeAlert || completed || workedMinutes < Math.min(570, limit)) return null;
+  if (!session || !profile || !charge || !activeAlert || !activeAlertEnabled || completed || workedMinutes < Math.min(570, limit)) return null;
   const title = activeAlert.level === 'blocking'
     ? 'LIMITE ATINGIDO! Pare de trabalhar e bata o ponto de saída AGORA!'
     : workedMinutes >= 590

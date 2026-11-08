@@ -13,7 +13,7 @@ const friendly = (error: unknown) => {
 const cacheKey = (id: string) => `olhaponto:${id}:time-entries`;
 const pendingKey = (id: string) => `olhaponto:${id}:pending-time-entries`;
 const zone = 'America/Bahia';
-const civilDate = (value: string | Date) => formatInTimeZone(value, zone, 'yyyy-MM-dd');
+const civilDate = (value: string | Date) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : formatInTimeZone(value, zone, 'yyyy-MM-dd');
 const readList = async (key: string): Promise<TimeEntry[]> => { try { return JSON.parse((await AsyncStorage.getItem(key)) || '[]') as TimeEntry[]; } catch { return []; } };
 const writeList = (key: string, rows: TimeEntry[]) => AsyncStorage.setItem(key, JSON.stringify(rows));
 
@@ -75,6 +75,19 @@ export const loadEntriesByMonth = (month: string | Date) => {
     matches,
   );
 };
+
+export const loadEntriesByDateRange = async (startDate: string | Date, endDate: string | Date): Promise<ServiceResult<TimeEntry[]>> => {
+  const start = civilDate(startDate);
+  const end = civilDate(endDate);
+  if (start > end) return { data: null, error: 'O intervalo informado é inválido.' };
+  const matches = (entry: TimeEntry) => entry.data >= start && entry.data <= end;
+  return cachedThenRemote(
+    (uid) => supabase.from('time_entries').select('*').eq('user_id', uid).gte('data', start).lte('data', end).order('registrado_em'),
+    matches,
+  );
+};
+
+export const loadEntriesByRange = loadEntriesByDateRange;
 
 function isNetworkFailure(error: { message?: string; code?: string; status?: number }): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;

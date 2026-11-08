@@ -65,6 +65,27 @@ describe('scheduleDayNotifications', () => {
     expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T12:00:00-03:00'));
   });
 
+  it('personaliza a antecedência do aviso pré-almoço sem depender de um horário fixo', async () => {
+    await scheduleDayNotifications([entry('entrada', '08:00')], {
+      userId: 'user-1',
+      lunchReminderMinutes: 180,
+      now: new Date('2026-11-05T10:00:00-03:00'),
+    });
+    const reminder = requests().find((request) => request.content.data?.type === 'lunch-start');
+    expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T11:00:00-03:00'));
+  });
+
+  it('permite desligar separadamente o aviso pré-almoço e o aviso de retorno', async () => {
+    await scheduleDayNotifications([entry('entrada', '08:00'), entry('saida_almoco', '11:30')], {
+      userId: 'user-1',
+      lunchReturnEnabled: false,
+      alertPreferences: { alerta_pausa_almoco: false },
+      now: new Date('2026-11-05T12:15:00-03:00'),
+    });
+    expect(requests().some((request) => request.content.data?.type === 'lunch-start')).toBe(false);
+    expect(requests().some((request) => request.content.data?.type === 'lunch-return')).toBe(false);
+  });
+
   it('avisa cinco minutos antes do retorno calculado a partir da saída real para almoço', async () => {
     await scheduleDayNotifications([entry('entrada', '08:00'), entry('saida_almoco', '11:30')], {
       userId: 'user-1',
@@ -87,6 +108,21 @@ describe('scheduleDayNotifications', () => {
 
     const reminder = requests().find((request) => request.content.data?.type === 'shift-complete');
     expect(reminder?.trigger?.date).toEqual(new Date('2026-11-05T18:00:00-03:00'));
+  });
+
+  it('respeita o toggle de 9h, mas conserva a notificação do limite crítico', async () => {
+    await scheduleDayNotifications([
+      entry('entrada', '08:00'),
+      entry('saida_almoco', '12:00'),
+      entry('volta_almoco', '13:00'),
+    ], {
+      userId: 'user-1',
+      alertPreferences: { alerta_9h: false },
+      now: new Date('2026-11-05T13:00:00-03:00'),
+    });
+    const alerts = requests().filter((request) => request.content.data?.type === 'work-alert');
+    expect(alerts.some((request) => (request.content.data as { minutes?: number }).minutes === 540)).toBe(false);
+    expect(alerts.some((request) => (request.content.data as { minutes?: number }).minutes === 600)).toBe(true);
   });
 
   it('não cancela lembretes da Agenda ao recalcular alertas de jornada', async () => {

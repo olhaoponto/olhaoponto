@@ -12,6 +12,16 @@ import { useThemeContext } from '@/lib/theme-provider';
 import type { AlertPreferences, WorkSchedule, WorkScheduleDayOverride, Workday } from '@/types/app';
 import { DEFAULT_WORK_SCHEDULE, getActiveWorkSchedule, getExpectedWorkMinutes, getWorkSchedules, validateWorkSchedule } from '@/utils/work-schedules';
 import { getLunchReturnWarningMinutes, parseLunchReturnWarningMinutes } from '@/utils/lunch-return';
+import { getLunchReminderMinutes, MAX_LUNCH_REMINDER_MINUTES, MIN_LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
+
+const WORK_ALERT_OPTIONS = [
+  { key: 'alerta_8h', label: 'Jornada completa (8h)' },
+  { key: 'alerta_9h', label: 'Lembrete de 9 horas' },
+  { key: 'alerta_9h30', label: 'Lembrete de 9h30' },
+  { key: 'alerta_9h45', label: 'Lembrete de 9h45' },
+  { key: 'alerta_9h50', label: 'Lembrete de 9h50' },
+  { key: 'alerta_9h55', label: 'Lembrete de 9h55' },
+] as const;
 
 export default function ConfiguracoesScreen() {
   const colors = useAppColors();
@@ -26,16 +36,20 @@ export default function ConfiguracoesScreen() {
   const [scheduleError, setScheduleError] = useState('');
   const [draftSchedule, setDraftSchedule] = useState<WorkSchedule>({ ...DEFAULT_WORK_SCHEDULE, id: 'schedule-draft' });
   const [customLunchReturnMinutes, setCustomLunchReturnMinutes] = useState('5');
+  const [customLunchReminderMinutes, setCustomLunchReminderMinutes] = useState('240');
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
   const schedules = getWorkSchedules(prefs, profile?.almoco_minutos ?? 60);
   const activeSchedule = getActiveWorkSchedule(prefs, profile?.almoco_minutos ?? 60);
   const selectedTheme = typeof prefs.tema === 'string' ? prefs.tema : 'system';
   const profileId = profile?.id;
   const savedLunchReturnMinutes = getLunchReturnWarningMinutes(prefs.lunch_return_warning_minutes);
+  const savedLunchReminderMinutes = getLunchReminderMinutes(prefs.lunch_reminder_minutes);
 
   // Keep the editable field aligned with the saved profile preference.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setCustomLunchReturnMinutes(String(savedLunchReturnMinutes)); }, [profileId, savedLunchReturnMinutes]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setCustomLunchReminderMinutes(String(savedLunchReminderMinutes)); }, [profileId, savedLunchReminderMinutes]);
   useEffect(() => { if (profileId) void AsyncStorage.getItem(`olhaponto:${profileId}:biometric`).then((value) => setBiometricEnabled(value === 'true')).catch(() => setBiometricEnabled(false)); }, [profileId]);
 
   const savePreferences = async (patch: Partial<AlertPreferences>, columns: Record<string, number> = {}) => {
@@ -87,6 +101,15 @@ export default function ConfiguracoesScreen() {
     const minutes = parseLunchReturnWarningMinutes(customLunchReturnMinutes);
     if (minutes === null) { setError('Informe um número inteiro entre 1 e 180 minutos.'); return; }
     await savePreferences({ lunch_return_warning_minutes: minutes });
+  };
+
+  const saveCustomLunchReminder = async () => {
+    const minutes = Number(customLunchReminderMinutes);
+    if (!Number.isInteger(minutes) || minutes < MIN_LUNCH_REMINDER_MINUTES || minutes > MAX_LUNCH_REMINDER_MINUTES) {
+      setError(`Informe um número inteiro entre ${MIN_LUNCH_REMINDER_MINUTES} e ${MAX_LUNCH_REMINDER_MINUTES} minutos.`);
+      return;
+    }
+    await savePreferences({ lunch_reminder_minutes: minutes });
   };
 
   const openScheduleEditor = (schedule?: WorkSchedule) => {
@@ -164,12 +187,21 @@ export default function ConfiguracoesScreen() {
 
       <SurfaceCard>
         <AppText variant="subtitle">Alertas, aparência e segurança</AppText>
+        <PreferenceSwitch label="Aviso preventivo antes do almoço" value={prefs.alerta_pausa_almoco !== false} onChange={(value) => savePreferences({ alerta_pausa_almoco: value })} />
+        <TextField label={`Avisar após X minutos de trabalho (${MIN_LUNCH_REMINDER_MINUTES}–${MAX_LUNCH_REMINDER_MINUTES})`} value={customLunchReminderMinutes} onChangeText={setCustomLunchReminderMinutes} keyboardType="number-pad" maxLength={3} placeholder="240" />
+        <StatusPill tone="teal">AVISO PREVENTIVO · {savedLunchReminderMinutes} MIN</StatusPill>
+        <ActionButton title="Salvar antecedência do aviso de pausa" variant="outline" onPress={saveCustomLunchReminder} loading={saving} />
+        <PreferenceSwitch label="Notificar antes de voltar do almoço" value={prefs.alerta_retorno_almoco !== false} onChange={(value) => savePreferences({ alerta_retorno_almoco: value })} />
         <AppText variant="small" color={colors.muted}>Aviso de retorno antes do fim do almoço</AppText>
         <View style={styles.choices}>{[5, 10, 15].map((value) => <Pressable key={value} onPress={() => savePreferences({ lunch_return_warning_minutes: value })} accessibilityRole="button" accessibilityState={{ selected: savedLunchReturnMinutes === value }} style={[styles.choice, { borderColor: savedLunchReturnMinutes === value ? colors.deepTeal : colors.border, backgroundColor: savedLunchReturnMinutes === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={savedLunchReturnMinutes === value ? colors.deepTeal : colors.foreground}>{value} min antes</AppText></Pressable>)}</View>
         <StatusPill tone="teal">AVISO ATUAL · {savedLunchReturnMinutes} MIN ANTES</StatusPill>
         <TextField label="Ou personalize a antecedência (1 a 180 min)" value={customLunchReturnMinutes} onChangeText={setCustomLunchReturnMinutes} keyboardType="number-pad" maxLength={3} placeholder="Ex.: 2" />
         <ActionButton title="Salvar antecedência personalizada" variant="outline" onPress={saveCustomLunchReturnWarning} loading={saving} />
         <PreferenceSwitch label="Notificações de jornada" value={prefs.enabled !== false} onChange={(value) => savePreferences({ enabled: value })} />
+        <AppText variant="small" color={colors.muted}>Alertas de jornada que você quer receber</AppText>
+        {WORK_ALERT_OPTIONS.map(({ key, label }) => <PreferenceSwitch key={key} label={label} value={prefs[key] !== false} onChange={(value) => savePreferences({ [key]: value })} />)}
+        <PreferenceSwitch label="Aviso no fim da jornada programada" value={prefs.alerta_fim_jornada !== false} onChange={(value) => savePreferences({ alerta_fim_jornada: value })} />
+        <AppText variant="tiny" color={colors.muted}>O aviso de bloqueio no limite pessoal — no máximo 10 horas — não pode ser desativado. Os alertas usam notificações locais e respeitam as permissões deste aparelho.</AppText>
         <PreferenceSwitch label="Som de alerta" value={prefs.som !== false} onChange={(value) => savePreferences({ som: value })} />
         <PreferenceSwitch label="Vibração" value={prefs.vibracao !== false} onChange={(value) => savePreferences({ vibracao: value })} />
         <PreferenceSwitch label="Rotação do contador Hoje" value={prefs.rotacao_contador !== false} onChange={(value) => savePreferences({ rotacao_contador: value })} />

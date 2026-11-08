@@ -205,3 +205,24 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 - [x] Criar e entregar o ZIP-fonte sem `.env`, `.git`, `node_modules` ou caches, após registrar o commit e o resultado da build.
 - Build EAS `2d191fc4-0423-4e06-978f-beb0fa90513b`: `Succeeded`, versão `1.0.1 (8)`, build time `11m14`, total `11m21`, disponível por 13 dias; built from code commit `94d979c`.
 - Link para abrir a instalação/baixar a APK no Android: https://expo.dev/accounts/edingtonmaquine/projects/olhonoponto/builds/2d191fc4-0423-4e06-978f-beb0fa90513b.
+
+
+## 17. Requisitos do anexo — implementação autorizada em 08/11/2026
+
+- [x] **Abertura com mascote:** variar a frase em cada abertura autenticada, evitar repetição consecutiva por usuário, aumentar a leitura para cerca de 11,5 segundos e preservar o avanço imediato.
+- [x] **Presença e logout administrativo:** a lista mostra o último heartbeat; “ativo agora” significa sinal nos últimos 2 minutos. O admin pode registrar pedido de saída por usuário sem visualizar tokens. A versão atual do app verifica o marcador ao iniciar, voltar ao primeiro plano e a cada 30s e encerra localmente sessões on-line na próxima verificação. Isso não revoga JWTs já emitidos na camada Auth do Supabase nem obriga versões antigas a sair. O marcador por usuário pode servir à futura ação em massa.
+- [x] **Comunicados de manutenção/atualização:** administração tem textos-modelo de manutenção, atualização e aviso, além de composição personalizada, edição, pausa/reativação e remoção. Usuários ativos veem a mensagem com o mascote e podem confirmá-la; recibos são por usuário.
+- [x] **Convite interno para almoço:** escolher colega ativo por nome, enviar convite com o mascote dentro do app e responder aceitando, não podendo ou tendo reunião; remetente recebe a resposta. RLS limita os convites aos participantes; não há leitura de contatos nem envio externo automático.
+- [x] **Compartilhar link de instalação:** campo HTTPS editável para copiar/colar, seletor nativo de compartilhamento e mensagem que diz que o destinatário deve solicitar acesso ao administrador.
+- [x] **Espelho por período:** seletor mensal/semanal, navegação por intervalos civis de sete dias inclusive na virada de mês; edição e exportação continuam disponíveis no modo mensal.
+- [x] **Falta e folga:** “Permita registrar, falta, folga.” Já há escolha no Hoje para `absence` (falta/ausência), `rest` (folga) e `medical_leave` (atestado), com cache/sincronização e RLS pessoal no Supabase existente; preservar esse comportamento e não duplicar migration.
+- [x] **Personalizar notificações:** aviso preventivo de pausa personalizável de 60–480 minutos e toggle próprio; retorno calculado pela batida real e com toggle/antecedência próprios; marcos e fim de jornada configuráveis. O bloqueio crítico e o teto de 10h permanecem obrigatórios.
+- [x] **Posição persistente do menu:** cartão de navegação aparece abaixo do cabeçalho nas telas Hoje, Espelho, Resumo e Agenda, na ordem existente; Perfil permanece no avatar.
+- [x] **Splash antes do login:** splash nativo exibe mascote e nome Olha o Ponto, sem modificar package/bundle IDs, scheme, owner ou `projectId` EAS.
+
+**Restrições desta rodada:** alterar somente `work/improvements-nov-2026`; usar o projeto Supabase e o projeto EAS já indicados; migration apenas aditiva; não mudar `main`, dados existentes, publicar em loja, criar projeto ou iniciar mais de uma build APK.
+
+**Estado remoto confirmado:** migration `admin_communications` registrada no Supabase como `20261108201303`; as cinco novas tabelas estão no schema `public` com RLS habilitada. Edge Function `admin-session-control` publicada como `ACTIVE`, `verify_jwt=true`; o slug não existia antes do deploy.
+
+
+**Validação desta implementação antes da APK:** `pnpm check` e `pnpm lint` passaram; `pnpm test` passou com 97 testes e 1 teste legado ignorado; `git diff --check` passou; o bundle Android Expo foi exportado para `/tmp` com `--no-bytecode`. A exportação local com bytecode Hermes não é compatível com este sandbox ARM porque o binário `hermesc` instalado é x86_64; não foi gerada APK localmente. A página Expo autenticada do projeto existente foi conferida: a última build anterior é `1.0.1 (8)` / `94d979c`, sem build desta etapa em andamento.
