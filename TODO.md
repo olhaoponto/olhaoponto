@@ -183,23 +183,25 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 
 ## 15. Navegação, Perfil/Configurações e mascote de abertura
 
-- [ ] Navegação principal: exibir na ordem `HOJE | ESPELHO | RESUMO | AGENDA` no menu/cartão compartilhado existente, incluindo navegação correta quando o app estiver em qualquer uma dessas telas.
-- [ ] Menu do avatar: ao tocar no ícone superior direito, oferecer exatamente as ações `Perfil`, `Configurações` e `Sair do Sistema`; preservar a sincronização de batidas pendentes antes de sair.
-- [ ] Separação Perfil/Configurações: manter no Perfil nome/e-mail, troca de senha, exportação, exclusão de conta, acesso a termos/sobre e administração para admin. Mover para Configurações limite, duração de almoço, jornadas, antecedência do aviso de retorno, preferências de alertas, aparência/tema e biometria. Preservar o salvamento já existente no Supabase/local e não mudar schema nem defaults.
-- [ ] Boas-vindas com mascote: depois da inicialização/autenticação existentes e antes de Hoje, apresentar em cada abertura fria uma tela temporária com o relógio mascote, frase breve de incentivo original em pt-BR, barra de progresso e fechamento automático após cerca de 6 segundos; permitir continuar imediatamente de forma discreta.
-- [ ] Identidade do personagem: usar o relógio visto em `assets/images/rest-day-clock-ui.png` como referência, mantendo sua identidade e extraindo o personagem isolado (não transformar a cadeira/cena de praia no mascote). Criar PNGs transparentes para tema neutro, Natal, Ano Novo, Carnaval e Festa Junina e selecionar conforme data brasileira; usar neutral como fallback.
-- [ ] Mensagem do dia: manter frases curtas e locais, selecionadas de forma determinística para o mesmo dia, sem copiar a mensagem do Vita MahJong e sem consulta de rede; o texto deve falar de jornada/pausas/ritmo e permanecer legível na tela.
-- [ ] Segurança e navegação: não interceptar login, biometria, troca de senha provisória ou aceite de termos; não reapresentar a tela de incentivo em caso de erro inicial, nem afetar mascote/fluxos das demais telas.
-- [ ] Economia de build: validar código localmente, publicar somente na branch existente `work/improvements-nov-2026` e gerar a APK pelo Expo.dev existente, perfil Android `preview`, sem compilar APK no sandbox e sem submissão/publicação de loja. Usar no máximo um build EAS para este conjunto de alterações.
+- [x] Navegação principal: exibir na ordem `HOJE | ESPELHO | RESUMO | AGENDA` no menu/cartão compartilhado existente, incluindo navegação correta quando o app estiver em qualquer uma dessas telas.
+- [x] Menu do avatar: ao tocar no ícone superior direito, oferecer exatamente as ações `Perfil`, `Configurações` e `Sair do Sistema`; preservar a sincronização de batidas pendentes antes de sair.
+- [x] Separação Perfil/Configurações: manter no Perfil nome/e-mail, troca de senha, exportação, exclusão de conta, acesso a termos/sobre e administração para admin. Mover para Configurações limite, duração de almoço, jornadas, antecedência do aviso de retorno, preferências de alertas, aparência/tema e biometria. Preservar o salvamento já existente no Supabase/local e não mudar schema nem defaults.
+- [x] Boas-vindas com mascote: depois da inicialização/autenticação existentes e antes de Hoje, apresentar em cada abertura fria uma tela temporária com o relógio mascote, frase breve de incentivo original em pt-BR, barra de progresso e fechamento automático após cerca de 6 segundos; permitir continuar imediatamente de forma discreta.
+- [x] Identidade do personagem: usar o relógio visto em `assets/images/rest-day-clock-ui.png` como referência, mantendo sua identidade e extraindo o personagem isolado (não transformar a cadeira/cena de praia no mascote). Criar PNGs transparentes para tema neutro, Natal, Ano Novo, Carnaval e Festa Junina e selecionar conforme data brasileira; usar neutral como fallback.
+- [x] Mensagem do dia: manter frases curtas e locais, selecionadas de forma determinística para o mesmo dia, sem copiar a mensagem do Vita MahJong e sem consulta de rede; o texto deve falar de jornada/pausas/ritmo e permanecer legível na tela.
+- [x] Segurança e navegação: não interceptar login, biometria, troca de senha provisória ou aceite de termos; não reapresentar a tela de incentivo em caso de erro inicial, nem afetar mascote/fluxos das demais telas.
+- [x] Economia de build: validar código localmente, publicar somente na branch existente `work/improvements-nov-2026` e gerar a APK pelo Expo.dev existente, perfil Android `preview`, sem compilar APK no sandbox e sem submissão/publicação de loja. Usar no máximo um build EAS para este conjunto de alterações.
 
 
-## 15. Navegação, Configurações e abertura com mascote — 8 de novembro de 2026
+## 16. Resultado final — navegação, Configurações e abertura com mascote — 8 de novembro de 2026
 
 - [x] Atualizar o cartão de navegação para `HOJE | ESPELHO | RESUMO | AGENDA` nessa ordem e deixar Perfil fora da barra principal.
 - [x] Separar Perfil (dados, segurança, exportação e ações da conta) de Configurações (limites, jornadas, almoço, alertas, tema e biometria); o avatar oferece exatamente Perfil, Configurações e Sair do Sistema.
 - [x] Criar a abertura com relógio mascote, mensagens originais determinísticas em pt-BR, variações neutra/Natal/Ano Novo/Carnaval/Festa Junina, barra de progresso, continuação imediata e auto-fechamento em 6,5 segundos.
 - [x] Centralizar a tela na rota protegida `/welcome` após sessão restaurada, login, troca obrigatória de senha e aceite inicial dos termos; preservar biometria, autenticação e guardas de acesso.
 - [x] Validar com `pnpm check`, `pnpm lint`, `pnpm test` (89 aprovados, 1 legado ignorado), `git diff --check` e exportação somente do bundle Android do Expo. Nenhuma APK foi compilada localmente.
-- [ ] Enviar somente ao repositório existente `olhaoponto/olhaoponto`, branch `work/improvements-nov-2026`; não alterar `main` nem criar projeto novo.
-- [ ] Acionar uma APK Android no Expo EAS existente `@edingtonmaquine/olhonoponto`, perfil/ambiente `preview`, `android.buildType=apk`; não enviar nem submeter à Play Store.
-- [ ] Criar e entregar um ZIP-fonte sem `.env`, `.git`, `node_modules` ou caches, depois de registrar o commit de código e o resultado da build.
+- [x] Enviar somente ao repositório existente `olhaoponto/olhaoponto`, branch `work/improvements-nov-2026`; não alterar `main` nem criar projeto novo. Commit de código `94d979ce0e6d2c49e6fb27294a027b282688d694`.
+- [x] Gerar APK Android interna pelo Expo EAS existente `@edingtonmaquine/olhonoponto`, perfil/ambiente `preview`, `android.buildType=apk`; auto-submit desligado, nenhuma submissão à Play Store.
+- [x] Criar e entregar o ZIP-fonte sem `.env`, `.git`, `node_modules` ou caches, após registrar o commit e o resultado da build.
+- Build EAS `2d191fc4-0423-4e06-978f-beb0fa90513b`: `Succeeded`, versão `1.0.1 (8)`, build time `11m14`, total `11m21`, disponível por 13 dias; built from code commit `94d979c`.
+- Link para abrir a instalação/baixar a APK no Android: https://expo.dev/accounts/edingtonmaquine/projects/olhonoponto/builds/2d191fc4-0423-4e06-978f-beb0fa90513b.

@@ -151,6 +151,8 @@ O identificador Android configurado é `space.manus.olhaponto.t099013940753689`.
 
 O perfil `preview` incrementa o versionCode remoto automaticamente para que uma APK de correção possa atualizar a instalação anterior, desde que permaneça assinada com a keystore cadastrada no projeto EAS `olhonoponto`.
 
+Última APK interna gerada em 08/11/2026: EAS build `2d191fc4-0423-4e06-978f-beb0fa90513b`, versão `1.0.1 (8)`, status `Succeeded`, branch `work/improvements-nov-2026`, commit de código `94d979c`. O link do build abre a instalação/transferência no Android e fica disponível por 13 dias: https://expo.dev/accounts/edingtonmaquine/projects/olhonoponto/builds/2d191fc4-0423-4e06-978f-beb0fa90513b. A compilação foi interna; nenhuma loja foi submetida.
+
 Uma distribuição iOS instalável fora do Expo Go exige Apple Developer/assinatura e configuração Apple; não está configurada neste perfil APK.
 
 ## Privacidade
