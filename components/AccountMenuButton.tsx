@@ -6,7 +6,7 @@ import { ActionButton, AppText, SurfaceCard, initials, useAppColors } from '@/co
 import { syncPendingEntries } from '@/services/time-entry-service';
 import { logout } from '@/services/auth-service';
 import { useAppStore } from '@/store/app-store';
-import { APP_ROUTES, APP_TAB_ROUTES } from '@/utils/app-routes';
+import { APP_ROUTES } from '@/utils/app-routes';
 
 export function AccountMenuButton() {
   const colors = useAppColors();
@@ -42,7 +42,7 @@ export function AccountMenuButton() {
       <Pressable
         onPress={() => { setError(''); setVisible(true); }}
         accessibilityRole="button"
-        accessibilityLabel="Abrir menu Perfil, Agenda e Sair"
+        accessibilityLabel="Abrir menu Perfil, Configurações e Sair do Sistema"
         style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}
       >
         <AppText variant="subtitle" color={colors.deepTeal}>{initials(profile?.nome)}</AppText>
@@ -61,9 +61,9 @@ export function AccountMenuButton() {
               </Pressable>
             </View>
             {error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
-            <ActionButton title="Perfil" variant="outline" onPress={() => { close(); router.replace(APP_TAB_ROUTES.perfil); }} icon={<MaterialCommunityIcons name="account-cog-outline" size={19} color={colors.deepTeal} />} />
-            <ActionButton title="Agenda" variant="outline" onPress={() => { close(); router.push(APP_ROUTES.agenda); }} icon={<MaterialCommunityIcons name="calendar-clock-outline" size={19} color={colors.deepTeal} />} />
-            <ActionButton title="Sair da conta" variant="outline" onPress={handleSignOut} loading={signingOut} icon={<MaterialCommunityIcons name="logout" size={19} color={colors.deepTeal} />} />
+            <ActionButton title="Perfil" variant="outline" onPress={() => { close(); router.replace(APP_ROUTES.perfil); }} icon={<MaterialCommunityIcons name="account-outline" size={19} color={colors.deepTeal} />} />
+            <ActionButton title="Configurações" variant="outline" onPress={() => { close(); router.replace(APP_ROUTES.configuracoes); }} icon={<MaterialCommunityIcons name="cog-outline" size={19} color={colors.deepTeal} />} />
+            <ActionButton title="Sair do Sistema" variant="outline" onPress={handleSignOut} loading={signingOut} icon={<MaterialCommunityIcons name="logout" size={19} color={colors.deepTeal} />} />
           </SurfaceCard>
         </View>
       </Modal>

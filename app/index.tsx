@@ -71,7 +71,7 @@ export default function SplashRoute() {
       }
       if (profile.senha_provisoria || session.user.user_metadata?.senha_provisoria === true) router.replace('/change-password');
       else if (!profile.aceite_termos_em) router.replace('/terms');
-      else router.replace('/(tabs)');
+      else router.replace('/welcome');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível iniciar o aplicativo.');
       setBusy(false);

@@ -524,7 +524,7 @@ export default function AgendaScreen() {
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <TabNavigationCard active={null} />
+      <TabNavigationCard active="agenda" />
       <PageHeading eyebrow="Organize seu dia" title="Agenda" subtitle="Reuniões e lembretes sincronizados com o aparelho." right={<AccountMenuButton />} />
 
       <SurfaceCard style={styles.introCard}>

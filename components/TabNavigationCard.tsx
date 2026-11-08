@@ -8,6 +8,7 @@ const items: { key: AppTabKey; label: string; icon: React.ComponentProps<typeof 
   { key: 'index', label: 'HOJE', icon: 'clock-time-four-outline' },
   { key: 'espelho', label: 'ESPELHO', icon: 'calendar-month-outline' },
   { key: 'resumo', label: 'RESUMO', icon: 'chart-box-outline' },
+  { key: 'agenda', label: 'AGENDA', icon: 'calendar-clock-outline' },
 ];
 
 export function TabNavigationCard({ active = 'index' }: { active?: AppTabKey | null }) {

@@ -118,6 +118,7 @@ function AppStack() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: SchemeColors[colorScheme].background } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
         <Stack.Screen name="terms" />
         <Stack.Screen name="change-password" />
         <Stack.Screen name="auth/reset-password" />
@@ -127,6 +128,7 @@ function AppStack() {
         <Stack.Screen name="about" />
         <Stack.Screen name="bank-hours" />
         <Stack.Screen name="agenda" />
+        <Stack.Screen name="configuracoes" />
       </Stack>
       <GlobalAlertOverlay />
       <StatusBar style="auto" />

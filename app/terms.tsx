@@ -23,7 +23,7 @@ export default function TermsScreen() {
       const result = await acceptTerms(TERMS_VERSION);
       if (result.error || !result.data) { setError(result.error || 'Não foi possível registrar seu aceite.'); return; }
       useAppStore.getState().setProfile(result.data);
-      router.replace('/(tabs)');
+      router.replace('/welcome');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível registrar o aceite. Tente novamente.');
     } finally { setLoading(false); }

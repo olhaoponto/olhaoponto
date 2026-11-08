@@ -34,4 +34,11 @@ describe('auth route guard', () => {
     expect(getAuthRouteRedirect({ routeRoot: 'admin', sessionUserId: 'user-1', profile })).toBe('/(tabs)');
     expect(getAuthRouteRedirect({ routeRoot: '(tabs)', sessionUserId: 'user-1', profile })).toBeNull();
   });
+
+  it('protege a rota de boas-vindas e só a libera após autenticação e aceite', () => {
+    expect(isRouteProtected('welcome')).toBe(true);
+    expect(getAuthRouteRedirect({ routeRoot: 'welcome' })).toBe('/login');
+    expect(getAuthRouteRedirect({ routeRoot: 'welcome', sessionUserId: 'user-1', profile: { ...profile, aceite_termos_em: null } })).toBe('/terms');
+    expect(getAuthRouteRedirect({ routeRoot: 'welcome', sessionUserId: 'user-1', profile })).toBeNull();
+  });
 });

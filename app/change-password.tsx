@@ -29,7 +29,7 @@ export default function ChangePasswordScreen() {
       const profile = await getProfile();
       if (profile.data) useAppStore.getState().setProfile(profile.data);
       if (!profile.data?.aceite_termos_em) router.replace('/terms');
-      else router.replace('/(tabs)');
+      else router.replace('/welcome');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível trocar a senha. Tente novamente.');
     } finally { setLoading(false); }

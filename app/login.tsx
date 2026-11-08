@@ -52,7 +52,7 @@ export default function LoginScreen() {
       else await AsyncStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
       if (profile.senha_provisoria || user.user_metadata?.senha_provisoria === true) router.replace('/change-password');
       else if (!profile.aceite_termos_em) router.replace('/terms');
-      else router.replace('/(tabs)');
+      else router.replace('/welcome');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir o acesso. Confira sua conexão e tente novamente.');
     } finally { setLoading(false); }
