@@ -5,7 +5,9 @@ Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios ho
 ## Almoço, Agenda e conta
 
 - O retorno do almoço é calculado somente depois da batida real de saída: hora registrada + duração do intervalo da jornada ativa. O aviso usa a antecedência escolhida (5, 10, 15 minutos ou um valor personalizado entre 1 e 180), sem horário fixo para sair.
-- A Agenda permite cadastrar, editar e excluir reuniões com lembretes locais. Títulos e detalhes ficam no armazenamento do aparelho por usuário e não são enviados ao Supabase nem sincronizados entre dispositivos; eventos locais são apagados ao sair da conta por privacidade.
+- A Agenda permite selecionar calendários sincronizados pelo sistema do aparelho, importar reuniões, criar reuniões em calendários graváveis e receber lembretes locais do app. O Outlook/Microsoft 365 (incluindo calendário usado pelo Teams) e o Google Calendar aparecem somente quando a conta e a sincronização nativa estão habilitadas no Android/iOS; o app não pede senha nem implementa login OAuth próprio. Em aparelhos Android, confira no Outlook a opção de sincronizar calendário com o calendário padrão do dispositivo.
+- Os eventos são lidos/criados no provider de calendário do aparelho e ficam sob controle da conta de calendário escolhida; a seleção de calendários e metadados de lembretes ficam separados por usuário no armazenamento local. Títulos, detalhes e eventos não são enviados ao Supabase. O logout remove metadados locais do app, mas não exclui reuniões já gravadas no calendário pessoal do sistema.
+- Antes de gravar uma reunião, a Agenda verifica o total de horas até o fim do evento, descontando batidas reais de almoço. Sem saída registrada, apresenta a faixa entre o cenário com pausa possível e sem pausa; para datas futuras, usa a mediana das cinco entradas recentes (mínimo três dias) ou pede ao usuário uma entrada prevista. Se houver risco de passar de 10h, mostra alerta de confirmação, mas não bloqueia a reunião.
 - O avatar no canto superior direito oferece as rotas Perfil e Agenda e a opção Sair; o cartão principal de navegação mantém Hoje, Espelho e Resumo.
 
 ## Tecnologia e estrutura
@@ -13,11 +15,11 @@ Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios ho
 - Expo SDK 57 / React Native / Expo Router / TypeScript.
 - Supabase Auth, Postgres, RLS e Edge Functions; projeto existente `duqytmwhlrjqduzscgpa`.
 - Supabase client usando as variáveis `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY`; sessão nativa em SecureStore e sessão Web em localStorage.
-- `expo-notifications` para notificações locais; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho; `expo-screen-orientation` para o contador em paisagem apenas na tela Hoje.
+- `expo-notifications` para notificações locais; `expo-calendar` para leitura/gravação dos calendários nativos; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho; `expo-screen-orientation` para o contador em paisagem apenas na tela Hoje.
 - `date-fns`/`date-fns-tz`, Zustand, React Native Reanimated, SVG e charges Lottie/SVG locais.
 - `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo, Perfil, Agenda, alertas, Sobre, Administração e Banco de horas.
-- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações, Agenda local, ajustes externos do banco e exportação.
-- `utils/`: cálculo de jornada, validação, jornadas configuráveis, saldo acumulado e níveis de alerta.
+- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações, calendário nativo e preferências locais da Agenda, ajustes externos do banco e exportação.
+- `utils/`: cálculo de jornada, validação, jornadas configuráveis, projeção de risco de horas para reuniões, saldo acumulado e níveis de alerta.
 - `components/charges/`: biblioteca local de 18 variações de charges.
 - `supabase/migrations/`: schema versionado; `supabase/functions/`: funções de conta com validação no servidor.
 
@@ -147,7 +149,7 @@ Uma distribuição iOS instalável fora do Expo Go exige Apple Developer/assinat
 
 ## Privacidade
 
-O app coleta nome, e-mail, preferências, batidas inseridas e a situação do dia (trabalho, folga, ausência ou atestado). O status do dia é pessoal, não pede diagnóstico e as policies RLS limitam a leitura/edição ao próprio usuário ativo; administradores não recebem esse conteúdo. A administração não recebe dados de batidas. Termos/Política de Privacidade informam as finalidades e direitos; aceite é gravado com versão e data. O usuário pode exportar seus dados, editar horários e apagar sua conta. Cache e fila offline são separados por usuário; se houver batidas pendentes, o app exige conexão e sincronização antes de concluir o logout, para não perder registros. Notificações de jornada são locais ao dispositivo; o app não lê contatos e o envio de mensagens só ocorre depois de escolha e confirmação no compartilhamento do sistema. Não grave segredos ou dados pessoais em logs.
+O app coleta nome, e-mail, preferências, batidas inseridas e a situação do dia (trabalho, folga, ausência ou atestado). O status do dia é pessoal, não pede diagnóstico e as policies RLS limitam a leitura/edição ao próprio usuário ativo; administradores não recebem esse conteúdo. A administração não recebe dados de batidas. Termos/Política de Privacidade informam as finalidades e direitos; aceite é gravado com versão e data. O usuário pode exportar seus dados, editar horários e apagar sua conta. Cache e fila offline são separados por usuário; se houver batidas pendentes, o app exige conexão e sincronização antes de concluir o logout, para não perder registros. Notificações de jornada e de reuniões são locais ao dispositivo. Com permissão, a Agenda lê os calendários que a pessoa seleciona e grava reuniões no calendário gravável escolhido; os eventos permanecem no provider/conta de calendário do aparelho e não são enviados ao Supabase pelo app. A escolha de calendários e metadados de lembretes ficam no armazenamento local separado por usuário. O app não lê contatos e o envio de mensagens só ocorre depois de escolha e confirmação no compartilhamento do sistema. Não grave segredos ou dados pessoais em logs.
 
 ## Observações
 

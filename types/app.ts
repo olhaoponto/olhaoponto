@@ -42,6 +42,9 @@ export interface AgendaMeeting {
   title: string;
   starts_at: string;
   reminder_minutes: number;
+  ends_at?: string;
+  calendar_id?: string;
+  native_event_id?: string;
 }
 
 export interface AlertPreferences {

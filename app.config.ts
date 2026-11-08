@@ -110,6 +110,7 @@ const config: ExpoConfig = {
     "expo-asset",
     "expo-router",
     "expo-notifications",
+    "expo-calendar",
     "expo-sharing",
     ["expo-local-authentication", { faceIDPermission: "Permitir que Olha o Ponto use o Face ID para proteger seu acesso." }],
     [
