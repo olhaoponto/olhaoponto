@@ -162,12 +162,12 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 - [x] **Aviso de risco antes de marcar:** calcular a projeção até o término da reunião com entrada e almoço reais do dia, sem presumir horário fixo de almoço; quando ainda não houver saída para intervalo, informar uma faixa considerando o intervalo configurado ou sua ausência. Para datas futuras, estimar a entrada pela mediana de até cinco dias recentes (exige três) ou solicitar horário previsto. Se o cenário passar de 10 horas, mostrar confirmação explícita antes de salvar, sem bloquear o usuário.
 - [x] **Validação desta etapa:** cobrir 07:31–19:31 (11h trabalhadas após 60 min de almoço), limite exato de 10h, intervalo variável e mediana de entrada. Verificar TypeScript, lint, testes, configuração/exportação Expo, permissões nativas e preservação da versão correta da branch `work/improvements-nov-2026`; não aplicar migrations nem alterar `main`.
 
-- [ ] **Publicação e APK desta etapa:** registrar a implementação na branch existente `work/improvements-nov-2026`, enviar ao repositório existente e criar APK Android interna `preview` no projeto Expo existente; não publicar em loja nem tocar em `main`.
-- **Configuração prevista:** Android + perfil `preview`, sem auto-submit. Registrar o ID EAS e status final depois de concluir a build.
+- [x] **Publicação e APK desta etapa:** registrar a implementação na branch existente `work/improvements-nov-2026`, enviar ao repositório existente e criar APK Android interna `preview` no projeto Expo existente; não publicar em loja nem tocar em `main`.
+- **Configuração concluída:** Android, perfil/ambiente `preview`, sem auto-submit. EAS build `38ed8cd1-c044-4f1d-8255-15b6d68620af`, status `Succeeded`, versão `1.0.1 (7)`, commit de código `4e38020`.
 
 
-- [ ] **Publicação e APK desta etapa:** registrar a implementação na branch existente `work/improvements-nov-2026`, enviar ao repositório existente e criar APK Android interna `preview` no projeto Expo existente; não publicar em loja nem tocar em `main`.
-- **Configuração prevista:** Android + perfil `preview`, sem auto-submit. Registrar o ID EAS e status final depois de concluir a build.
+- [x] **Publicação e APK desta etapa:** registrar a implementação na branch existente `work/improvements-nov-2026`, enviar ao repositório existente e criar APK Android interna `preview` no projeto Expo existente; não publicar em loja nem tocar em `main`.
+- **Configuração concluída:** Android, perfil/ambiente `preview`, sem auto-submit. EAS build `38ed8cd1-c044-4f1d-8255-15b6d68620af`, status `Succeeded`, versão `1.0.1 (7)`, commit de código `4e38020`.
 
 
 ## 14. Agenda nativa e alerta de jornada — branch correta
@@ -177,4 +177,5 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 - [x] Agendar lembretes locais de reuniões selecionadas, preservando notificações de jornada; persistir seleção e metadados por usuário no aparelho, sem armazenar reuniões no Supabase.
 - [x] Antes de salvar, projetar horas trabalhadas até o fim da reunião; sinalizar possibilidade/certeza de passar 10:00, usar batidas reais de almoço e intervalo variável, estimar entradas futuras pelo histórico ou solicitar horário previsto.
 - [x] Documentar que Outlook/Teams e Google precisam estar sincronizados com o calendário do sistema; nenhuma senha/OAuth é coletada pelo app.
-- [x] Validar localmente TypeScript, testes, lint e configuração Expo. Sem migration Supabase, push à `main`, publicação em loja ou nova build EAS nesta etapa.
+- [x] Validar localmente: `pnpm check`, `pnpm test` (86 aprovados, 1 legado ignorado), `pnpm lint`, `git diff --check` e exportação Android. Sem migration Supabase nem publicação em loja; `main` permaneceu inalterada.
+- [x] Enviar o commit de código `4e38020` somente para `work/improvements-nov-2026` e gerar a APK pelo EAS existente. Build `38ed8cd1-c044-4f1d-8255-15b6d68620af`, `1.0.1 (7)`, `Succeeded`, disponível por 13 dias; auto-submit desmarcado.
