@@ -110,4 +110,4 @@
 ## 10. Entrega da APK corrigida
 
 - [x] A APK Android inicial foi gerada no projeto Expo EAS `olhonoponto` e a pessoa usuária confirmou que a baixou; o repositório público autorizado é `olhaoponto/olhaoponto`, sem incluir segredos.
-- [ ] Nova APK corrigida: sincronizar somente o código/arte autorizado em `olhaoponto/olhaoponto`, preservar o arquivo preexistente `inicio.txt` e os projetos Expo `vivacondo` e `herois`; gerar a APK pelo perfil `preview` no ambiente `preview`, com `android.buildType=apk` e versionCode incrementado para atualização sobre a versão instalada. Entregar o link/arquivo do build corrigido e um ZIP-fonte sem `.env`, chaves, `.git`, `node_modules` ou caches.
+- [x] Nova APK corrigida: preservados o repositório `olhaoponto/olhaoponto`, o arquivo `inicio.txt` e os projetos Expo `vivacondo` e `herois`; APK Android gerada no projeto EAS existente pelo perfil `preview`, ambiente `preview`, `android.buildType=apk`, versão `1.0.1 (6)`, build `304b40c9-80e3-4d8f-a436-b2f7976690d5`, commit de código `7f9ff9b`. Link do build e ZIP-fonte sem `.env`, chaves, `.git`, `node_modules` ou caches serão entregues; nenhuma submissão à Play Store foi feita.
