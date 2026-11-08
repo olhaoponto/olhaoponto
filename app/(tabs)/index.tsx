@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import * as Network from 'expo-network';
 import * as Haptics from 'expo-haptics';
@@ -24,6 +25,7 @@ function friendlyDate(value: Date) { return new Intl.DateTimeFormat('pt-BR', { t
 function localTime(value: string) { return formatInTimeZone(new Date(value), ZONE, 'HH:mm'); }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const colors = useAppColors();
   const profile = useAppStore((state) => state.profile);
   const session = useAppStore((state) => state.session);
@@ -114,13 +116,19 @@ export default function HomeScreen() {
   };
 
   const timeFor = (type: PunchType) => todayEntries.find((entry) => entry.tipo === type);
+  const lunchOutEntry = timeFor('saida_almoco');
+  const beforeLunchReturn = profile?.preferencias_alerta?.before_minutes ?? 5;
+  const expectedLunchReturn = lunchOutEntry ? new Date(new Date(lunchOutEntry.registrado_em).getTime() + lunchMinutes * 60_000) : null;
+  const expectedLunchPreAlert = expectedLunchReturn ? new Date(expectedLunchReturn.getTime() - beforeLunchReturn * 60_000) : null;
+  const lunchReturnLabel = expectedLunchReturn ? formatInTimeZone(expectedLunchReturn, profile?.fuso || ZONE, 'HH:mm') : '—';
+  const lunchPreAlertLabel = expectedLunchPreAlert ? formatInTimeZone(expectedLunchPreAlert, profile?.fuso || ZONE, 'HH:mm') : '—';
   const projectedLabel = eta ? formatInTimeZone(new Date(eta), profile?.fuso || ZONE, 'HH:mm') : '—';
   const pendingCount = todayEntries.filter((entry) => Boolean((entry as TimeEntry & { _pending?: boolean })._pending)).length;
   const name = profile?.nome?.trim().split(/\s+/)[0] || 'por aí';
 
   return (
     <ScreenShell contentStyle={styles.page}>
-      <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<View style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="subtitle" color={colors.deepTeal}>{(profile?.nome || 'OP').split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></View>} />
+      <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<Pressable onPress={() => router.push('/(tabs)/perfil')} accessibilityRole="button" accessibilityLabel="Abrir Perfil" style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}><AppText variant="subtitle" color={colors.deepTeal}>{(profile?.nome || 'OP').split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')}</AppText></Pressable>} />
 
       {offline || pendingCount > 0 ? <View style={[styles.offlineBanner, { backgroundColor: `${colors.warning}2B`, borderColor: `${colors.warning}70` }]}><MaterialCommunityIcons name="cloud-off-outline" size={20} color={colors.foreground} /><AppText variant="small" style={{ flex: 1 }}>{pendingCount ? `${pendingCount} batida(s) aguardando sincronização.` : 'Modo offline: mostrando seus dados salvos neste aparelho.'}</AppText><StatusPill tone="yellow">OFFLINE</StatusPill></View> : null}
       {notificationStatus && (!notificationStatus.granted || !notificationStatus.exactAlarms) ? <SurfaceCard tone="soft" style={{ gap: 8 }}><AppText variant="small" color={colors.foreground}>{!notificationStatus.granted ? 'Ative as notificações para receber avisos quando o app estiver fechado.' : 'Notificações estão ativas, mas o Android pode entregar os alarmes com atraso enquanto Alarmes e lembretes não estiver liberado.'}</AppText>{Platform.OS !== 'web' ? <Pressable onPress={() => { void Linking.openSettings().catch(() => undefined); }} accessibilityRole="button"><AppText variant="small" color={colors.deepTeal}>Abrir configurações do aplicativo</AppText></Pressable> : null}</SurfaceCard> : null}
@@ -151,7 +159,7 @@ export default function HomeScreen() {
         {manual && nextPunch ? <View style={{ gap: 12 }}><TextField label="Horário da batida (HH:mm)" value={manualTime} onChangeText={setManualTime} placeholder="Ex.: 08:00" keyboardType="numbers-and-punctuation" maxLength={5} accessibilityLabel="Horário exato da batida" /><AppText variant="tiny" color={colors.muted}>A data de hoje é usada automaticamente. Horários futuros, fora de ordem ou que ultrapassem o limite não serão registrados.</AppText></View> : null}
       </SurfaceCard>
 
-      {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>O contador está pausado. Lembrete para voltar em {lunchMinutes} minutos.</AppText></View></SurfaceCard> : null}
+      {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>O contador está pausado. Saída registrada às {lunchOutEntry ? localTime(lunchOutEntry.registrado_em) : '—'}; retorno previsto às {lunchReturnLabel} e aviso do app às {lunchPreAlertLabel}. O intervalo não conta como hora trabalhada.</AppText></View></SurfaceCard> : null}
       <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       <ConfettiBurst visible={celebrated} />
     </ScreenShell>

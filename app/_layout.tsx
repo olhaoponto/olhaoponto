@@ -61,7 +61,7 @@ function SessionBridge() {
 function AppStack() {
   const router = useRouter();
   const profile = useAppStore((state) => state.profile);
-  const pendingNotification = useRef<{ type: 'work-alert' | 'lunch-return' | 'lunch-start'; level: string; userId?: string } | null>(null);
+  const pendingNotification = useRef<{ type: 'work-alert' | 'lunch-return' | 'lunch-return-prealert' | 'lunch-start' | 'calendar-event'; level: string; minutes?: number; userId?: string } | null>(null);
   const handledNotification = useRef('');
   const [notificationVersion, setNotificationVersion] = useState(0);
   const { colorScheme, setColorScheme } = useThemeContext();
@@ -75,11 +75,11 @@ function AppStack() {
       const dedupeKey = `${request.identifier}:${response.actionIdentifier}`;
       if (handledNotification.current === dedupeKey) return;
       handledNotification.current = dedupeKey;
-      const data = request.content.data as { type?: string; level?: string; user_id?: string };
-      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-start') return;
+      const data = request.content.data as { type?: string; level?: string; minutes?: number; user_id?: string };
+      if (data.type !== 'work-alert' && data.type !== 'lunch-return' && data.type !== 'lunch-return-prealert' && data.type !== 'lunch-start' && data.type !== 'calendar-event') return;
       const currentUserId = useAppStore.getState().profile?.id;
       if (currentUserId && data.user_id && currentUserId !== data.user_id) return;
-      pendingNotification.current = { type: data.type, level: data.level ?? '8h', userId: data.user_id };
+      pendingNotification.current = { type: data.type, level: data.level ?? '8h', minutes: typeof data.minutes === 'number' ? data.minutes : undefined, userId: data.user_id };
       setNotificationVersion((version) => version + 1);
       void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     };
@@ -92,7 +92,8 @@ function AppStack() {
     if (!pending || !profile?.id) return;
     pendingNotification.current = null;
     if (pending.userId && pending.userId !== profile.id) return;
-    router.push({ pathname: '/alert', params: { level: pending.level, type: pending.type } });
+    if (pending.type === 'calendar-event') router.push('/(tabs)/agenda');
+    else router.push({ pathname: '/alert', params: { level: pending.level, type: pending.type, minutes: pending.minutes ? String(pending.minutes) : undefined } });
   }, [notificationVersion, profile?.id, router]);
   return (
     <>

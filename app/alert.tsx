@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { formatInTimeZone } from 'date-fns-tz';
 import { ActionButton, AppText, ClockMascot, ScreenShell, SurfaceCard, useAppColors } from '@/components/ui';
 import { chooseCharge, ChargeIllustration, type AlertLevel } from '@/components/charges';
 import { useAppStore } from '@/store/app-store';
@@ -13,27 +14,31 @@ function normalize(value: string | string[] | undefined): AlertLevel {
 
 export default function AlertScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ level?: string; type?: string }>();
+  const params = useLocalSearchParams<{ level?: string; type?: string; minutes?: string }>();
   const colors = useAppColors();
   const profile = useAppStore((state) => state.profile);
   const entries = useAppStore((state) => state.entries);
   const level = normalize(params.level);
   const lunchReturn = params.type === 'lunch-return';
+  const lunchReturnPreAlert = params.type === 'lunch-return-prealert';
   const lunchStart = params.type === 'lunch-start';
   const charge = chooseCharge(level);
   const today = getBahiaDate(new Date());
   const worked = calculateWorkedMinutes(entries.filter((entry) => entry.data === today));
   const limit = profile?.limite_minutos ?? 600;
   const isCritical = level === '10h';
-  const lunchReminder = lunchStart || lunchReturn;
-  const headline = lunchReturn ? 'Hora de voltar do almoço' : lunchStart ? 'Pausa para o almoço' : ({ '8h': 'Jornada regular concluída', '9h': 'Atenção: hora extra', '9h30': 'Faltam 30 minutos', '9h45': 'Faltam 15 minutos', '9h50': 'Faltam 10 minutos', '10h': 'Limite atingido' } satisfies Record<AlertLevel, string>)[level];
+  const lunchReminder = lunchStart || lunchReturn || lunchReturnPreAlert;
+  const lunchOut = entries.find((entry) => entry.data === today && entry.tipo === 'saida_almoco');
+  const expectedReturn = lunchOut ? formatInTimeZone(new Date(new Date(lunchOut.registrado_em).getTime() + (profile?.almoco_minutos ?? 60) * 60_000), profile?.fuso || 'America/Bahia', 'HH:mm') : null;
+  const beforeMinutes = Math.max(1, Number(Array.isArray(params.minutes) ? params.minutes[0] : params.minutes) || 5);
+  const headline = lunchReturnPreAlert ? 'Retorno do almoço próximo' : lunchReturn ? 'Hora de voltar do almoço' : lunchStart ? 'Pausa para o almoço' : ({ '8h': 'Jornada regular concluída', '9h': 'Atenção: hora extra', '9h30': 'Faltam 30 minutos', '9h45': 'Faltam 15 minutos', '9h50': 'Faltam 10 minutos', '10h': 'Limite atingido' } satisfies Record<AlertLevel, string>)[level];
   return (
     <ScreenShell contentStyle={styles.page}>
-      <View style={styles.top}><ClockMascot size={62} worried={isCritical} /><AppText variant="tiny" color={isCritical ? colors.error : colors.deepTeal} style={{ letterSpacing: 1.1 }}>{lunchReturn ? 'LEMBRETE DE RETORNO' : lunchStart ? 'LEMBRETE DE PAUSA' : isCritical ? 'ALERTA CRÍTICO' : 'LEMBRETE DE JORNADA'}</AppText></View>
+      <View style={styles.top}><ClockMascot size={62} worried={isCritical} /><AppText variant="tiny" color={isCritical ? colors.error : colors.deepTeal} style={{ letterSpacing: 1.1 }}>{lunchReturnPreAlert || lunchReturn ? 'LEMBRETE DE RETORNO' : lunchStart ? 'LEMBRETE DE PAUSA' : isCritical ? 'ALERTA CRÍTICO' : 'LEMBRETE DE JORNADA'}</AppText></View>
       <SurfaceCard style={{ alignItems: 'center', gap: 15, borderColor: isCritical ? colors.error : colors.border }}>
         {lunchReminder ? <MaterialCommunityIcons name="food-outline" size={52} color={colors.deepTeal} accessibilityLabel="Lembrete de almoço" /> : <ChargeIllustration chargeId={charge.id} size={224} />}
         <AppText variant="title" style={{ textAlign: 'center' }}>{isCritical && !lunchReminder ? 'LIMITE ATINGIDO!' : headline}</AppText>
-        <AppText variant="body" color={colors.muted} style={{ textAlign: 'center' }}>{lunchReturn ? 'O intervalo previsto terminou. Registre a volta no relógio da empresa e no app para retomar o contador.' : lunchStart ? `Você já trabalhou ${formatMinutesHHMM(worked)}. Se for iniciar o intervalo, registre a saída no relógio da empresa e no app. O almoço não entra na soma de horas trabalhadas.` : isCritical ? 'Pare de trabalhar e bata o ponto de saída agora.' : `Você já trabalhou ${formatMinutesHHMM(worked)}. Seu limite diário é ${formatMinutesHHMM(limit)}.`}</AppText>
+        <AppText variant="body" color={colors.muted} style={{ textAlign: 'center' }}>{lunchReturnPreAlert ? `Faltam ${beforeMinutes} minutos para voltar${expectedReturn ? `, às ${expectedReturn}` : ''}. Registre a volta no relógio da empresa e no app para retomar o contador.` : lunchReturn ? `O intervalo previsto terminou${expectedReturn ? ` às ${expectedReturn}` : ''}. Registre a volta no relógio da empresa e no app para retomar o contador.` : lunchStart ? `Você já trabalhou ${formatMinutesHHMM(worked)}. Se for iniciar o intervalo, registre a saída no relógio da empresa e no app. O almoço não entra na soma de horas trabalhadas.` : isCritical ? 'Pare de trabalhar e bata o ponto de saída agora.' : `Você já trabalhou ${formatMinutesHHMM(worked)}. Seu limite diário é ${formatMinutesHHMM(limit)}.`}</AppText>
         {!lunchReminder ? <AppText variant="small" color={colors.deepTeal} style={{ textAlign: 'center' }}>{charge.caption}</AppText> : null}
         <ActionButton title={isCritical ? 'Voltar para registrar a saída' : 'Entendido'} onPress={() => router.replace('/(tabs)')} style={isCritical ? { backgroundColor: colors.error, borderColor: colors.error } : undefined} />
       </SurfaceCard>

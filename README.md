@@ -7,11 +7,11 @@ Aplicativo mobile Expo/React Native + TypeScript para acompanhar os próprios ho
 - Expo SDK 57 / React Native / Expo Router / TypeScript.
 - Supabase Auth, Postgres, RLS e Edge Functions; projeto existente `duqytmwhlrjqduzscgpa`.
 - Supabase client usando as variáveis `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY`; sessão nativa em SecureStore e sessão Web em localStorage.
-- `expo-notifications` para notificações locais; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho.
+- `expo-notifications` para notificações locais; `expo-calendar` para ler calendários escolhidos e gravar reuniões no calendário nativo; `expo-network` para sincronização ao retornar a conexão; `expo-local-authentication` para biometria opcional por aparelho.
 - `date-fns`/`date-fns-tz`, Zustand, React Native Reanimated, SVG e charges Lottie/SVG locais.
-- `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo/Perfil, alertas, Sobre e Administração.
-- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações e exportação.
-- `utils/`: cálculo de jornada, validação e níveis de alerta.
+- `app/`: rotas de splash/login/termos, abas Hoje/Espelho/Resumo/Agenda, rota Perfil acessada pelo avatar, alertas, Sobre e Administração.
+- `services/`: cliente Auth/Supabase, batidas/cache/fila offline/notificações, calendário nativo e exportação.
+- `utils/`: cálculo de jornada, risco de reuniões, validação e níveis de alerta.
 - `components/charges/`: biblioteca local de 18 variações de charges.
 - `supabase/migrations/`: schema versionado; `supabase/functions/`: funções de conta com validação no servidor.
 
@@ -98,17 +98,25 @@ O aceite de termos, as batidas (inclusive horário manual) e a troca de senha ex
 
 ## Uso
 
-A tela **Hoje** apresenta contador ao vivo, tempo faltante, horário-limite projetado, sequência Entrada → Saída para almoço → Volta do almoço → Saída, registro manual HH:mm e fila offline. O fuso padrão é `America/Bahia`; o almoço pausa a contagem. O limite padrão é 10:00, ajustável pelo usuário para um valor menor; o banco nunca aceita mais de 10:00.
+A tela **Hoje** apresenta contador ao vivo, tempo faltante, horário-limite projetado, sequência Entrada → Saída para almoço → Volta do almoço → Saída, registro manual HH:mm e fila offline. A saída para almoço usa a batida real (não existe hora fixa); o app soma a duração configurada para calcular o retorno e mostra o horário do aviso. O intervalo real pausa a contagem. O limite padrão é 10:00, ajustável pelo usuário para um valor menor; o banco nunca aceita mais de 10:00.
 
 Se a confirmação do alerta crítico chegar depois do limite, o app pede confirmação explícita e grava a saída no último horário permitido, com justificativa visível no Espelho; não grava uma jornada acima do teto. Esse registro é um controle pessoal e não substitui o registro oficial do empregador.
 
 Se ainda não houve saída para almoço, o app mostra e agenda um aviso preventivo ao completar 4:00 horas trabalhadas; após registrar a saída para almoço, agenda o retorno segundo os minutos definidos no Perfil. Os alertas de jornada permanecem nos marcos 8:00, 9:00, 9:30, 9:45, 9:50, 9:55 e limite pessoal. As notificações são locais; Android pode exigir permissão de notificação e permissão de alarmes exatos nas configurações do sistema. A entrega exata em segundo plano depende das permissões e políticas de bateria do aparelho. O modo Expo Go serve para desenvolvimento; teste notificações/alarme exato no APK final.
 
-**Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** exporta o histórico em JSON, permite alterar preferências e solicitar a exclusão da conta. A biblioteca e os cálculos principais são locais/offline.
+**Agenda** é voltada a reuniões: seleciona calendários do aparelho, exibe compromissos, grava reuniões no calendário gravável escolhido e pode avisar localmente 5 minutos antes. O **Espelho** permite navegar por mês/ano, editar/excluir batidas com confirmação, lançar uma batida esquecida com justificativa, conferir horas extras estimadas e exportar/compartilhar PDF ou CSV. O **Perfil** é acessado pelo avatar superior, exporta o histórico em JSON, permite alterar preferências e solicitar a exclusão da conta. A biblioteca e os cálculos principais são locais/offline.
+
+### Agenda, calendários sincronizados e risco de jornada
+
+O calendário é nativo do Android/iOS; a exportação Web não lê nem grava eventos. Na primeira utilização, o app pede a permissão do aparelho e a pessoa escolhe quais calendários quer consultar. Eventos importados são somente leitura dentro do Olha o Ponto. Reuniões criadas são gravadas no calendário selecionado que permita escrita; a sincronização para a conta Microsoft/Google é feita pelo próprio provedor do calendário. O app não pede e-mail como forma de autorização, não armazena credenciais Microsoft/Google e não envia títulos, notas ou horários de eventos ao Supabase.
+
+Para ver reuniões Microsoft/Teams, sincronize a conta de trabalho no Outlook para Android e habilite **Sync calendars/Sincronizar calendários** nas configurações dessa conta; os eventos do Teams que aparecem no calendário Outlook podem então ser exibidos pelo calendário do aparelho. Para Google, adicione a conta e mantenha a sincronização de calendário ativada no dispositivo. Se a conta/calendário não estiver exposta ao calendário nativo, ela não aparecerá na lista do app. Ao selecionar calendários e manter **Avisos do Olha o Ponto para reuniões** ativo, o app agenda notificações locais 5 minutos antes; o calendário original também pode avisar, resultando em notificações duplicadas.
+
+Antes de gravar uma reunião, a Agenda compara o término com a jornada: usa a entrada real registrada ou, em data futura, a mediana das cinco entradas recentes (com pelo menos três dias); a estimativa é identificada e pode ser ajustada, e sem histórico suficiente o app pede a entrada prevista. Se a saída real para almoço já ocorreu, usa essa batida e a volta real/configurada. Sem batida de saída para almoço, não presume hora fixa e mostra a faixa entre o cenário com a pausa configurada e o cenário sem pausa; avisa se o cenário máximo puder passar de 10:00 horas trabalhadas. Se a reunião terminar antes de uma saída real registrada, nenhuma pausa futura é descontada. O aviso permite voltar/editar ou confirmar; nunca bloqueia a marcação.
 
 ### Ajustar limite, almoço e tempos dos alertas
 
-No Perfil, cada usuário escolhe limite pessoal de 8h, 9h ou 10h e previsão de almoço de 30, 45, 60 ou 90 minutos. O lembrete de pausa padrão aos 240 minutos está separado em `LUNCH_REMINDER_MINUTES`; os marcos de jornada (8h, 9h, 9h30, 9h45, 9h50, 9h55 e limite) e a cadência de repetição estão centralizados em `utils/alerts.ts` (`ALERT_THRESHOLDS`). Um desenvolvedor deve manter a agenda em `services/notification-service.ts` e os testes correspondentes atualizados. O banco continua impondo o teto de 600 minutos trabalhados mesmo se alguém alterar apenas a interface.
+No Perfil, cada usuário escolhe limite pessoal de 8h, 9h ou 10h e duração do almoço de 30, 45, 60 ou 90 minutos; a hora de saída é a batida real, nunca fixa. A antecedência do aviso de retorno oferece 5, 10, 15 minutos ou um inteiro personalizado menor que a duração do almoço. O lembrete de pausa padrão aos 240 minutos está separado em `LUNCH_REMINDER_MINUTES`; os marcos de jornada (8h, 9h, 9h30, 9h45, 9h50, 9h55 e limite) e a cadência de repetição estão centralizados em `utils/alerts.ts` (`ALERT_THRESHOLDS`). Um desenvolvedor deve manter a agenda em `services/notification-service.ts` e os testes correspondentes atualizados. O banco continua impondo o teto de 600 minutos trabalhados mesmo se alguém alterar apenas a interface.
 
 ## Gerar APK para instalação direta (EAS)
 
@@ -133,7 +141,7 @@ Uma distribuição iOS instalável fora do Expo Go exige Apple Developer/assinat
 
 ## Privacidade
 
-O app coleta apenas nome, e-mail, preferências e batidas inseridas pelo usuário. A administração não recebe dados de batidas. Termos/Política de Privacidade informam as finalidades e direitos; aceite é gravado com versão e data. O usuário pode exportar seus dados, editar horários e apagar sua conta. Cache e fila offline são separados por usuário; se houver batidas pendentes, o app exige conexão e sincronização antes de concluir o logout, para não perder registros. Notificações de jornada são locais ao dispositivo. Não grave segredos ou dados pessoais em logs.
+O app coleta apenas nome, e-mail, preferências e batidas inseridas pelo usuário. A administração não recebe dados de batidas. Termos/Política de Privacidade informam as finalidades e direitos; aceite é gravado com versão e data. O usuário pode exportar seus dados, editar horários e apagar sua conta. Cache e fila offline são separados por usuário; se houver batidas pendentes, o app exige conexão e sincronização antes de concluir o logout, para não perder registros. As notificações de jornada e reuniões são locais; eventos de calendários selecionados permanecem no provedor nativo e não são enviados ao Supabase pelo app. Não grave segredos ou dados pessoais em logs.
 
 ## Observações
 

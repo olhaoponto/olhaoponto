@@ -33,7 +33,9 @@ export default function PerfilScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
   const [deleteWord, setDeleteWord] = useState('');
+  const [customBeforeMinutes, setCustomBeforeMinutes] = useState('');
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
+  const beforeMinutes = typeof prefs.before_minutes === 'number' ? prefs.before_minutes : 5;
   const selectedTheme = typeof prefs.tema === 'string' ? prefs.tema : 'system';
   const profileId = profile?.id;
   const profileName = profile?.nome || '';
@@ -42,6 +44,8 @@ export default function PerfilScreen() {
   // Draft fields follow profile changes from Auth; user edits remain local until Save.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setName(profileName); setEmail(profileEmail); }, [profileId, profileName, profileEmail]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setCustomBeforeMinutes([5, 10, 15].includes(beforeMinutes) ? '' : String(beforeMinutes)); }, [profileId, beforeMinutes]);
   useEffect(() => { if (profileId) void AsyncStorage.getItem(`olhaponto:${profileId}:biometric`).then((value) => setBiometricEnabled(value === 'true')).catch(() => setBiometricEnabled(false)); }, [profileId]);
 
   const savePreferences = async (patch: Partial<AlertPreferences>, columns: Record<string, number> = {}) => {
@@ -74,6 +78,19 @@ export default function PerfilScreen() {
     if (theme === 'system') setColorScheme(Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
     else setColorScheme(theme);
     await savePreferences({ tema: theme });
+  };
+
+  const chooseLunchDuration = async (value: number) => {
+    if (beforeMinutes >= value) { setError('Reduza primeiro a antecedência do aviso para um valor menor que a duração do almoço.'); return; }
+    await savePreferences({}, { almoco_minutos: value });
+  };
+
+  const saveCustomBefore = async () => {
+    if (!profile) return;
+    const value = Number(customBeforeMinutes);
+    if (!Number.isInteger(value) || value <= 0) { setError('Informe uma antecedência personalizada em minutos inteiros e positivos.'); return; }
+    if (value >= profile.almoco_minutos) { setError('A antecedência precisa ser menor que a duração configurada do almoço.'); return; }
+    await savePreferences({ before_minutes: value });
   };
 
   const toggleBiometrics = async (value: boolean) => {
@@ -164,8 +181,12 @@ export default function PerfilScreen() {
         <AppText variant="small" color={colors.muted}>Limite diário pessoal · nunca acima de 10h</AppText>
         <View style={styles.choices}>{[480, 540, 600].map((value) => <Pressable key={value} onPress={() => savePreferences({}, { limite_minutos: value })} accessibilityRole="button" accessibilityState={{ selected: profile.limite_minutos === value }} style={[styles.choice, { borderColor: profile.limite_minutos === value ? colors.deepTeal : colors.border, backgroundColor: profile.limite_minutos === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={profile.limite_minutos === value ? colors.deepTeal : colors.foreground}>{formatLimit(value)}</AppText></Pressable>)}</View>
         <AppText variant="small" color={colors.muted}>Duração prevista do almoço</AppText>
-        <View style={styles.choices}>{[30, 45, 60, 90].map((value) => <Pressable key={value} onPress={() => savePreferences({}, { almoco_minutos: value })} accessibilityRole="button" accessibilityState={{ selected: profile.almoco_minutos === value }} style={[styles.choice, { borderColor: profile.almoco_minutos === value ? colors.deepTeal : colors.border, backgroundColor: profile.almoco_minutos === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={profile.almoco_minutos === value ? colors.deepTeal : colors.foreground}>{value} min</AppText></Pressable>)}</View>
-        <AppText variant="tiny" color={colors.muted}>O almoço configurado é usado para projetar o horário de saída; o intervalo real não conta como hora trabalhada.</AppText>
+        <View style={styles.choices}>{[30, 45, 60, 90].map((value) => <Pressable key={value} onPress={() => chooseLunchDuration(value)} accessibilityRole="button" accessibilityState={{ selected: profile.almoco_minutos === value }} style={[styles.choice, { borderColor: profile.almoco_minutos === value ? colors.deepTeal : colors.border, backgroundColor: profile.almoco_minutos === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={profile.almoco_minutos === value ? colors.deepTeal : colors.foreground}>{value} min</AppText></Pressable>)}</View>
+        <AppText variant="small" color={colors.muted}>Avisar antes do fim do almoço</AppText>
+        <View style={styles.choices}>{[5, 10, 15].map((value) => <Pressable key={value} onPress={() => { setCustomBeforeMinutes(''); void savePreferences({ before_minutes: value }); }} accessibilityRole="button" accessibilityState={{ selected: beforeMinutes === value }} style={[styles.choice, { borderColor: beforeMinutes === value ? colors.deepTeal : colors.border, backgroundColor: beforeMinutes === value ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={beforeMinutes === value ? colors.deepTeal : colors.foreground}>{value} min</AppText></Pressable>)}<View style={[styles.choice, { borderColor: ![5, 10, 15].includes(beforeMinutes) ? colors.deepTeal : colors.border, backgroundColor: ![5, 10, 15].includes(beforeMinutes) ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={!([5, 10, 15].includes(beforeMinutes)) ? colors.deepTeal : colors.foreground}>Personalizada</AppText></View></View>
+        <TextField label="Antecedência personalizada (minutos)" value={customBeforeMinutes} onChangeText={setCustomBeforeMinutes} keyboardType="number-pad" placeholder="Ex.: 2" maxLength={3} />
+        <ActionButton title="Salvar antecedência personalizada" variant="outline" onPress={saveCustomBefore} loading={saving} disabled={!customBeforeMinutes.trim()} />
+        <AppText variant="tiny" color={colors.muted}>A saída para almoço usa a batida real, sem horário fixo. O app calcula a volta somando a duração configurada e avisa com a antecedência escolhida; o intervalo real não conta como hora trabalhada.</AppText>
       </SurfaceCard>
 
       <SurfaceCard>

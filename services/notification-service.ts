@@ -55,17 +55,28 @@ function makeTrigger(date: Date, channelId: string): Notifications.DateTriggerIn
   };
 }
 
-export async function cancelDayNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+export async function cancelScheduledNotificationsByType(types: readonly string[], userId?: string): Promise<void> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const wanted = new Set(types);
+  const matching = scheduled.filter((request) => {
+    const data = request.content.data as { type?: string; user_id?: string } | undefined;
+    return Boolean(data?.type && wanted.has(data.type) && (!userId || data.user_id === userId));
+  });
+  await Promise.all(matching.map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
+}
+
+export async function cancelDayNotifications(userId?: string): Promise<void> {
+  if (!userId) return;
+  await cancelScheduledNotificationsByType(['work-alert', 'lunch-return', 'lunch-return-prealert', 'lunch-start'], userId);
 }
 
 /** Recalcula agenda toda vez que o usuário bate ponto ou edita um horário. */
 export async function scheduleDayNotifications(
   entries: readonly TimeEntry[],
-  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
+  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; beforeMinutes?: number; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
 ): Promise<void> {
-  const { userId, limitMinutes = 600, lunchMinutes = 60, enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
-  await cancelDayNotifications();
+  const { userId, limitMinutes = 600, lunchMinutes = 60, beforeMinutes = 5, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  await cancelDayNotifications(userId);
   if (!enabled || entries.length === 0) return;
   const channelId = `work-alerts-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
   if (Platform.OS === 'android') {
@@ -103,11 +114,25 @@ export async function scheduleDayNotifications(
   if (lunchOut && !lunchIn && !finalOut) {
     const lunchAt = new Date(lunchOut.registrado_em).getTime();
     const reminderAt = new Date(lunchAt + Math.max(0, lunchMinutes) * 60_000);
+    const returnClock = new Intl.DateTimeFormat('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' }).format(reminderAt);
+    const leadMinutes = Math.floor(beforeMinutes);
+    const preAlertAt = new Date(reminderAt.getTime() - leadMinutes * 60_000);
+    if (Number.isInteger(leadMinutes) && leadMinutes > 0 && leadMinutes < lunchMinutes && preAlertAt > now) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Lembrete: retorno do almoço próximo',
+          body: `Seu almoço termina às ${returnClock}. Faltam ${leadMinutes} minutos para voltar.`,
+          sound: soundEnabled ? 'default' : false,
+          data: { type: 'lunch-return-prealert', level: '8h' satisfies AlertRouteLevel, minutes: leadMinutes, user_id: userId },
+        },
+        trigger: makeTrigger(preAlertAt, channelId),
+      });
+    }
     if (reminderAt > now) {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Hora de voltar do almoço',
-          body: 'Seu intervalo terminou. Registre a volta para retomar o contador.',
+          body: `Seu intervalo previsto terminou às ${returnClock}. Registre a volta para retomar o contador.`,
           sound: soundEnabled ? 'default' : false,
           data: { type: 'lunch-return', level: '8h' satisfies AlertRouteLevel, user_id: userId },
         },

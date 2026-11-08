@@ -59,6 +59,7 @@ export default function GlobalAlertOverlay() {
   const completed = todayEntries.some((entry) => entry.tipo === 'saida');
   const limit = profile?.limite_minutos ?? 600;
   const lunchMinutes = profile?.almoco_minutos ?? 60;
+  const lunchReminderMinutes = profile?.preferencias_alerta?.before_minutes ?? 5;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = Math.floor(workedSeconds / 60);
   const activeAlert = getCurrentAlert(workedMinutes, limit);
@@ -81,12 +82,14 @@ export default function GlobalAlertOverlay() {
       userId: session.user.id,
       limitMinutes: limit,
       lunchMinutes,
+      beforeMinutes: lunchReminderMinutes,
+      timeZone: profile.fuso || zone,
       enabled: profile.preferencias_alerta?.enabled !== false,
       soundEnabled: profile.preferencias_alerta?.som !== false,
       vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
       now: new Date(),
     }).catch(() => undefined);
-  }, [session, profile, limit, lunchMinutes, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
+  }, [session, profile, limit, lunchMinutes, lunchReminderMinutes, profile?.fuso, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
 
   useEffect(() => {
     if (!key || !session || !profile) return;

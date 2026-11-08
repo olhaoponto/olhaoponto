@@ -27,7 +27,8 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Hoje', tabBarIcon: icon('clock-time-four-outline') }} />
       <Tabs.Screen name="espelho" options={{ title: 'Espelho', tabBarIcon: icon('calendar-month-outline') }} />
       <Tabs.Screen name="resumo" options={{ title: 'Resumo', tabBarIcon: icon('chart-box-outline') }} />
-      <Tabs.Screen name="perfil" options={{ title: 'Perfil', tabBarIcon: icon('account-circle-outline') }} />
+      <Tabs.Screen name="agenda" options={{ title: 'Agenda', tabBarIcon: icon('calendar-clock-outline') }} />
+      <Tabs.Screen name="perfil" options={{ href: null }} />
     </Tabs>
   );
 }

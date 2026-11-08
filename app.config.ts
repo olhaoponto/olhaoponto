@@ -108,6 +108,7 @@ const config: ExpoConfig = {
   plugins: [
     "expo-asset",
     "expo-router",
+    ["expo-calendar", { calendarPermission: "O Olha o Ponto precisa acessar os calendários escolhidos para exibir eventos e gravar reuniões que você criar." }],
     "expo-notifications",
     "expo-sharing",
     ["expo-local-authentication", { faceIDPermission: "Permitir que Olha o Ponto use o Face ID para proteger seu acesso." }],
