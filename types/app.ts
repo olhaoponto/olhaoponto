@@ -71,6 +71,20 @@ export interface LunchInviteSummary {
   responded_at: string | null;
 }
 
+export type PointReminderStatus = 'pending' | 'acknowledged';
+
+export interface PointReminderSummary {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  sender_name: string;
+  recipient_name: string;
+  message: string;
+  status: PointReminderStatus;
+  created_at: string;
+  acknowledged_at: string | null;
+}
+
 export interface BalanceAdjustment {
   id: string;
   user_id: string;

@@ -1,4 +1,4 @@
-import type { BroadcastMessage, BroadcastType, LunchColleague, LunchInviteStatus, LunchInviteSummary } from '../types/app';
+import type { BroadcastMessage, BroadcastType, LunchColleague, LunchInviteStatus, LunchInviteSummary, PointReminderSummary } from '../types/app';
 import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
 
@@ -30,21 +30,22 @@ export const BROADCAST_PRESETS: readonly { id: string; label: string; message_ty
   },
 ];
 
-export async function loadHomeCommunications(userId: string): Promise<ServiceResult<{ broadcasts: BroadcastMessage[]; invites: LunchInviteSummary[] }>> {
+export async function loadHomeCommunications(userId: string): Promise<ServiceResult<{ broadcasts: BroadcastMessage[]; invites: LunchInviteSummary[]; pointReminders: PointReminderSummary[] }>> {
   try {
-    const [messageResult, receiptResult, inviteResult] = await Promise.all([
+    const [messageResult, receiptResult, inviteResult, reminderResult] = await Promise.all([
       supabase.from('app_broadcast_messages').select('id,title,message,message_type,active,expires_at,created_by,created_at,updated_at').eq('active', true).order('created_at', { ascending: false }).limit(50),
       supabase.from('app_broadcast_receipts').select('message_id').eq('user_id', userId).limit(200),
       supabase.rpc('list_my_lunch_invites'),
+      supabase.rpc('list_my_point_reminders'),
     ]);
-    const error = messageResult.error || receiptResult.error || inviteResult.error;
+    const error = messageResult.error || receiptResult.error || inviteResult.error || reminderResult.error;
     if (error) return { data: null, error: friendly(error) };
     const readIds = new Set((receiptResult.data ?? []).map((row) => row.message_id));
     const now = Date.now();
     const broadcasts = ((messageResult.data ?? []) as BroadcastMessage[]).filter((item) =>
       !readIds.has(item.id) && (!item.expires_at || new Date(item.expires_at).getTime() > now),
     );
-    return { data: { broadcasts, invites: (inviteResult.data ?? []) as LunchInviteSummary[] }, error: null };
+    return { data: { broadcasts, invites: (inviteResult.data ?? []) as LunchInviteSummary[], pointReminders: (reminderResult.data ?? []) as PointReminderSummary[] }, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
@@ -88,6 +89,28 @@ export async function replyToLunchInvite(inviteId: string, status: Exclude<Lunch
     }).eq('id', inviteId).select('id').maybeSingle();
     if (error) return { data: null, error: friendly(error) };
     if (!data) return { data: null, error: 'Este convite já foi respondido ou não está disponível.' };
+    return { data: null, error: null };
+  } catch (error) { return { data: null, error: friendly(error) }; }
+}
+
+export async function sendPointReminder(input: { recipient_id: string; message: string }): Promise<ServiceResult<{ id: string }>> {
+  const auth = await getAuthenticatedSession();
+  if (!auth.session) return { data: null, error: auth.error || SESSION_REQUIRED_MESSAGE };
+  try {
+    const { data, error } = await supabase.from('point_reminders').insert({
+      sender_id: auth.session.user.id,
+      recipient_id: input.recipient_id,
+      message: input.message.trim().slice(0, 500),
+    }).select('id').single();
+    return { data: data as { id: string } | null, error: error ? friendly(error) : null };
+  } catch (error) { return { data: null, error: friendly(error) }; }
+}
+
+export async function acknowledgePointReminder(reminderId: string): Promise<ServiceResult<void>> {
+  try {
+    const { data, error } = await supabase.from('point_reminders').update({ status: 'acknowledged', acknowledged_at: new Date().toISOString() }).eq('id', reminderId).eq('status', 'pending').select('id').maybeSingle();
+    if (error) return { data: null, error: friendly(error) };
+    if (!data) return { data: null, error: 'Este lembrete já foi confirmado ou não está disponível.' };
     return { data: null, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }

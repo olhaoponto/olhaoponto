@@ -237,3 +237,13 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 - [x] Confirmar a Agenda: ao sincronizar e ao cadastrar reuniões com término, ela calcula a faixa de trabalho provável até o fim usando batidas, histórico/entrada prevista e intervalo; avisa quando é possível ou provável exceder 10:00, sem bloquear o calendário. O limite de 10h continua protegido na tela de batidas.
 
 **Estado desta rodada:** nenhuma build Expo será iniciada automaticamente; a validação será local até nova instrução explícita.
+
+## 19. Experiência imersiva e boas práticas — implementação autorizada em 08/11/2026
+
+- [x] Fazer a abertura ocupar a tela inteira, com o mascote como protagonista, composição chamativa e marca sem recorte; manter mensagens variadas, avanço imediato e identidade sóbria do Olha o Ponto.
+- [x] Evoluir o caminho da missão para um mapa de fases inspirado na estrutura da referência, sem copiar a paleta colorida: mostrar fases numeradas, posição atual, trechos já cumpridos e próximos objetivos.
+- [x] Criar progressão de boas práticas em que registrar corretamente o ponto, manter o dia organizado, convidar para o almoço e lembrar um colega de registrar o ponto sejam ações positivas; atraso ou saldo negativo não devem retirar fase nem gerar punição.
+- [x] Exibir uma microanimação de desbloqueio quando uma nova meta/fase for alcançada, sem bloquear o fluxo da batida.
+- [x] Adicionar um card interno separado para lembrar colega ativo de registrar o ponto, com resposta/ciência no aplicativo e acesso limitado aos participantes; preservar o convite de almoço existente como fluxo independente.
+
+**Validação remota desta rodada:** migration `point_reminders` aplicada no projeto `duqytmwhlrjqduzscgpa` como versão `20261108235848`; tabela criada com RLS habilitada e sem registros iniciais.
