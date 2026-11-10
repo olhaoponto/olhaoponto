@@ -93,12 +93,19 @@ export async function updateProfile(updates: Partial<Pick<Profile, 'nome' | 'alm
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
-export async function updateEmail(email: string): Promise<AuthResult> {
+export async function updateEmail(email: string): Promise<AuthResult<Profile>> {
   const auth = await getAuthenticatedSession();
   if (!auth.session) return { data: null, error: auth.error || SESSION_REQUIRED_MESSAGE };
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes('@')) return { data: null, error: 'Informe um e-mail válido.' };
   try {
-    const { error } = await supabase.auth.updateUser({ email: email.trim() });
-    return { data: null, error: error ? friendly(error) : null };
+    const { error: authError } = await supabase.auth.updateUser({ email: normalizedEmail });
+    if (authError) return { data: null, error: friendly(authError) };
+    const { data, error: profileError } = await supabase.from('profiles').update({ email: normalizedEmail }).eq('id', auth.session.user.id).select('*').single();
+    if (profileError || !data) return { data: null, error: friendly(profileError || new Error('O e-mail foi aceito pelo Auth, mas não foi possível atualizar o perfil.')) };
+    const profile = data as Profile;
+    await cacheProfile(profile);
+    return { data: profile, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 

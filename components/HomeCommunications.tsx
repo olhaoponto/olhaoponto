@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, ClockMascot, SurfaceCard, StatusPill, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import type { BroadcastMessage, LunchColleague, LunchInviteStatus, LunchInviteSummary, PointReminderSummary } from '@/types/app';
-import { acknowledgeBroadcast, acknowledgePointReminder, loadActiveColleagues, loadHomeCommunications, replyToLunchInvite, sendLunchInvite, sendPointReminder } from '@/services/communications-service';
+import { acknowledgeBroadcast, acknowledgePointReminder, cancelLunchInvite, cancelPointReminder, loadActiveColleagues, loadHomeCommunications, replyToLunchInvite, sendLunchInvite, sendPointReminder } from '@/services/communications-service';
 
 const zoneDefault = 'America/Bahia';
 function clock(value: string | Date, timeZone: string) {
@@ -91,8 +91,8 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
     await refresh();
   };
 
-  const reply = async (invite: LunchInviteSummary, status: Exclude<LunchInviteStatus, 'pending'>) => {
-    const messages: Record<Exclude<LunchInviteStatus, 'pending'>, string> = {
+  const reply = async (invite: LunchInviteSummary, status: Exclude<LunchInviteStatus, 'pending' | 'cancelled'>) => {
+    const messages: Record<Exclude<LunchInviteStatus, 'pending' | 'cancelled'>, string> = {
       accepted: 'Posso sim! Vamos almoçar juntos.',
       unavailable: 'Hoje não vou conseguir almoçar junto.',
       meeting: 'Tenho uma reunião nesse horário, então não vou conseguir.',
@@ -110,6 +110,24 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
     if (result.error) { setError(result.error); return; }
     setPointReminders((current) => current.map((item) => item.id === reminder.id ? { ...item, status: 'acknowledged', acknowledged_at: new Date().toISOString() } : item));
     setNotice('Lembrete confirmado. Ponto em dia fica mais fácil de revisar.');
+  };
+
+  const cancelInvite = async (invite: LunchInviteSummary) => {
+    setRespondingId(invite.id); setError('');
+    const result = await cancelLunchInvite(invite.id);
+    setRespondingId('');
+    if (result.error) { setError(result.error); return; }
+    setNotice('Convite cancelado. O colega não receberá uma nova ação para este convite.');
+    await refresh();
+  };
+
+  const cancelReminder = async (reminder: PointReminderSummary) => {
+    setRespondingId(reminder.id); setError('');
+    const result = await cancelPointReminder(reminder.id);
+    setRespondingId('');
+    if (result.error) { setError(result.error); return; }
+    setNotice('Lembrete cancelado.');
+    await refresh();
   };
 
   const currentUserId = userId;
@@ -160,14 +178,15 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
         <View style={styles.mascot}><ClockMascot size={48} /></View>
         <View style={{ flex: 1, gap: 5 }}>
           <AppText variant="subtitle">Convite para {invite.recipient_name}</AppText>
-          <AppText variant="small" color={colors.muted}>{invite.status === 'pending' ? 'Aguardando resposta do colega.' : invite.response_message || (invite.status === 'accepted' ? 'O colega aceitou o convite.' : invite.status === 'meeting' ? 'O colega tem uma reunião nesse horário.' : 'O colega não poderá ir.')}</AppText>
+          <AppText variant="small" color={colors.muted}>{invite.status === 'pending' ? 'Aguardando resposta do colega.' : invite.response_message || (invite.status === 'accepted' ? 'O colega aceitou o convite.' : invite.status === 'meeting' ? 'O colega tem uma reunião nesse horário.' : invite.status === 'cancelled' ? 'Você cancelou este convite.' : 'O colega não poderá ir.')}</AppText>
           <AppText variant="tiny" color={colors.muted}>Retorno proposto às {clock(invite.return_at, timeZone)}.</AppText>
+          {invite.status === 'pending' ? <ActionButton title="Cancelar convite" variant="outline" onPress={() => void cancelInvite(invite)} loading={respondingId === invite.id} icon={<MaterialCommunityIcons name="close-circle-outline" size={18} color={colors.deepTeal} />} /> : null}
         </View>
       </SurfaceCard>)}
 
       {recentOutgoingReminders.map((reminder) => <SurfaceCard key={`reminder-out-${reminder.id}`} style={styles.messageCard}>
         <View style={styles.mascot}><ClockMascot size={48} /></View>
-        <View style={{ flex: 1, gap: 5 }}><AppText variant="subtitle">Lembrete para {reminder.recipient_name}</AppText><AppText variant="small" color={colors.muted}>{reminder.status === 'acknowledged' ? 'O colega confirmou o lembrete.' : 'Aguardando o colega abrir e confirmar.'}</AppText></View>
+        <View style={{ flex: 1, gap: 5 }}><AppText variant="subtitle">Lembrete para {reminder.recipient_name}</AppText><AppText variant="small" color={colors.muted}>{reminder.status === 'acknowledged' ? 'O colega confirmou o lembrete.' : reminder.status === 'cancelled' ? 'Você cancelou este lembrete.' : 'Aguardando o colega abrir e confirmar.'}</AppText>{reminder.status === 'pending' ? <ActionButton title="Cancelar lembrete" variant="outline" onPress={() => void cancelReminder(reminder)} loading={respondingId === reminder.id} /> : null}</View>
       </SurfaceCard>)}
 
       <SurfaceCard style={styles.inviteCard}>

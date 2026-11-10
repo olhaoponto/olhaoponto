@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { loadEntriesByDate, loadEntriesByMonth, insertTimeEntry, syncPendingEntries } from '@/services/time-entry-service';
-import { prepareLocalNotifications } from '@/services/notification-service';
+import { prepareLocalNotifications, scheduleDayNotifications } from '@/services/notification-service';
 import { calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
 import { getLunchReminderMinutes } from '@/utils/alerts';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
@@ -16,7 +16,7 @@ import { getCivilWeekday, getWeekDateRange } from '@/utils/day-status';
 import { getWeeklyMissionSummary } from '@/utils/weekly-mission';
 import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
 import { DayOutcomeCard } from '@/components/DayOutcomeCard';
-import { getWorkScheduleForDate, getScheduleEndAt } from '@/utils/work-schedules';
+import { getExpectedWorkMinutesForDate, getWorkScheduleForDate, getScheduleEndAt } from '@/utils/work-schedules';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { AccountMenuButton } from '@/components/AccountMenuButton';
@@ -77,6 +77,7 @@ export default function HomeScreen() {
   const lunchMinutes = activeSchedule.lunch_minutes;
   const lunchReminderMinutes = getLunchReminderMinutes(profile?.preferencias_alerta?.lunch_reminder_minutes);
   const lunchReturnWarningMinutes = getLunchReturnWarningMinutes(profile?.preferencias_alerta?.lunch_return_warning_minutes);
+  const expectedWorkMinutes = getExpectedWorkMinutesForDate(activeSchedule, today);
   const lunchOutEntry = todayEntries.find((entry) => entry.tipo === 'saida_almoco');
   const lunchReturnTiming = lunchOutEntry ? calculateLunchReturnTimes(lunchOutEntry.registrado_em, lunchMinutes, lunchReturnWarningMinutes) : null;
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
@@ -86,7 +87,7 @@ export default function HomeScreen() {
   const lunchStarted = todayEntries.some((entry) => entry.tipo === 'saida_almoco');
   const ended = todayEntries.some((entry) => entry.tipo === 'saida');
   const progress = Math.min(1, workedMinutes / Math.max(1, limit));
-  const alertColor = ended ? colors.teal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : workedMinutes >= 540 ? colors.coral : workedMinutes >= 480 ? colors.warning : colors.teal;
+  const alertColor = ended ? colors.teal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : workedMinutes >= 540 ? colors.coral : workedMinutes >= expectedWorkMinutes ? colors.warning : colors.teal;
   const eta = projectEndTime(todayEntries, limit, lunchMinutes);
   const scheduledEnd = todayEntries.some((entry) => entry.tipo === 'entrada') ? getScheduleEndAt(today, activeSchedule, profile?.fuso || ZONE) : null;
   const shiftComplete = Boolean(!ended && scheduledEnd && now >= scheduledEnd);
@@ -143,7 +144,7 @@ export default function HomeScreen() {
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(manualTime)) { setError('Informe o horário no formato HH:mm.'); setLoading(false); return; }
       stamp = fromZonedTime(`${today}T${manualTime}:00`, profile.fuso || ZONE).toISOString();
     } else {
-      stamp = new Date(Math.floor(Date.now() / 60_000) * 60_000).toISOString();
+      stamp = new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
     }
     const candidate = { tipo: nextPunch, registrado_em: stamp, data: today };
     const validation = validatePunch(todayEntries, candidate, now, limit);
@@ -155,6 +156,22 @@ export default function HomeScreen() {
     setEntries(updated);
     setWeekEntries((current) => [...current.filter((entry) => entry.data !== today || entry.id !== result.data!.id), result.data!].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
     upsertEntry(result.data);
+    void scheduleDayNotifications(updated, {
+      userId: session?.user.id,
+      limitMinutes: limit,
+      lunchMinutes,
+      lunchReturnWarningMinutes,
+      lunchReturnEnabled: profile.preferencias_alerta?.alerta_retorno_almoco !== false,
+      lunchReminderMinutes,
+      alertPreferences: profile.preferencias_alerta,
+      workSchedule: activeSchedule,
+      normalWorkMinutes: expectedWorkMinutes,
+      timeZone: profile.fuso || ZONE,
+      enabled: profile.preferencias_alerta?.enabled !== false,
+      soundEnabled: profile.preferencias_alerta?.som !== false,
+      vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
+      now: new Date(),
+    }).catch(() => undefined);
     if (manual) setManualTime('');
     setManual(false);
     const finishedWithinLimit = nextPunch === 'saida' && validation.workedMinutes !== undefined && validation.workedMinutes <= limit;
@@ -242,12 +259,12 @@ Enviado pelo Olha o Ponto.` }); }
 
       {shouldShowOutcome ? <DayOutcomeCard status={todayStatus?.status ?? null} weekendPrompt={weekendNeedsChoice} busy={savingDayStatus} dateLabel={dateLabel} onChoose={(status) => void handleChooseDayStatus(status)} onManage={() => setDayStatusModal(true)} /> : <>
         <SurfaceCard style={[styles.timerCard, { borderColor: `${alertColor}65` }]}>
-          <View style={styles.timerHeader}><View style={{ gap: 4, flex: 1 }}><AppText variant="small" color={colors.muted}>Seu contador de hoje</AppText><AppText variant="subtitle">{lunchInProgress ? 'Pausa para o almoço' : ended ? 'Jornada encerrada' : 'Jornada em andamento'}</AppText></View><StatusPill tone={ended ? 'teal' : workedMinutes >= 570 ? 'danger' : workedMinutes >= 480 ? 'yellow' : 'teal'}>{lunchInProgress ? 'PAUSADO' : ended ? 'FINALIZADO' : 'AO VIVO'}</StatusPill></View>
+          <View style={styles.timerHeader}><View style={{ gap: 4, flex: 1 }}><AppText variant="small" color={colors.muted}>Seu contador de hoje</AppText><AppText variant="subtitle">{lunchInProgress ? 'Pausa para o almoço' : ended ? 'Jornada encerrada' : 'Jornada em andamento'}</AppText></View><StatusPill tone={ended ? 'teal' : workedMinutes >= 570 ? 'danger' : workedMinutes >= expectedWorkMinutes ? 'yellow' : 'teal'}>{lunchInProgress ? 'PAUSADO' : ended ? 'FINALIZADO' : 'AO VIVO'}</StatusPill></View>
           <AppText variant="hero" style={[styles.clock, { color: alertColor }]} accessibilityLabel={`Tempo trabalhado ${elapsed(workedSeconds)}`}>{elapsed(workedSeconds)}</AppText>
           <View style={styles.metricRow}><View style={{ flex: 1, gap: 3 }}><AppText variant="small" color={colors.muted}>Você já trabalhou</AppText><AppText variant="subtitle">{formatMinutesHHMM(workedMinutes)} hoje</AppText></View><View style={[styles.metricDivider, { backgroundColor: colors.border }]} /><View style={{ flex: 1, gap: 3 }}><AppText variant="small" color={colors.muted}>Faltam para o limite</AppText><AppText variant="subtitle" color={remainingMinutes <= 30 ? colors.error : colors.deepTeal}>{formatMinutesHHMM(remainingMinutes)}</AppText></View></View>
           <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: alertColor }]} /></View>
           <View style={styles.etaRow}><MaterialCommunityIcons name="flag-checkered" size={18} color={colors.deepTeal} /><AppText variant="small" style={{ flex: 1 }}>{ended ? 'Saída registrada' : 'Horário-limite de saída projetado'}</AppText><AppText variant="subtitle" color={colors.deepTeal}>{ended && timeFor('saida') ? localTime(timeFor('saida')!.registrado_em) : projectedLabel}</AppText></View>
-          {workedMinutes >= 480 && workedMinutes < 570 ? <View style={[styles.alertBanner, { backgroundColor: workedMinutes >= 540 ? `${colors.coral}20` : `${colors.warning}2B` }]}><MaterialCommunityIcons name={workedMinutes >= 540 ? 'alert-circle-outline' : 'check-circle-outline'} size={21} color={workedMinutes >= 540 ? colors.error : colors.deepTeal} /><AppText variant="small" style={{ flex: 1, fontWeight: '600' }}>{workedMinutes >= 540 ? 'Você já está em hora extra. Planeje sua saída.' : 'Jornada normal completa. A partir daqui é hora extra!'}</AppText></View> : null}
+          {workedMinutes >= expectedWorkMinutes && workedMinutes < 570 ? <View style={[styles.alertBanner, { backgroundColor: workedMinutes >= 540 ? `${colors.coral}20` : `${colors.warning}2B` }]}><MaterialCommunityIcons name={workedMinutes >= 540 ? 'alert-circle-outline' : 'check-circle-outline'} size={21} color={workedMinutes >= 540 ? colors.error : colors.deepTeal} /><AppText variant="small" style={{ flex: 1, fontWeight: '600' }}>{workedMinutes >= 540 ? 'A jornada prevista foi concluída. Planeje sua saída.' : `Jornada prevista completa (${formatMinutesHHMM(expectedWorkMinutes)}). A partir daqui é hora extra.`}</AppText></View> : null}
           {shiftComplete ? <View style={[styles.alertBanner, { backgroundColor: `${colors.coral}20` }]}><MaterialCommunityIcons name="calendar-check-outline" size={21} color={colors.error} /><AppText variant="small" style={{ flex: 1, fontWeight: '700' }}>Sua jornada programada terminou às {activeSchedule.end_time}. Registre a saída no relógio da empresa e no aplicativo.</AppText></View> : null}
         </SurfaceCard>
 

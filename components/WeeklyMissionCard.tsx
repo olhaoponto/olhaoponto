@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, Modal, PanResponder, StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, SurfaceCard, useAppColors } from '@/components/ui';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
@@ -7,12 +7,11 @@ import type { WeeklyMissionSummary } from '@/utils/weekly-mission';
 import { formatMinutesHHMM } from '@/utils/work-time';
 
 const MAP_STOPS = [
-  { label: 'Começo', icon: 'flag-outline' as const, top: 78, left: 12 },
-  { label: 'Entrada', icon: 'clock-check-outline' as const, top: 62, left: 36 },
-  { label: 'Ritmo', icon: 'run-fast' as const, top: 45, left: 67 },
-  { label: 'Pausa', icon: 'coffee-outline' as const, top: 28, left: 42 },
-  { label: 'Constância', icon: 'star-outline' as const, top: 13, left: 75 },
-  { label: 'Descanso', icon: 'home-heart' as const, top: 2, left: 28 },
+  { label: 'Começo', icon: 'flag-outline' as const, top: 88, left: 23 },
+  { label: 'Entrada certa', icon: 'clock-check-outline' as const, top: 68, left: 77 },
+  { label: 'Pausa', icon: 'coffee-outline' as const, top: 48, left: 23 },
+  { label: 'Espelho revisado', icon: 'file-check-outline' as const, top: 28, left: 77 },
+  { label: 'Descanso', icon: 'home-heart' as const, top: 8, left: 23 },
 ];
 
 export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMissionSummary; onOpenMirror: () => void }) {
@@ -21,12 +20,14 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
   const complete = summary.completed >= summary.goal;
   const currentStop = Math.min(MAP_STOPS.length - 1, Math.round(ratio * (MAP_STOPS.length - 1)));
   const [levelUp, setLevelUp] = useState(false);
+  const [puzzleVisible, setPuzzleVisible] = useState(false);
   const [pulse] = useState(() => new Animated.Value(1));
   const previousCompleted = useRef(summary.completed);
 
   useEffect(() => {
     if (summary.completed > previousCompleted.current) {
       setLevelUp(true);
+      setPuzzleVisible(true);
       Animated.sequence([
         Animated.spring(pulse, { toValue: 1.22, useNativeDriver: true }),
         Animated.spring(pulse, { toValue: 1, useNativeDriver: true }),
@@ -50,8 +51,7 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
       <View style={{ gap: 4 }}><AppText variant="subtitle">Seu caminho desta semana</AppText><AppText variant="small" color={colors.muted}>Cada registro correto move o mascote para a próxima placa. Lembretes e convites ajudam o time, mas nunca retiram pontos.</AppText></View>
 
       <View style={[styles.map, { backgroundColor: `${colors.deepTeal}08`, borderColor: `${colors.teal}30` }]}>
-        <View style={[styles.road, { borderColor: `${colors.teal}55` }]} />
-        <View style={[styles.roadInner, { borderColor: `${colors.yellow}65` }]} />
+        <View style={[styles.road, { borderColor: `${colors.teal}42` }]} />
         {MAP_STOPS.map((stop, index) => {
           const reached = index <= currentStop;
           const isCurrent = index === currentStop;
@@ -69,6 +69,7 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
       {complete ? <AppText variant="small" color={colors.deepTeal}>Você chegou ao descanso. A próxima semana começa sem saldo negativo e sem punição retroativa.</AppText> : <AppText variant="tiny" color={colors.muted}>O próximo trecho aparece ao resolver mais um dia da semana.</AppText>}
       {summary.balanceMinutes < 0 ? <View style={[styles.guidance, { backgroundColor: `${colors.warning}20`, borderColor: `${colors.warning}60` }]}><MaterialCommunityIcons name="hand-heart-outline" size={20} color={colors.deepTeal} /><AppText variant="tiny" style={{ flex: 1 }} color={colors.foreground}>Diferença estimada de {formatMinutesHHMM(Math.abs(summary.balanceMinutes))}. Confira o espelho e combine com o RH; isso não remove sua progressão.</AppText></View> : summary.balanceMinutes > 0 ? <AppText variant="tiny" color={colors.muted}>A diferença estimada não é o saldo oficial da empresa e não dá pontos extras.</AppText> : null}
       <ActionButton title="Revisar meu espelho" variant="outline" onPress={onOpenMirror} icon={<MaterialCommunityIcons name="calendar-check-outline" size={18} color={colors.deepTeal} />} />
+      <PuzzleRewardModal visible={puzzleVisible} onClose={() => setPuzzleVisible(false)} />
     </SurfaceCard>
   );
 }
@@ -78,8 +79,7 @@ const styles = StyleSheet.create({
   icon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   phasePill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },
   map: { height: 330, borderRadius: 24, borderWidth: 1, overflow: 'hidden', position: 'relative' },
-  road: { position: 'absolute', left: '10%', right: '10%', top: '6%', bottom: '7%', borderWidth: 12, borderRadius: 70, transform: [{ rotate: '-8deg' }] },
-  roadInner: { position: 'absolute', left: '10%', right: '10%', top: '6%', bottom: '7%', borderWidth: 2, borderStyle: 'dashed', borderRadius: 70, transform: [{ rotate: '-8deg' }] },
+  road: { position: 'absolute', width: 2, top: '12%', bottom: '7%', left: '50%', borderLeftWidth: 2, borderStyle: 'dashed' },
   stop: { position: 'absolute', width: 82, alignItems: 'center', gap: 4, transform: [{ translateX: -41 }, { translateY: -20 }] },
   node: { width: 43, height: 43, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center', shadowColor: '#071F1D', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   stopLabel: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 4 },
@@ -90,4 +90,39 @@ const styles = StyleSheet.create({
   fill: { height: '100%', borderRadius: 999 },
   practiceRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderWidth: 1, borderRadius: 13 },
   guidance: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 11, borderRadius: 13, borderWidth: 1 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(4, 22, 24, 0.72)', justifyContent: 'center', padding: 20 },
+  puzzleModal: { width: '100%', maxWidth: 420, alignSelf: 'center', gap: 13 },
+  modalTitle: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  puzzleBoard: { height: 270, borderWidth: 1, borderRadius: 20, position: 'relative', overflow: 'hidden' },
+  puzzleTarget: { position: 'absolute', top: 46, right: 42, width: 78, height: 78, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  puzzlePiece: { position: 'absolute', top: 0, left: 0, width: 70, height: 70, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });
+
+function PuzzleRewardModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const colors = useAppColors();
+  const [placed, setPlaced] = useState(false);
+  const [position] = useState(() => new Animated.ValueXY({ x: 18, y: 180 }));
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !placed,
+    onMoveShouldSetPanResponder: () => !placed,
+    onPanResponderMove: Animated.event([null, { dx: position.x, dy: position.y }], { useNativeDriver: false }),
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dx > 100 && gesture.dy < -35) {
+        setPlaced(true);
+        Animated.spring(position, { toValue: { x: 166, y: 50 }, useNativeDriver: false }).start();
+      } else Animated.spring(position, { toValue: { x: 18, y: 180 }, useNativeDriver: false }).start();
+    },
+  });
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <View style={styles.modalBackdrop}><SurfaceCard style={[styles.puzzleModal, { backgroundColor: colors.card }]}>
+      <View style={styles.modalTitle}><MaterialCommunityIcons name="puzzle-outline" size={25} color={colors.coral} /><AppText variant="subtitle">Peça desbloqueada!</AppText></View>
+      <AppText variant="small" color={colors.muted}>Você avançou uma fase. Arraste a peça até o espaço indicado para montar o seu painel de boas práticas.</AppText>
+      <View style={[styles.puzzleBoard, { borderColor: `${colors.teal}55`, backgroundColor: `${colors.deepTeal}0A` }]}>
+        <View style={[styles.puzzleTarget, { borderColor: colors.coral }]}><MaterialCommunityIcons name="image-outline" size={28} color={colors.coral} /></View>
+        <Animated.View {...panResponder.panHandlers} style={[styles.puzzlePiece, { backgroundColor: colors.deepTeal, transform: position.getTranslateTransform() }]}><MaterialCommunityIcons name="clock-check-outline" size={29} color="#FFFFFF" /></Animated.View>
+      </View>
+      {placed ? <AppText variant="small" color={colors.deepTeal} style={{ textAlign: 'center', fontWeight: '800' }}>Peça encaixada. Próxima boa prática desbloqueada!</AppText> : <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Arraste para cima e para a direita.</AppText>}
+      <ActionButton title={placed ? 'Continuar jornada' : 'Deixar para depois'} variant={placed ? 'secondary' : 'outline'} onPress={onClose} />
+    </SurfaceCard></View>
+  </Modal>;
+}

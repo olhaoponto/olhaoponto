@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppStore } from '@/store/app-store';
 import { calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, safeClockOutTimestamp, validatePunch } from '@/utils/work-time';
 import { getCurrentAlert, getLunchReminderMinutes, isWorkAlertEnabled } from '@/utils/alerts';
-import { getWorkScheduleForDate } from '@/utils/work-schedules';
+import { getExpectedWorkMinutesForDate, getWorkScheduleForDate } from '@/utils/work-schedules';
 import { getCivilWeekday } from '@/utils/day-status';
 import { loadDayStatuses } from '@/services/day-status-service';
 import type { DayStatusRecord } from '@/types/app';
@@ -75,9 +75,10 @@ export default function GlobalAlertOverlay() {
   const lunchMinutes = activeSchedule.lunch_minutes;
   const lunchReminderMinutes = getLunchReminderMinutes(profile?.preferencias_alerta?.lunch_reminder_minutes);
   const lunchReturnWarningMinutes = getLunchReturnWarningMinutes(profile?.preferencias_alerta?.lunch_return_warning_minutes);
+  const expectedWorkMinutes = getExpectedWorkMinutesForDate(activeSchedule, today);
   const workedSeconds = calculateWorkedSeconds(todayEntries, now);
   const workedMinutes = Math.floor(workedSeconds / 60);
-  const activeAlert = getCurrentAlert(workedMinutes, limit);
+  const activeAlert = workedMinutes < expectedWorkMinutes ? null : getCurrentAlert(workedMinutes, limit);
   const activeAlertEnabled = Boolean(activeAlert && isWorkAlertEnabled(activeAlert.minutes, limit, profile?.preferencias_alerta));
   const key = session?.user.id && !completed && activeAlertEnabled ? `${session.user.id}:${displayKey(workedMinutes, limit)}` : '';
   const level = alertLevel(workedMinutes, limit);
@@ -112,13 +113,14 @@ export default function GlobalAlertOverlay() {
       lunchReminderMinutes,
       alertPreferences: profile.preferencias_alerta,
       workSchedule: activeSchedule,
+      normalWorkMinutes: expectedWorkMinutes,
       timeZone: profile.fuso || zone,
       enabled: profile.preferencias_alerta?.enabled !== false,
       soundEnabled: profile.preferencias_alerta?.som !== false,
       vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
       now: new Date(),
     }).catch(() => undefined);
-  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, lunchReminderMinutes, activeSchedule, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
+  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, lunchReminderMinutes, activeSchedule, expectedWorkMinutes, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
 
   useEffect(() => {
     const userId = session?.user.id;

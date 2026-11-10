@@ -54,7 +54,7 @@ export interface LunchColleague {
   nome: string;
 }
 
-export type LunchInviteStatus = 'pending' | 'accepted' | 'unavailable' | 'meeting';
+export type LunchInviteStatus = 'pending' | 'accepted' | 'unavailable' | 'meeting' | 'cancelled';
 
 export interface LunchInviteSummary {
   id: string;
@@ -71,7 +71,7 @@ export interface LunchInviteSummary {
   responded_at: string | null;
 }
 
-export type PointReminderStatus = 'pending' | 'acknowledged';
+export type PointReminderStatus = 'pending' | 'acknowledged' | 'cancelled';
 
 export interface PointReminderSummary {
   id: string;

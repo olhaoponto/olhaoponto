@@ -25,6 +25,9 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
   const [progress] = useState(() => new Animated.Value(0));
   const [float] = useState(() => new Animated.Value(0));
   const [glow] = useState(() => new Animated.Value(0));
+  const sceneIndex = welcome.message.length % 4;
+  const sceneIcons = ['target-account', 'coffee-outline', 'home-heart', 'account-heart-outline'] as const;
+  const sceneLabels = ['FOCO COM LEVEZA', 'PAUSA TAMBÉM É META', 'CAMINHO PARA O DESCANSO', 'BOA PRÁTICA EM EQUIPE'];
   const completed = useRef(false);
   const finish = useCallback(() => {
     if (completed.current) return;
@@ -74,7 +77,7 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
 
   return (
     <ScreenShell scroll={false} edges={['top', 'bottom', 'left', 'right']} contentStyle={[styles.page, { backgroundColor: colors.background }]}>
-      <View style={styles.stage}>
+      <View style={[styles.stage, { backgroundColor: sceneIndex === 0 ? `${colors.teal}0B` : sceneIndex === 1 ? `${colors.yellow}12` : sceneIndex === 2 ? `${colors.coral}0B` : `${colors.deepTeal}0A` }]}>
         <View style={styles.decorLayer} pointerEvents="none">
           <View style={[styles.cornerOrb, styles.orbTop, { backgroundColor: `${colors.yellow}18` }]} />
           <View style={[styles.cornerOrb, styles.orbBottom, { backgroundColor: `${colors.coral}13` }]} />
@@ -95,10 +98,10 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
         <View style={styles.hero}>
           <Animated.View style={[styles.haloOuter, { borderColor: `${colors.teal}30`, transform: [{ scale: haloScale }], opacity: haloOpacity }]} />
           <View style={[styles.haloInner, { borderColor: `${colors.yellow}38`, backgroundColor: `${colors.yellow}10` }]} />
-          <Animated.View style={{ transform: [{ translateY: mascotLift }, { scale: mascotScale }] }}>
+          <Animated.View style={{ transform: [{ translateY: mascotLift }, { scale: mascotScale }, { rotate: sceneIndex === 1 ? '-2deg' : sceneIndex === 2 ? '2deg' : '0deg' }] }}>
             <Image source={mascotImages[welcome.theme]} resizeMode="contain" accessibilityRole="image" accessibilityLabel="Mascote relógio do Olha o Ponto" style={styles.mascot} />
           </Animated.View>
-          <View style={[styles.heroTag, { backgroundColor: colors.deepTeal }]}><MaterialCommunityIcons name="star-four-points-outline" size={14} color={colors.yellow} /><AppText variant="tiny" color="#FFFFFF" style={{ fontWeight: '800' }}>SEU DIA COMEÇA AQUI</AppText></View>
+          <View style={[styles.heroTag, { backgroundColor: colors.deepTeal }]}><MaterialCommunityIcons name={sceneIcons[sceneIndex]} size={14} color={colors.yellow} /><AppText variant="tiny" color="#FFFFFF" style={{ fontWeight: '800' }}>{sceneLabels[sceneIndex]}</AppText></View>
         </View>
 
         <View style={[styles.bottomSheet, { backgroundColor: colors.card, borderColor: `${colors.teal}35` }]}>

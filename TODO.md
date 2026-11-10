@@ -247,3 +247,15 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 - [x] Adicionar um card interno separado para lembrar colega ativo de registrar o ponto, com resposta/ciência no aplicativo e acesso limitado aos participantes; preservar o convite de almoço existente como fluxo independente.
 
 **Validação remota desta rodada:** migration `point_reminders` aplicada no projeto `duqytmwhlrjqduzscgpa` como versão `20261108235848`; tabela criada com RLS habilitada e sem registros iniciais.
+
+## 20. Correções após teste da APK — 10 de novembro de 2026
+
+- [x] Aviso de retorno do almoço: reagendar localmente logo após cada batida, inclusive quando a batida fica pendente offline; não depender do refresh da internet.
+- [x] E-mail do perfil: sincronizar a alteração em Auth e `profiles`; manter confirmação do novo endereço quando exigida pelo Supabase.
+- [x] Convites e lembretes: permitir ao remetente cancelar pendências na tela Hoje, sem apagar o histórico; migration `20261110035335_cancel_communications` aplicada no Supabase existente.
+- [x] Jornada no cronômetro: segunda a quinta usa 9h trabalhadas previstas e sexta usa 8h; o marco de 8h não sinaliza hora extra em segunda–quinta.
+- [x] Mapa de boas práticas: percurso vertical de cinco fases, espaçado e sóbrio, com próximo destino explícito.
+- [x] Abertura: cenário, cor de fundo, ícone e movimento variam conforme o recado do dia, preservando o mascote original.
+- [x] Recompensa: avanço de fase abre modal de peça de quebra-cabeça arrastável; encaixe gera feedback positivo.
+
+**Validação:** TypeScript, ESLint e 97 testes passaram; 1 teste legado de logout continua skip. A nova migration foi aplicada ao projeto `duqytmwhlrjqduzscgpa` como `20261110035335`.

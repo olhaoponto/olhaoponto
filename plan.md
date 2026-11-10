@@ -1,11 +1,11 @@
 
 
-## Rodada de experiência de jogo e abertura imersiva — 8 de novembro de 2026
+## Correções após teste offline e mapa de boas práticas — 10 de novembro de 2026
 
-A nova referência será interpretada como estrutura de mapa de fases, não como paleta: o Olha o Ponto usará fundo sóbrio, teal profundo, coral pontual e amarelo de destaque. A missão será um percurso vertical sinuoso, com fases numeradas, personagem marcador, trechos concluídos e próximos objetivos. O saldo negativo não reduz fase nem gera punição; somente boas práticas registradas avançam o percurso.
+A rodada corrige o agendamento local do retorno do almoço: depois de cada batida, a tela Hoje recalcula e agenda a notificação diretamente no aparelho, sem depender da sincronização com o Supabase. A agenda local continua sendo cancelada/recriada para evitar duplicidade.
 
-A abertura deixará de parecer um cartão centralizado. Ela ocupará toda a área segura, com o mascote grande como protagonista, marca em moldura segura, elementos de ponteiro/trilha no fundo, mensagem editorial e entrada para Hoje na base da tela. A animação será suave e chamativa, sem copiar a imagem de referência.
+O e-mail salvo atualiza Auth e `profiles` no mesmo fluxo, mantendo a confirmação exigida pelo Supabase. Convites de almoço e lembretes agora podem ser cancelados pelo remetente enquanto aguardam resposta, com estado preservado no histórico e RLS aditiva.
 
-Além do convite para almoço, haverá uma comunicação interna independente para lembrar um colega de registrar o ponto. O lembrete terá destinatário ativo, mensagem e confirmação, com RLS limitada aos participantes. O envio de convite/lembrete será tratado como boa prática social visual no mapa, mas não alterará batidas nem o cálculo oficial da jornada.
+O cronômetro passa a considerar a jornada prevista do dia: segunda a quinta 08:00–18:00 com uma hora de almoço resulta em 9 horas trabalhadas; sexta 08:00–17:00 resulta em 8 horas. Oito horas não aparecem mais como hora extra de segunda a quinta.
 
-Quando uma nova fase for alcançada, o card do mapa exibirá uma microanimação de desbloqueio com confete discreto e mensagem de fase liberada. A progressão continuará baseada nos dias resolvidos e poderá receber boas práticas sociais sem transformar horas extras em pontuação.
+O mapa foi simplificado para cinco fases claramente espaçadas, sem estrada colorida embolada. Ao avançar, abre uma recompensa interativa: o usuário arrasta a peça para o encaixe do quebra-cabeça. A abertura alterna cenário, ícone, cor de fundo e movimento conforme o recado do mascote.

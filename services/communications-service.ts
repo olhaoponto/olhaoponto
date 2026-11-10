@@ -80,7 +80,7 @@ export async function sendLunchInvite(input: { recipient_id: string; lunch_at: s
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
-export async function replyToLunchInvite(inviteId: string, status: Exclude<LunchInviteStatus, 'pending'>, responseMessage: string): Promise<ServiceResult<void>> {
+export async function replyToLunchInvite(inviteId: string, status: Exclude<LunchInviteStatus, 'pending' | 'cancelled'>, responseMessage: string): Promise<ServiceResult<void>> {
   try {
     const { data, error } = await supabase.from('lunch_invites').update({
       status,
@@ -106,11 +106,29 @@ export async function sendPointReminder(input: { recipient_id: string; message: 
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
+export async function cancelLunchInvite(inviteId: string): Promise<ServiceResult<void>> {
+  try {
+    const { data, error } = await supabase.from('lunch_invites').update({ status: 'cancelled', response_message: 'Convite cancelado pelo remetente.', responded_at: new Date().toISOString() }).eq('id', inviteId).eq('status', 'pending').select('id').maybeSingle();
+    if (error) return { data: null, error: friendly(error) };
+    if (!data) return { data: null, error: 'Este convite já foi respondido ou cancelado.' };
+    return { data: null, error: null };
+  } catch (error) { return { data: null, error: friendly(error) }; }
+}
+
 export async function acknowledgePointReminder(reminderId: string): Promise<ServiceResult<void>> {
   try {
     const { data, error } = await supabase.from('point_reminders').update({ status: 'acknowledged', acknowledged_at: new Date().toISOString() }).eq('id', reminderId).eq('status', 'pending').select('id').maybeSingle();
     if (error) return { data: null, error: friendly(error) };
     if (!data) return { data: null, error: 'Este lembrete já foi confirmado ou não está disponível.' };
+    return { data: null, error: null };
+  } catch (error) { return { data: null, error: friendly(error) }; }
+}
+
+export async function cancelPointReminder(reminderId: string): Promise<ServiceResult<void>> {
+  try {
+    const { data, error } = await supabase.from('point_reminders').update({ status: 'cancelled', acknowledged_at: new Date().toISOString() }).eq('id', reminderId).eq('status', 'pending').select('id').maybeSingle();
+    if (error) return { data: null, error: friendly(error) };
+    if (!data) return { data: null, error: 'Este lembrete já foi confirmado ou cancelado.' };
     return { data: null, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }

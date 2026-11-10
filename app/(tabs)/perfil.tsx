@@ -47,6 +47,7 @@ export default function PerfilScreen() {
     if (email.trim().toLowerCase() !== profile.email.toLowerCase()) {
       const emailResult = await updateEmail(email);
       if (emailResult.error) { setSaving(false); setError(emailResult.error); return; }
+      if (emailResult.data) setProfile(emailResult.data);
       setMessage('Nome salvo. Enviamos um link de confirmação para o novo e-mail; ele será atualizado após a confirmação.');
     } else setMessage('Seus dados foram atualizados.');
     setSaving(false);

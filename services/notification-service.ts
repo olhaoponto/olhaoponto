@@ -127,9 +127,9 @@ export async function scheduleMeetingNotifications(
 /** Recalcula agenda toda vez que o usuário bate ponto ou edita um horário. */
 export async function scheduleDayNotifications(
   entries: readonly TimeEntry[],
-  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; lunchReturnEnabled?: boolean; lunchReminderMinutes?: number; alertPreferences?: AlertPreferences | null; workSchedule?: WorkSchedule; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
+  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; lunchReturnEnabled?: boolean; lunchReminderMinutes?: number; alertPreferences?: AlertPreferences | null; workSchedule?: WorkSchedule; normalWorkMinutes?: number; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
 ): Promise<void> {
-  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, normalWorkMinutes = 480, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
   const pauseReminderMinutes = getLunchReminderMinutes(lunchReminderMinutes ?? alertPreferences?.lunch_reminder_minutes);
   await cancelDayNotifications();
   if (!enabled || entries.length === 0) return;
@@ -204,7 +204,8 @@ export async function scheduleDayNotifications(
   if (finalOut || !lunchIn && lunchOut) return;
 
   const thresholds = new Set<number>();
-  for (const item of ALERT_THRESHOLDS) if (item.minutes <= limitMinutes) thresholds.add(item.minutes);
+  for (const item of ALERT_THRESHOLDS) if (item.minutes <= limitMinutes && (item.minutes !== 480 || normalWorkMinutes <= 480)) thresholds.add(item.minutes);
+  if (normalWorkMinutes > 480 && normalWorkMinutes <= limitMinutes) thresholds.add(normalWorkMinutes);
   thresholds.add(Math.max(1, limitMinutes));
   // From 9h50 onward, repeat every minute through the hard limit.
   for (let minute = 590; minute <= Math.min(600, limitMinutes); minute++) thresholds.add(minute);
