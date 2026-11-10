@@ -99,7 +99,7 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
           <Animated.View style={[styles.haloOuter, { borderColor: `${colors.teal}30`, transform: [{ scale: haloScale }], opacity: haloOpacity }]} />
           <View style={[styles.haloInner, { borderColor: `${colors.yellow}38`, backgroundColor: `${colors.yellow}10` }]} />
           <Animated.View style={{ transform: [{ translateY: mascotLift }, { scale: mascotScale }, { rotate: sceneIndex === 1 ? '-2deg' : sceneIndex === 2 ? '2deg' : '0deg' }] }}>
-            <Image source={mascotImages[welcome.theme]} resizeMode="contain" accessibilityRole="image" accessibilityLabel="Mascote relógio do Olha o Ponto" style={styles.mascot} />
+            <Image source={mascotImages[welcome.mascotTheme]} resizeMode="contain" accessibilityRole="image" accessibilityLabel="Mascote relógio do Olha o Ponto" style={styles.mascot} />
           </Animated.View>
           <View style={[styles.heroTag, { backgroundColor: colors.deepTeal }]}><MaterialCommunityIcons name={sceneIcons[sceneIndex]} size={14} color={colors.yellow} /><AppText variant="tiny" color="#FFFFFF" style={{ fontWeight: '800' }}>{sceneLabels[sceneIndex]}</AppText></View>
         </View>

@@ -132,9 +132,9 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
 
   const currentUserId = userId;
   const incoming = invites.filter((invite) => invite.recipient_id === currentUserId && invite.status === 'pending').slice(0, 3);
-  const recentOutgoing = invites.filter((invite) => invite.sender_id === currentUserId).slice(0, 3);
+  const recentOutgoing = invites.filter((invite) => invite.sender_id === currentUserId && invite.status !== 'cancelled').slice(0, 3);
   const incomingReminders = pointReminders.filter((reminder) => reminder.recipient_id === currentUserId && reminder.status === 'pending').slice(0, 3);
-  const recentOutgoingReminders = pointReminders.filter((reminder) => reminder.sender_id === currentUserId).slice(0, 3);
+  const recentOutgoingReminders = pointReminders.filter((reminder) => reminder.sender_id === currentUserId && reminder.status !== 'cancelled').slice(0, 3);
   const timeZone = profile?.fuso || zoneDefault;
 
   return (

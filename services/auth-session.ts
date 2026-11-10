@@ -26,6 +26,8 @@ export async function getAuthenticatedSession(): Promise<{ session: Session | nu
 
     return { session: null, error: SESSION_REQUIRED_MESSAGE };
   } catch {
+    const fallback = useAppStore.getState().session;
+    if (fallback?.access_token && fallback.refresh_token) return { session: fallback, error: null };
     return { session: null, error: SESSION_REQUIRED_MESSAGE };
   }
 }

@@ -8,6 +8,7 @@ export interface DailyWelcome {
   seasonLabel: string;
   message: string;
   theme: MascotTheme;
+  mascotTheme: MascotTheme;
 }
 
 export interface WelcomeMessageSelectionOptions {
@@ -142,11 +143,15 @@ export function getDailyWelcome(date: Date = new Date(), options: WelcomeMessage
   const hour = Number(formatInTimeZone(date, TIME_ZONE, 'H'));
   const greeting = hour < 12 ? 'Bom dia!' : hour < 18 ? 'Boa tarde!' : 'Boa noite!';
   const themeMessages = messages[theme];
+  const message = selectMessage(themeMessages.lines, options.previousMessage, options.random ?? Math.random);
+  const baseMascotRotation: MascotTheme[] = ['base', 'carnival', 'junina', 'newyear', 'christmas'];
+  const mascotTheme = theme === 'base' ? baseMascotRotation[themeMessages.lines.indexOf(message) % baseMascotRotation.length] : theme;
   return {
     dateKey,
     greeting,
     seasonLabel: themeMessages.label,
-    message: selectMessage(themeMessages.lines, options.previousMessage, options.random ?? Math.random),
+    message,
     theme,
+    mascotTheme,
   };
 }

@@ -102,7 +102,8 @@ async function persistOrQueue(entry: TimeEntry): Promise<ServiceResult<TimeEntry
   try {
     const remote = await supabase.from('time_entries').insert(entry).select('*').single();
     if (remote.error) {
-      if (!isNetworkFailure(remote.error)) return { data: null, error: friendly(remote.error) };
+      const transportFailure = isNetworkFailure(remote.error) || !remote.error.code;
+      if (!transportFailure) return { data: null, error: friendly(remote.error) };
       const queued = { ...entry, _pending: true } as TimeEntry;
       await writeList(pendingKey(uid), [...pending.filter((item) => item.id !== entry.id), queued]);
       await writeList(cacheKey(uid), [...cached.filter((item) => item.id !== entry.id), queued]);
@@ -112,7 +113,8 @@ async function persistOrQueue(entry: TimeEntry): Promise<ServiceResult<TimeEntry
     return { data: remote.data as TimeEntry, error: null };
   } catch (error) {
     const networkError = error instanceof Error ? { message: error.message, name: error.name } : { message: '' };
-    if (!/TypeError|network|fetch|connection|offline|timeout/i.test(`${networkError.name ?? ''} ${networkError.message}`)) return { data: null, error: friendly(error) };
+    const transportFailure = /TypeError|network|fetch|connection|offline|timeout|abort|load failed/i.test(`${networkError.name ?? ''} ${networkError.message}`) || !networkError.message;
+    if (!transportFailure) return { data: null, error: friendly(error) };
     const queued = { ...entry, _pending: true } as TimeEntry;
     await writeList(pendingKey(uid), [...pending.filter((item) => item.id !== entry.id), queued]);
     await writeList(cacheKey(uid), [...cached.filter((item) => item.id !== entry.id), queued]);
