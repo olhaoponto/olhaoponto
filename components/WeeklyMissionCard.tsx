@@ -1,224 +1,250 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { useEffect, useMemo, useState } from 'react';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { ClipPath, Defs, G, Image as SvgImage, Path, Rect } from 'react-native-svg';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, SurfaceCard, useAppColors } from '@/components/ui';
-import { ConfettiBurst } from '@/components/ConfettiBurst';
-import { useAppStore } from '@/store/app-store';
 import type { WeeklyMissionSummary } from '@/utils/weekly-mission';
-import { formatMinutesHHMM } from '@/utils/work-time';
-import { loadMissionEvents, recordMissionEvent } from '@/services/mission-progress-service';
 
-const MAP_STOPS = [
-  { title: 'Saída', objective: 'Comece registrando seu ponto', icon: 'flag-outline' as const },
-  { title: 'Entrada certa', objective: 'Registre a entrada no horário', icon: 'clock-check-outline' as const },
-  { title: 'Pausa respeitada', objective: 'Registre saída e volta do almoço', icon: 'coffee-outline' as const },
-  { title: 'Ajude um colega', objective: 'Envie um convite ou lembrete', icon: 'account-heart-outline' as const },
-  { title: 'Revise o espelho', objective: 'Confira e confirme seu espelho', icon: 'file-check-outline' as const },
-  { title: 'Descanso conquistado', objective: 'Complete a jornada da semana', icon: 'home-heart' as const },
-];
-const MAP_COORDS = [
-  { x: 82, y: 820 }, { x: 218, y: 690 }, { x: 86, y: 555 },
-  { x: 220, y: 405 }, { x: 86, y: 255 }, { x: 218, y: 105 },
-];
-const MAP_PATH = 'M 218 820 C 218 760, 82 760, 82 690 S 218 620, 218 555 S 86 480, 86 405 S 220 330, 220 255 S 86 180, 86 105';
-const PUZZLE_KEY = (userId: string) => `olhaponto:${userId}:puzzle-pieces`;
-const MIRROR_KEY = (userId: string, week: string) => `olhaponto:${userId}:mirror-reviewed:${week}`;
+const MAP_WIDTH = 360;
+const MAP_HEIGHT = 1200;
+const NODE_SIZE = 56;
+const IMAGE_SOURCE = require('../assets/images/rest-day-clock-ui.png');
+
+const MAP_NODES = [
+  { id: 1, x: 180, y: 1080, title: 'Comece bem', objective: 'Registre sua entrada com atenção.' },
+  { id: 2, x: 270, y: 930, title: 'Entrada certa', objective: 'Mantenha o horário de entrada atualizado.' },
+  { id: 3, x: 110, y: 780, title: 'Pausa respeitada', objective: 'Registre a saída e a volta do almoço.' },
+  { id: 4, x: 260, y: 630, title: 'Ajude um colega', objective: 'Envie um convite ou lembrete para alguém.' },
+  { id: 5, x: 110, y: 480, title: 'Revise o espelho', objective: 'Confira suas batidas antes de fechar a semana.' },
+  { id: 6, x: 200, y: 330, title: 'Descanso conquistado', objective: 'Complete a jornada e revele a imagem.' },
+] as const;
+
+const EDGE_TABS = {
+  top: [0, 1, -1, 0, 1, 0],
+  right: [1, -1, 0],
+  bottom: [0, 1, -1, 0, 1, 0],
+  left: [1, -1, 0],
+};
+
+type Edge = 'top' | 'right' | 'bottom' | 'left';
+
+function averageY(a: { y: number }, b: { y: number }) {
+  return (a.y + b.y) / 2;
+}
+
+function curveBetween(from: (typeof MAP_NODES)[number], to: (typeof MAP_NODES)[number]) {
+  const middleY = averageY(from, to);
+  return `M ${from.x} ${from.y} C ${from.x} ${middleY}, ${to.x} ${middleY}, ${to.x} ${to.y}`;
+}
+
+function buildMapPath() {
+  return MAP_NODES.slice(0, -1).map((node, index) => curveBetween(node, MAP_NODES[index + 1])).join(' ');
+}
+
+function edgeSegment(x: number, y: number, length: number, edge: Edge, tab: number) {
+  const sign = tab >= 0 ? 1 : -1;
+  const size = 10;
+  const center = length / 2;
+  const tabPath = `C ${center - 18} ${sign * size}, ${center - 10} ${sign * size}, ${center} ${sign * size} C ${center + 10} ${sign * size}, ${center + 18} ${sign * size}, ${center + 18} 0`;
+  if (edge === 'top') return `M ${x} ${y} H ${x + center - 18} ${tabPath.replace('M ', '')} H ${x + length}`;
+  if (edge === 'bottom') return `M ${x} ${y} H ${x + center - 18} ${tabPath.replace('M ', '')} H ${x + length}`;
+  if (edge === 'left') return `M ${x} ${y} V ${y + center - 18} C ${x + sign * size} ${y + center - 10}, ${x + sign * size} ${y + center}, ${x + sign * size} ${y + center + 10} C ${x + sign * size} ${y + center + 18}, ${x} ${y + center + 18}, ${x} ${y + length}`;
+  return `M ${x} ${y} V ${y + center - 18} C ${x + sign * size} ${y + center - 10}, ${x + sign * size} ${y + center}, ${x + sign * size} ${y + center + 10} C ${x + sign * size} ${y + center + 18}, ${x} ${y + center + 18}, ${x} ${y + length}`;
+}
+
+function puzzlePath(row: number, column: number, cellWidth: number, cellHeight: number) {
+  const x = column * cellWidth;
+  const y = row * cellHeight;
+  const top = row === 0 ? `M ${x} ${y} H ${x + cellWidth}` : edgeSegment(x, y, cellWidth, 'top', EDGE_TABS.top[column + row]);
+  const right = column === 1 ? `L ${x + cellWidth} ${y + cellHeight}` : `L ${x + cellWidth} ${y + cellHeight / 2 - 18} C ${x + cellWidth + 10} ${y + cellHeight / 2 - 10}, ${x + cellWidth + 10} ${y + cellHeight / 2}, ${x + cellWidth + 10} ${y + cellHeight / 2 + 10} C ${x + cellWidth + 10} ${y + cellHeight / 2 + 18}, ${x + cellWidth} ${y + cellHeight / 2 + 18}, ${x + cellWidth} ${y + cellHeight}`;
+  const bottom = row === 2 ? `L ${x} ${y + cellHeight} Z` : `L ${x + cellWidth / 2 + 18} ${y + cellHeight} C ${x + cellWidth / 2 + 10} ${y + cellHeight + 10}, ${x + cellWidth / 2} ${y + cellHeight + 10}, ${x + cellWidth / 2 - 10} ${y + cellHeight + 10} C ${x + cellWidth / 2 - 18} ${y + cellHeight + 10}, ${x + cellWidth / 2 - 18} ${y + cellHeight}, ${x} ${y + cellHeight} Z`;
+  const left = column === 0 ? '' : `M ${x} ${y + cellHeight} L ${x} ${y + cellHeight / 2 + 18} C ${x - 10} ${y + cellHeight / 2 + 10}, ${x - 10} ${y + cellHeight / 2}, ${x - 10} ${y + cellHeight / 2 - 10} C ${x - 10} ${y + cellHeight / 2 - 18}, ${x} ${y + cellHeight / 2 - 18}, ${x} ${y}`;
+  return `${top} ${right} ${bottom} ${left}`;
+}
+
+function PuzzleBoard({ placed, tray, colors }: { placed: number[]; tray: number[]; colors: ReturnType<typeof useAppColors> }) {
+  const cellWidth = 148;
+  const cellHeight = 116;
+  return (
+    <View style={[styles.boardShell, { backgroundColor: `${colors.deepTeal}12`, borderColor: `${colors.teal}58` }]}>
+      <Svg width={296} height={348} viewBox="0 0 296 348">
+        <Defs>
+          {Array.from({ length: 6 }, (_, index) => <ClipPath key={`clip-${index}`} id={`puzzle-piece-${index}`}><Path d={puzzlePath(Math.floor(index / 2), index % 2, cellWidth, cellHeight)} /></ClipPath>)}
+        </Defs>
+        <Rect x="0" y="0" width="296" height="348" fill={`${colors.deepTeal}10`} />
+        {Array.from({ length: 6 }, (_, index) => {
+          const row = Math.floor(index / 2);
+          const column = index % 2;
+          const path = puzzlePath(row, column, cellWidth, cellHeight);
+          const isPlaced = placed.includes(index);
+          const isTray = tray.includes(index);
+          return (
+            <G key={`piece-${index}`}>
+              <Path d={path} fill={isPlaced ? 'transparent' : `${colors.card}55`} stroke={isPlaced ? `${colors.teal}AA` : `${colors.muted}55`} strokeWidth={2} />
+              {isPlaced ? <SvgImage href={IMAGE_SOURCE} x={0} y={0} width={296} height={348} preserveAspectRatio="xMidYMid slice" opacity={0.92} clipPath={`url(#puzzle-piece-${index})`} /> : null}
+              {isTray ? <Path d={path} fill="none" stroke={colors.coral} strokeWidth={2} strokeDasharray="4 4" opacity={0.65} /> : null}
+            </G>
+          );
+        })}
+      </Svg>
+      {placed.length < 6 ? <View style={styles.boardBlur}><AppText variant="tiny" color="#FFFFFF" style={styles.boardBlurText}>A imagem está se formando</AppText></View> : null}
+    </View>
+  );
+}
+
+function MapAvatar({ phase, animateToNext }: { phase: number; animateToNext: number }) {
+  const progress = useSharedValue(0);
+  const pulse = useSharedValue(1);
+  const from = MAP_NODES[Math.max(0, Math.min(MAP_NODES.length - 1, phase - 1))];
+  const to = MAP_NODES[Math.max(0, Math.min(MAP_NODES.length - 1, animateToNext - 1))];
+
+  useEffect(() => {
+    progress.value = 0;
+    if (animateToNext > phase) progress.value = withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.cubic) });
+    pulse.value = withRepeat(withSequence(withTiming(1.12, { duration: 900 }), withTiming(1, { duration: 900 })), -1, true);
+  }, [animateToNext, phase, progress, pulse]);
+
+  const style = useAnimatedStyle(() => {
+    const t = progress.value;
+    const middleY = (from.y + to.y) / 2;
+    const firstX = from.x + (to.x - from.x) * 0.18;
+    const secondX = from.x + (to.x - from.x) * 0.82;
+    const x = (1 - t) ** 3 * from.x + 3 * (1 - t) ** 2 * t * firstX + 3 * (1 - t) * t ** 2 * secondX + t ** 3 * to.x;
+    const y = (1 - t) ** 3 * from.y + 3 * (1 - t) ** 2 * t * middleY + 3 * (1 - t) * t ** 2 * middleY + t ** 3 * to.y;
+    return { transform: [{ translateX: x - 26 }, { translateY: y - 26 }, { scale: pulse.value }] };
+  });
+
+  return <Animated.View pointerEvents="none" style={[styles.avatar, style]}><Image source={require('../assets/images/mascot/clock-base.png')} resizeMode="contain" style={styles.avatarImage} /></Animated.View>;
+}
 
 export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMissionSummary; onOpenMirror: () => void }) {
   const colors = useAppColors();
-  const userId = useAppStore((state) => state.session?.user.id ?? null);
-  const [missionEvents, setMissionEvents] = useState<string[]>([]);
-  const missionCompleted = Math.min(MAP_STOPS.length, summary.completed + missionEvents.length);
-  const complete = missionCompleted >= MAP_STOPS.length;
-  const currentStop = Math.min(MAP_STOPS.length - 1, missionCompleted);
-  const [levelUp, setLevelUp] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [phase, setPhase] = useState(4);
+  const [animatedPhase, setAnimatedPhase] = useState(4);
+  const [selectedPhase, setSelectedPhase] = useState(4);
+  const [placed, setPlaced] = useState([0, 1]);
+  const [tray, setTray] = useState([2, 3]);
   const [puzzleVisible, setPuzzleVisible] = useState(false);
-  const [boardVisible, setBoardVisible] = useState(false);
-  const [placedPieces, setPlacedPieces] = useState(0);
-  const [mirrorReviewed, setMirrorReviewed] = useState(false);
-  const [puzzleLoaded, setPuzzleLoaded] = useState(!userId);
-  const [pulse] = useState(() => new Animated.Value(1));
-  const previousCompleted = useRef(summary.completed);
-  const weekKey = summary.startDate;
+  const [revealVisible, setRevealVisible] = useState(false);
+  const mapPath = useMemo(() => buildMapPath(), []);
+  void summary;
 
-  useEffect(() => {
-    if (!userId) return;
-    Promise.all([AsyncStorage.getItem(PUZZLE_KEY(userId)), AsyncStorage.getItem(MIRROR_KEY(userId, weekKey)), loadMissionEvents(userId, weekKey)]).then(([pieces, reviewed, events]) => {
-      const count = Number(pieces ?? 0);
-      setPlacedPieces(Number.isFinite(count) ? Math.max(0, Math.min(6, count)) : 0);
-      setMirrorReviewed(reviewed === 'true');
-      setMissionEvents(events);
-      setPuzzleLoaded(true);
-    }).catch(() => setPuzzleLoaded(true));
-  }, [userId, weekKey]);
-
-  useEffect(() => {
-    if (!userId) return undefined;
-    const timer = setInterval(() => { void loadMissionEvents(userId, weekKey).then(setMissionEvents); }, 1200);
-    return () => clearInterval(timer);
-  }, [userId, weekKey]);
-
-  useEffect(() => {
-    if (!puzzleLoaded) return;
-    if (summary.completed > previousCompleted.current) {
-      setLevelUp(true);
-      if (summary.completed > placedPieces) setTimeout(() => setPuzzleVisible(true), 0);
-      Animated.sequence([
-        Animated.spring(pulse, { toValue: 1.2, useNativeDriver: true }),
-        Animated.spring(pulse, { toValue: 1, useNativeDriver: true }),
-      ]).start();
-      const timer = setTimeout(() => setLevelUp(false), 2400);
-      previousCompleted.current = summary.completed;
-      return () => clearTimeout(timer);
+  const completeMission = () => {
+    if (phase >= 6) {
+      setRevealVisible(true);
+      return;
     }
-    previousCompleted.current = summary.completed;
-  }, [placedPieces, pulse, puzzleLoaded, summary.completed]);
+    const nextPhase = phase + 1;
+    setAnimatedPhase(nextPhase);
+    setPhase(nextPhase);
+    setSelectedPhase(nextPhase);
+    const nextPiece = placed.length + tray.length;
+    if (nextPiece < 6) setTray((current) => [...current, nextPiece]);
+    setTimeout(() => setPuzzleVisible(true), 900);
+  };
 
-  const completePiece = async () => {
-    const next = Math.min(6, placedPieces + 1);
-    setPlacedPieces(next);
-    if (userId) await AsyncStorage.setItem(PUZZLE_KEY(userId), String(next)).catch(() => undefined);
+  const reset = () => {
+    setPhase(4);
+    setAnimatedPhase(4);
+    setSelectedPhase(4);
+    setPlaced([0, 1]);
+    setTray([2, 3]);
     setPuzzleVisible(false);
+    setRevealVisible(false);
   };
 
-  const confirmMirrorReview = async () => {
-    setMirrorReviewed(true);
-    if (userId) {
-      await AsyncStorage.setItem(MIRROR_KEY(userId, weekKey), 'true').catch(() => undefined);
-      await recordMissionEvent(userId, weekKey, 'review_mirror');
-      setMissionEvents((current) => current.includes('review_mirror') ? current : [...current, 'review_mirror']);
-    }
-    if (placedPieces < 6) setPuzzleVisible(true);
-  };
-
+  const selected = MAP_NODES[selectedPhase - 1];
   return (
-    <SurfaceCard style={{ gap: 13, borderColor: `${colors.teal}65`, overflow: 'hidden' }}>
-      <ConfettiBurst visible={levelUp} />
-      <View style={styles.heading}>
-        <View style={[styles.icon, { backgroundColor: `${colors.teal}20` }]}><MaterialCommunityIcons name="map-marker-path" size={23} color={colors.deepTeal} /></View>
-        <View style={{ flex: 1, gap: 2 }}><AppText variant="tiny" color={colors.deepTeal} style={{ fontWeight: '800', letterSpacing: 1 }}>JORNADA DE BOAS PRÁTICAS</AppText><AppText variant="tiny" color={colors.muted}>Complete tarefas reais para avançar de fase.</AppText></View>
-        <View style={[styles.phasePill, { backgroundColor: `${colors.coral}18` }]}><AppText variant="tiny" color={colors.coral} style={{ fontWeight: '800' }}>FASE {currentStop + 1}</AppText></View>
+    <SurfaceCard style={[styles.container, { borderColor: `${colors.teal}65`, paddingBottom: Math.max(18, insets.bottom) }]}>
+      <View style={styles.header}>
+        <View style={[styles.headerIcon, { backgroundColor: `${colors.teal}1F` }]}><MaterialCommunityIcons name="map-marker-path" size={23} color={colors.teal} /></View>
+        <View style={styles.headerCopy}><AppText variant="tiny" color={colors.teal} style={styles.eyebrow}>JORNADA DE BOAS PRÁTICAS</AppText><AppText variant="small" color={colors.muted}>Avance pelas missões e monte o quadro surpresa.</AppText></View>
+        <View style={[styles.phaseBadge, { borderColor: `${colors.coral}65`, backgroundColor: `${colors.coral}15` }]}><AppText variant="tiny" color={colors.coral} style={styles.bold}>FASE {phase}/6</AppText></View>
       </View>
 
-      <View style={{ gap: 4 }}><AppText variant="subtitle">Seu caminho desta semana</AppText><AppText variant="small" color={colors.muted}>Você não está apenas vendo um marcador: está na fase abaixo. Cada objetivo concluído abre o próximo trecho e libera uma peça do quadro.</AppText></View>
-
-      <View style={[styles.map, { backgroundColor: `${colors.deepTeal}08`, borderColor: `${colors.teal}35` }]}>
-        <View style={[styles.mapTop, { backgroundColor: colors.card, borderColor: colors.border }]}><MaterialCommunityIcons name="map-outline" size={17} color={colors.coral} /><AppText variant="tiny" color={colors.deepTeal} style={{ fontWeight: '800' }}>{complete ? 'JORNADA CONCLUÍDA' : `OBJETIVO ATUAL: ${MAP_STOPS[currentStop].title.toUpperCase()}`}</AppText></View>
-        <ScrollView contentContainerStyle={styles.mapScrollContent} showsVerticalScrollIndicator={false} contentOffset={{ x: 0, y: Math.max(0, MAP_COORDS[currentStop].y - 140) }}>
+      <View style={styles.sectionTitle}><AppText variant="subtitle">Seu caminho desta semana</AppText><AppText variant="tiny" color={colors.muted}>Toque em uma fase para ver o objetivo.</AppText></View>
+      <View style={[styles.mapFrame, { backgroundColor: `${colors.deepTeal}0D`, borderColor: `${colors.teal}40` }]}>
+        <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.mapScroll} contentOffset={{ x: 0, y: Math.max(0, MAP_HEIGHT - MAP_NODES[phase - 1].y - 430) }}>
           <View style={styles.mapCanvas}>
-            <View style={styles.softCloudOne} /><View style={styles.softCloudTwo} />
-            <Svg width={300} height={900} style={StyleSheet.absoluteFill}>
-              <Path d={MAP_PATH} fill="none" stroke={colors.border} strokeWidth={17} strokeLinecap="round" strokeDasharray="5 12" />
-              <Path d={MAP_PATH} fill="none" stroke={colors.teal} strokeWidth={17} strokeLinecap="round" strokeDasharray={missionCompleted > 0 ? '1000' : '0'} opacity={0.72} />
+            <View style={[styles.hill, styles.hillOne, { backgroundColor: `${colors.teal}16` }]} /><View style={[styles.hill, styles.hillTwo, { backgroundColor: `${colors.coral}0D` }]} />
+            <Svg width={MAP_WIDTH} height={MAP_HEIGHT} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} style={StyleSheet.absoluteFill}>
+              <Path d={mapPath} fill="none" stroke={`${colors.muted}75`} strokeWidth={12} strokeLinecap="round" strokeDasharray="8 14" />
+              <Path d={MAP_NODES.slice(0, Math.max(1, phase - 1)).map((node, index) => curveBetween(node, MAP_NODES[index + 1])).join(' ')} fill="none" stroke={colors.teal} strokeWidth={12} strokeLinecap="round" />
             </Svg>
-            {MAP_STOPS.map((stop, index) => {
-              const reached = index < missionCompleted;
-              const isCurrent = index === currentStop;
-              const point = MAP_COORDS[index];
-              return <View key={stop.title} style={[styles.mapNode, { left: point.x - 31, top: point.y - 31 }]}>
-                <Animated.View style={[styles.node, { backgroundColor: reached ? colors.deepTeal : colors.card, borderColor: isCurrent ? colors.coral : reached ? colors.deepTeal : colors.border, transform: [{ scale: isCurrent ? pulse : 1 }] }]}>
-                  {isCurrent ? <Image source={require('../assets/images/mascot/clock-base.png')} resizeMode="contain" style={styles.mascotOnMap} /> : <MaterialCommunityIcons name={reached ? 'puzzle-check' : isCurrent ? stop.icon : 'lock-outline'} size={20} color={reached ? '#FFFFFF' : colors.muted} />}
-                </Animated.View>
-                <View style={[styles.stopCard, { backgroundColor: colors.card, borderColor: isCurrent ? `${colors.coral}80` : colors.border }]}><AppText variant="tiny" color={isCurrent ? colors.deepTeal : colors.muted} style={{ fontWeight: '800' }}>{`FASE ${index + 1}${isCurrent ? ' • VOCÊ ESTÁ AQUI' : ''}`}</AppText><AppText variant="small" style={{ fontWeight: isCurrent ? '800' : '600' }}>{stop.title}</AppText><AppText variant="tiny" color={colors.muted}>{stop.objective}</AppText></View>
-              </View>;
+            <MapAvatar phase={phase} animateToNext={animatedPhase} />
+            {MAP_NODES.map((node) => {
+              const completed = node.id < phase;
+              const current = node.id === phase;
+              const selectedNode = node.id === selectedPhase;
+              return <Pressable key={node.id} onPress={() => setSelectedPhase(node.id)} accessibilityRole="button" accessibilityLabel={`Fase ${node.id}: ${node.title}`} style={[styles.mapNode, { left: node.x - NODE_SIZE / 2, top: node.y - NODE_SIZE / 2 }]}><View style={[styles.node, { width: current ? 68 : NODE_SIZE, height: current ? 68 : NODE_SIZE, borderRadius: current ? 34 : 28, backgroundColor: completed ? colors.teal : current ? `${colors.coral}22` : `${colors.card}DD`, borderColor: selectedNode || current ? colors.coral : completed ? colors.teal : `${colors.muted}75` }]}>{completed ? <MaterialCommunityIcons name="check" size={24} color="#FFFFFF" /> : current ? <AppText variant="subtitle" color={colors.coral} style={styles.bold}>{node.id}</AppText> : <><MaterialCommunityIcons name="lock-outline" size={17} color={colors.muted} /><AppText variant="tiny" color={colors.muted} style={styles.nodeNumber}>{node.id}</AppText></>}</View></Pressable>;
             })}
           </View>
         </ScrollView>
-        {levelUp ? <View style={[styles.levelUp, { backgroundColor: colors.deepTeal }]}><MaterialCommunityIcons name="puzzle-outline" size={16} color={colors.yellow} /><AppText variant="tiny" color="#FFFFFF" style={{ fontWeight: '800' }}>NOVA FASE! PEÇA DESBLOQUEADA</AppText></View> : null}
       </View>
 
-      <View style={[styles.currentMission, { backgroundColor: `${colors.coral}10`, borderColor: `${colors.coral}55` }]}><Image source={require('../assets/images/mascot/clock-base.png')} resizeMode="contain" style={styles.missionMascot} /><View style={{ flex: 1, gap: 3 }}><AppText variant="tiny" color={colors.coral} style={{ fontWeight: '800' }}>VOCÊ ESTÁ NA FASE {currentStop + 1}</AppText><AppText variant="small" style={{ fontWeight: '800' }}>{MAP_STOPS[currentStop].title}</AppText><AppText variant="tiny" color={colors.muted}>Objetivo: {MAP_STOPS[currentStop].objective}.</AppText></View></View>
-
-      <View style={styles.puzzleSummary}>
-        <View style={[styles.previewFrame, { borderColor: `${colors.teal}45`, backgroundColor: `${colors.deepTeal}08` }]}>{placedPieces === 6 ? <Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="cover" style={styles.previewImage} /> : <MaterialCommunityIcons name="image-lock-outline" size={22} color={colors.muted} />}</View>
-        <View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '800' }}>Quadro surpresa</AppText><AppText variant="tiny" color={colors.muted}>{placedPieces}/6 peças montadas. {placedPieces === 6 ? 'Imagem completa desbloqueada!' : 'A imagem só aparece quando todas as peças forem encaixadas.'}</AppText></View>
-        {placedPieces === 6 ? <Pressable onPress={() => setBoardVisible(true)} accessibilityRole="button" accessibilityLabel="Visualizar quadro montado" style={[styles.viewBoardButton, { borderColor: colors.deepTeal }]}><MaterialCommunityIcons name="image-search-outline" size={18} color={colors.deepTeal} /><AppText variant="tiny" color={colors.deepTeal} style={{ fontWeight: '800' }}>VER QUADRO</AppText></Pressable> : null}
+      <View style={[styles.missionPanel, { backgroundColor: `${colors.coral}12`, borderColor: `${colors.coral}58` }]}>
+        <View style={styles.missionHeading}><AppText variant="tiny" color={colors.coral} style={styles.eyebrow}>{selected.id === phase ? `VOCÊ ESTÁ NA FASE ${phase}` : `FASE ${selected.id}`}</AppText>{selected.id !== phase ? <MaterialCommunityIcons name="information-outline" size={17} color={colors.muted} /> : null}</View>
+        <AppText variant="subtitle" style={styles.missionTitle}>{selected.title}</AppText><AppText variant="small" color={colors.muted}>Objetivo: {selected.objective}</AppText>
       </View>
 
-      <View style={{ gap: 7 }}><View style={styles.progressHeader}><AppText variant="small" style={{ fontWeight: '700' }}>Fases do acompanhamento</AppText><AppText variant="small" color={colors.deepTeal} style={{ fontWeight: '800' }}>{missionCompleted}/6</AppText></View><View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { width: `${Math.round((missionCompleted / 6) * 100)}%`, backgroundColor: complete ? colors.teal : colors.coral }]} /></View></View>
+      <View style={styles.boardHeader}><View><AppText variant="subtitle">Quadro surpresa</AppText><AppText variant="tiny" color={colors.muted}>{placed.length + tray.length}/6 peças conquistadas · {tray.length} na bandeja</AppText></View><Pressable onPress={() => setPuzzleVisible(true)} style={[styles.smallButton, { borderColor: colors.teal }]}><MaterialCommunityIcons name="puzzle-outline" size={17} color={colors.teal} /><AppText variant="tiny" color={colors.teal} style={styles.bold}>ABRIR</AppText></Pressable></View>
+      <PuzzleBoard placed={placed} tray={tray} colors={colors} />
+      <View style={styles.tray}><AppText variant="tiny" color={colors.muted} style={styles.bold}>BANDEJA</AppText><View style={styles.trayPieces}>{tray.map((piece) => <View key={piece} style={[styles.trayPiece, { borderColor: colors.coral, backgroundColor: `${colors.coral}18` }]}><MaterialCommunityIcons name="puzzle-outline" size={19} color={colors.coral} /><AppText variant="tiny" color={colors.coral} style={styles.bold}>{piece + 1}</AppText></View>)}</View></View>
 
-      <View style={[styles.mirrorMission, { borderColor: mirrorReviewed ? `${colors.teal}70` : colors.border, backgroundColor: mirrorReviewed ? `${colors.teal}10` : colors.card }]}><MaterialCommunityIcons name={mirrorReviewed ? 'check-circle' : 'file-search-outline'} size={22} color={mirrorReviewed ? colors.teal : colors.coral} /><View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '800' }}>{mirrorReviewed ? 'Espelho revisado nesta semana' : 'Missão atual: revisar o espelho'}</AppText><AppText variant="tiny" color={colors.muted}>{mirrorReviewed ? 'Você confirmou esta etapa e a recompensa já foi liberada.' : 'Abra o espelho, confira suas batidas e depois confirme aqui para liberar uma peça.'}</AppText></View></View>
-      <View style={styles.actionRow}><ActionButton title="Abrir espelho" variant="outline" onPress={onOpenMirror} icon={<MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.deepTeal} />} /><ActionButton title={mirrorReviewed ? 'Peça já liberada' : 'Conferi e ganhar peça'} variant={mirrorReviewed ? 'secondary' : 'primary'} onPress={() => void confirmMirrorReview()} disabled={mirrorReviewed} icon={<MaterialCommunityIcons name={mirrorReviewed ? 'check' : 'puzzle-outline'} size={18} color={mirrorReviewed ? colors.deepTeal : '#FFFFFF'} />} /></View>
-      {summary.balanceMinutes < 0 ? <View style={[styles.guidance, { backgroundColor: `${colors.warning}20`, borderColor: `${colors.warning}60` }]}><MaterialCommunityIcons name="hand-heart-outline" size={20} color={colors.deepTeal} /><AppText variant="tiny" style={{ flex: 1 }} color={colors.foreground}>Diferença estimada de {formatMinutesHHMM(Math.abs(summary.balanceMinutes))}. Confira o espelho; isso não remove sua progressão.</AppText></View> : null}
-      <PuzzleRewardModal visible={puzzleVisible} pieceIndex={placedPieces} onClose={() => setPuzzleVisible(false)} onPlaced={() => void completePiece()} />
-      <BoardPreviewModal visible={boardVisible} onClose={() => setBoardVisible(false)} />
+      <View style={styles.actions}><ActionButton title={phase >= 6 ? 'Revelar imagem' : 'Concluir missão'} variant="primary" onPress={completeMission} icon={<MaterialCommunityIcons name="flag-checkered" size={18} color="#FFFFFF" />} /><ActionButton title="Resetar" variant="outline" onPress={reset} icon={<MaterialCommunityIcons name="restart" size={18} color={colors.deepTeal} />} /></View>
+      <ActionButton title="Abrir espelho" variant="secondary" onPress={onOpenMirror} icon={<MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.deepTeal} />} />
+
+      <Modal visible={puzzleVisible} transparent animationType="fade" onRequestClose={() => setPuzzleVisible(false)}><View style={styles.modalBackdrop}><SurfaceCard style={[styles.modalCard, { backgroundColor: colors.card, paddingBottom: Math.max(18, insets.bottom) }]}><View style={styles.modalTitle}><MaterialCommunityIcons name="puzzle-outline" size={24} color={colors.coral} /><AppText variant="subtitle">Bandeja de peças</AppText></View><AppText variant="small" color={colors.muted}>Mock visual: as peças ganhas ficam disponíveis para encaixe no quadro.</AppText><PuzzleBoard placed={placed} tray={tray} colors={colors} /><ActionButton title="Encaixar próxima peça" variant="primary" onPress={() => { if (tray.length) { const [next, ...rest] = tray; setTray(rest); setPlaced((current) => [...current, next]); } else setPuzzleVisible(false); }} icon={<MaterialCommunityIcons name="arrow-collapse" size={18} color="#FFFFFF" />} /><ActionButton title="Fechar" variant="outline" onPress={() => setPuzzleVisible(false)} /></SurfaceCard></View></Modal>
+      <Modal visible={revealVisible} transparent animationType="fade" onRequestClose={() => setRevealVisible(false)}><View style={styles.modalBackdrop}><SurfaceCard style={[styles.modalCard, { backgroundColor: colors.card, paddingBottom: Math.max(18, insets.bottom) }]}><View style={styles.modalTitle}><MaterialCommunityIcons name="image-check-outline" size={24} color={colors.teal} /><AppText variant="subtitle">Imagem revelada</AppText></View><Image source={IMAGE_SOURCE} resizeMode="cover" style={styles.revealImage} /><AppText variant="small" color={colors.muted} style={styles.centerText}>Você completou as seis fases do caminho.</AppText><ActionButton title="Fechar" variant="outline" onPress={() => setRevealVisible(false)} /></SurfaceCard></View></Modal>
     </SurfaceCard>
   );
 }
 
 const styles = StyleSheet.create({
-  heading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  icon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  phasePill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },
-  map: { height: 500, borderRadius: 24, borderWidth: 1, overflow: 'hidden', position: 'relative' },
-  mapScrollContent: { paddingTop: 18, paddingBottom: 18 },
-  mapCanvas: { width: 300, height: 900, alignSelf: 'center', position: 'relative' },
-  mapNode: { position: 'absolute', width: 148, alignItems: 'center', zIndex: 2, gap: 5 },
-  softCloudOne: { position: 'absolute', top: 150, left: 12, width: 72, height: 24, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.38)' },
-  softCloudTwo: { position: 'absolute', top: 470, right: 10, width: 82, height: 28, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.32)' },
-  mapTop: { position: 'absolute', top: 11, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, zIndex: 3 },
-  routeLine: { position: 'absolute', width: 2, top: '12%', bottom: '8%', left: '50%', borderLeftWidth: 2, borderStyle: 'dashed' },
-  mapStop: { position: 'absolute', width: 148, alignItems: 'center', transform: [{ translateX: -74 }, { translateY: -20 }], gap: 5, zIndex: 2 },
-  node: { width: 48, height: 48, borderRadius: 18, borderWidth: 2, alignItems: 'center', justifyContent: 'center', shadowColor: '#071F1D', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
-  mascotOnMap: { width: 39, height: 39 },
-  stopCard: { width: 142, borderRadius: 13, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 7, gap: 2 },
-  levelUp: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, zIndex: 4 },
-  currentMission: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 15, borderWidth: 1 },
-  missionMascot: { width: 45, height: 45 },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  track: { height: 10, borderRadius: 999, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 999 },
-  puzzleSummary: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  previewFrame: { width: 64, height: 54, borderRadius: 14, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  previewImage: { ...StyleSheet.absoluteFill, width: 64, height: 54 },
-  previewShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(4,22,24,0.38)' },
-  viewBoardButton: { alignItems: 'center', gap: 2, borderWidth: 1, borderRadius: 11, paddingHorizontal: 8, paddingVertical: 7 },
-  mirrorMission: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 11, borderRadius: 14, borderWidth: 1 },
-  actionRow: { flexDirection: 'row', gap: 8 },
-  guidance: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 11, borderRadius: 13, borderWidth: 1 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(4, 22, 24, 0.72)', justifyContent: 'center', padding: 20 },
-  puzzleModal: { width: '100%', maxWidth: 420, alignSelf: 'center', gap: 13 },
-  modalTitle: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  puzzleBoard: { height: 270, borderWidth: 1, borderRadius: 20, position: 'relative', overflow: 'hidden' },
-  boardImage: { position: 'absolute', left: 0, top: 0, width: 280, height: 220, opacity: 0.24 },
-  puzzleTarget: { position: 'absolute', top: 48, right: 34, width: 76, height: 76, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  targetImage: { position: 'absolute', width: 280, height: 220, left: -170, top: -48 },
-  puzzlePiece: { position: 'absolute', top: 0, left: 0, width: 76, height: 76, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  pieceImage: { position: 'absolute', width: 280, height: 220, left: -170, top: -48 },
-  boardModal: { width: '100%', maxWidth: 420, alignSelf: 'center', gap: 13, alignItems: 'center' },
-  boardLargeImage: { width: '100%', height: 350, borderRadius: 20 },
+  container: { gap: 14, overflow: 'hidden' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, gap: 2 },
+  eyebrow: { fontWeight: '800', letterSpacing: 1 },
+  bold: { fontWeight: '800' },
+  phaseBadge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
+  sectionTitle: { gap: 3 },
+  mapFrame: { height: 540, borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
+  mapScroll: { paddingVertical: 12 },
+  mapCanvas: { width: MAP_WIDTH, height: MAP_HEIGHT, alignSelf: 'center', position: 'relative' },
+  hill: { position: 'absolute', borderRadius: 999 },
+  hillOne: { width: 240, height: 90, top: 830, left: -60 },
+  hillTwo: { width: 260, height: 120, top: 460, right: -100 },
+  mapNode: { position: 'absolute', width: 70, height: 70, alignItems: 'center', justifyContent: 'center', zIndex: 4 },
+  node: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, shadowColor: '#071F1D', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  nodeNumber: { position: 'absolute', bottom: 5, fontWeight: '800' },
+  avatar: { position: 'absolute', left: 0, top: 0, width: 52, height: 52, zIndex: 8, alignItems: 'center', justifyContent: 'center' },
+  avatarImage: { width: 48, height: 48 },
+  missionPanel: { borderWidth: 1, borderRadius: 17, padding: 13, gap: 4 },
+  missionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  missionTitle: { fontWeight: '800' },
+  boardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  smallButton: { borderWidth: 1, borderRadius: 11, paddingHorizontal: 9, paddingVertical: 7, flexDirection: 'row', gap: 5, alignItems: 'center' },
+  boardShell: { alignSelf: 'center', width: '100%', maxWidth: 330, borderWidth: 1, borderRadius: 20, padding: 10, alignItems: 'center', overflow: 'hidden' },
+  boardBlur: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(4,22,24,0.25)' },
+  boardBlurText: { backgroundColor: 'rgba(4,22,24,0.72)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, fontWeight: '700' },
+  tray: { borderRadius: 14, padding: 10, gap: 8, backgroundColor: 'rgba(4,22,24,0.06)' },
+  trayPieces: { flexDirection: 'row', gap: 8 },
+  trayPiece: { width: 52, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
+  actions: { flexDirection: 'row', gap: 8 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(4,22,24,0.82)', justifyContent: 'center', padding: 18 },
+  modalCard: { width: '100%', maxWidth: 420, alignSelf: 'center', gap: 12, borderRadius: 24 },
+  modalTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  revealImage: { width: '100%', height: 260, borderRadius: 18 },
+  centerText: { textAlign: 'center' },
 });
-
-function PuzzleRewardModal({ visible, pieceIndex, onClose, onPlaced }: { visible: boolean; pieceIndex: number; onClose: () => void; onPlaced: () => void }) {
-  const colors = useAppColors();
-  const [placed, setPlaced] = useState(false);
-  const [position] = useState(() => new Animated.ValueXY({ x: 22, y: 178 }));
-  const start = useRef({ x: 22, y: 178 });
-  const current = useRef({ x: 22, y: 178 });
-  const placedRef = useRef(false);
-  // PanResponder precisa ser criado uma vez para manter o gesto contínuo durante o arraste.
-  // eslint-disable-next-line react-hooks/refs
-  const [panResponder] = useState(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => !placedRef.current,
-    onStartShouldSetPanResponderCapture: () => !placedRef.current,
-    onMoveShouldSetPanResponder: () => !placedRef.current,
-    onMoveShouldSetPanResponderCapture: () => !placedRef.current,
-    onPanResponderGrant: () => { start.current = { ...current.current }; },
-    onPanResponderMove: (_, gesture) => { current.current = { x: start.current.x + gesture.dx, y: start.current.y + gesture.dy }; position.setValue(current.current); },
-    onPanResponderRelease: (_, gesture) => {
-      const x = start.current.x + gesture.dx;
-      const y = start.current.y + gesture.dy;
-      if (x > 145 && y < 110) { placedRef.current = true; setPlaced(true); current.current = { x: 170, y: 48 }; Animated.spring(position, { toValue: current.current, useNativeDriver: false }).start(); }
-      else { current.current = { x: 22, y: 178 }; Animated.spring(position, { toValue: current.current, useNativeDriver: false }).start(); }
-    },
-  }));
-  useEffect(() => { if (!visible) { placedRef.current = false; current.current = { x: 22, y: 178 }; position.setValue(current.current); setTimeout(() => setPlaced(false), 0); } }, [position, visible]);
-  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View style={styles.modalBackdrop}><SurfaceCard style={[styles.puzzleModal, { backgroundColor: colors.card }]}><View style={styles.modalTitle}><MaterialCommunityIcons name="puzzle-outline" size={25} color={colors.coral} /><AppText variant="subtitle">Peça {pieceIndex + 1} desbloqueada!</AppText></View><AppText variant="small" color={colors.muted}>A imagem é surpresa. Encaixe a peça no espaço indicado; o quadro completo só será revelado ao montar as seis peças.</AppText><View style={[styles.puzzleBoard, { borderColor: `${colors.teal}55`, backgroundColor: `${colors.deepTeal}0A` }]}><View style={[styles.puzzleTarget, { borderColor: colors.coral, backgroundColor: `${colors.coral}12` }]}><MaterialCommunityIcons name="help" size={25} color={colors.coral} /></View><Animated.View {...panResponder.panHandlers} style={[styles.puzzlePiece, { backgroundColor: colors.deepTeal, transform: position.getTranslateTransform() }]}><MaterialCommunityIcons name="puzzle-outline" size={25} color="#FFFFFF" /></Animated.View></View>{placed ? <AppText variant="small" color={colors.deepTeal} style={{ textAlign: 'center', fontWeight: '800' }}>Peça encaixada. Ela ficará salva no quadro.</AppText> : <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Toque e arraste a peça para cima e para a direita.</AppText>}<ActionButton title={placed ? 'Montar peça no quadro' : 'Deixar para depois'} variant={placed ? 'secondary' : 'outline'} onPress={placed ? onPlaced : onClose} /></SurfaceCard></View></Modal>;
-}
-
-function BoardPreviewModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const colors = useAppColors();
-  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View style={styles.modalBackdrop}><SurfaceCard style={[styles.boardModal, { backgroundColor: colors.card }]}><View style={styles.modalTitle}><MaterialCommunityIcons name="image-search-outline" size={25} color={colors.deepTeal} /><AppText variant="subtitle">Seu quadro montado</AppText></View><Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="contain" style={styles.boardLargeImage} /><AppText variant="small" color={colors.muted} style={{ textAlign: 'center' }}>Continue cumprindo as missões para completar a imagem do descanso.</AppText><ActionButton title="Fechar quadro" variant="outline" onPress={onClose} /></SurfaceCard></View></Modal>;
-}
