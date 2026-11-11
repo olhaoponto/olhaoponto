@@ -6,6 +6,8 @@ import { ActionButton, AppText, ClockMascot, SurfaceCard, StatusPill, useAppColo
 import { useAppStore } from '@/store/app-store';
 import type { BroadcastMessage, LunchColleague, LunchInviteStatus, LunchInviteSummary, PointReminderSummary } from '@/types/app';
 import { acknowledgeBroadcast, acknowledgePointReminder, cancelLunchInvite, cancelPointReminder, loadActiveColleagues, loadHomeCommunications, replyToLunchInvite, sendLunchInvite, sendPointReminder } from '@/services/communications-service';
+import { recordMissionEvent } from '@/services/mission-progress-service';
+import { getBahiaDate } from '@/utils/work-time';
 
 const zoneDefault = 'America/Bahia';
 function clock(value: string | Date, timeZone: string) {
@@ -75,6 +77,7 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
       const result = await sendPointReminder({ recipient_id: colleague.id, message: `Olá, ${colleague.nome}! Lembrete amigável do Olha o Ponto: quando puder, registre sua batida para não deixar o dia sem conferência.` });
       setSavingInvite(false);
       if (result.error) { setError(result.error); return; }
+      await recordMissionEvent(userId, getBahiaDate(new Date()), 'help_colleague');
       setNotice(`Lembrete de ponto enviado para ${colleague.nome}.`);
       setInviteModal(false);
       await refresh();
@@ -86,6 +89,7 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
     const result = await sendLunchInvite({ recipient_id: colleague.id, lunch_at: lunchAt.toISOString(), return_at: returnAt.toISOString(), message });
     setSavingInvite(false);
     if (result.error) { setError(result.error); return; }
+    await recordMissionEvent(userId, getBahiaDate(new Date()), 'help_colleague');
     setNotice(`Convite enviado para ${colleague.nome}.`);
     setInviteModal(false);
     await refresh();

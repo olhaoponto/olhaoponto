@@ -22,6 +22,9 @@ export async function getAuthenticatedSession(): Promise<{ session: Session | nu
         useAppStore.getState().setSession(restored.data.session);
         return { session: restored.data.session, error: null };
       }
+      // A sessão local continua autorizando o registro offline. A renovação
+      // pode falhar apenas porque o aparelho está sem internet.
+      return { session: fallback, error: null };
     }
 
     return { session: null, error: SESSION_REQUIRED_MESSAGE };

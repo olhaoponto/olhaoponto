@@ -1,12 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Modal, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, SurfaceCard, useAppColors } from '@/components/ui';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { useAppStore } from '@/store/app-store';
 import type { WeeklyMissionSummary } from '@/utils/weekly-mission';
 import { formatMinutesHHMM } from '@/utils/work-time';
+import { loadMissionEvents, recordMissionEvent } from '@/services/mission-progress-service';
 
 const MAP_STOPS = [
   { title: 'Saída', objective: 'Comece registrando seu ponto', icon: 'flag-outline' as const },
@@ -16,15 +18,21 @@ const MAP_STOPS = [
   { title: 'Revise o espelho', objective: 'Confira e confirme seu espelho', icon: 'file-check-outline' as const },
   { title: 'Descanso conquistado', objective: 'Complete a jornada da semana', icon: 'home-heart' as const },
 ];
+const MAP_COORDS = [
+  { x: 82, y: 820 }, { x: 218, y: 690 }, { x: 86, y: 555 },
+  { x: 220, y: 405 }, { x: 86, y: 255 }, { x: 218, y: 105 },
+];
+const MAP_PATH = 'M 218 820 C 218 760, 82 760, 82 690 S 218 620, 218 555 S 86 480, 86 405 S 220 330, 220 255 S 86 180, 86 105';
 const PUZZLE_KEY = (userId: string) => `olhaponto:${userId}:puzzle-pieces`;
 const MIRROR_KEY = (userId: string, week: string) => `olhaponto:${userId}:mirror-reviewed:${week}`;
 
 export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMissionSummary; onOpenMirror: () => void }) {
   const colors = useAppColors();
   const userId = useAppStore((state) => state.session?.user.id ?? null);
-  const ratio = Math.min(1, summary.completed / Math.max(1, summary.goal));
-  const complete = summary.completed >= summary.goal;
-  const currentStop = Math.min(MAP_STOPS.length - 1, Math.round(ratio * (MAP_STOPS.length - 1)));
+  const [missionEvents, setMissionEvents] = useState<string[]>([]);
+  const missionCompleted = Math.min(MAP_STOPS.length, summary.completed + missionEvents.length);
+  const complete = missionCompleted >= MAP_STOPS.length;
+  const currentStop = Math.min(MAP_STOPS.length - 1, missionCompleted);
   const [levelUp, setLevelUp] = useState(false);
   const [puzzleVisible, setPuzzleVisible] = useState(false);
   const [boardVisible, setBoardVisible] = useState(false);
@@ -37,12 +45,19 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
 
   useEffect(() => {
     if (!userId) return;
-    Promise.all([AsyncStorage.getItem(PUZZLE_KEY(userId)), AsyncStorage.getItem(MIRROR_KEY(userId, weekKey))]).then(([pieces, reviewed]) => {
+    Promise.all([AsyncStorage.getItem(PUZZLE_KEY(userId)), AsyncStorage.getItem(MIRROR_KEY(userId, weekKey)), loadMissionEvents(userId, weekKey)]).then(([pieces, reviewed, events]) => {
       const count = Number(pieces ?? 0);
       setPlacedPieces(Number.isFinite(count) ? Math.max(0, Math.min(6, count)) : 0);
       setMirrorReviewed(reviewed === 'true');
+      setMissionEvents(events);
       setPuzzleLoaded(true);
     }).catch(() => setPuzzleLoaded(true));
+  }, [userId, weekKey]);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    const timer = setInterval(() => { void loadMissionEvents(userId, weekKey).then(setMissionEvents); }, 1200);
+    return () => clearInterval(timer);
   }, [userId, weekKey]);
 
   useEffect(() => {
@@ -70,7 +85,11 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
 
   const confirmMirrorReview = async () => {
     setMirrorReviewed(true);
-    if (userId) await AsyncStorage.setItem(MIRROR_KEY(userId, weekKey), 'true').catch(() => undefined);
+    if (userId) {
+      await AsyncStorage.setItem(MIRROR_KEY(userId, weekKey), 'true').catch(() => undefined);
+      await recordMissionEvent(userId, weekKey, 'review_mirror');
+      setMissionEvents((current) => current.includes('review_mirror') ? current : [...current, 'review_mirror']);
+    }
     if (placedPieces < 6) setPuzzleVisible(true);
   };
 
@@ -87,35 +106,38 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
 
       <View style={[styles.map, { backgroundColor: `${colors.deepTeal}08`, borderColor: `${colors.teal}35` }]}>
         <View style={[styles.mapTop, { backgroundColor: colors.card, borderColor: colors.border }]}><MaterialCommunityIcons name="map-outline" size={17} color={colors.coral} /><AppText variant="tiny" color={colors.deepTeal} style={{ fontWeight: '800' }}>{complete ? 'JORNADA CONCLUÍDA' : `OBJETIVO ATUAL: ${MAP_STOPS[currentStop].title.toUpperCase()}`}</AppText></View>
-        <View style={[styles.routeLine, { borderColor: `${colors.teal}55` }]} />
-        {MAP_STOPS.map((stop, index) => {
-          const reached = index < currentStop;
-          const isCurrent = index === currentStop;
-          const left = index % 2 === 0 ? '27%' : '73%';
-          const top = `${15 + index * 15.2}%` as `${number}%`;
-          return <View key={stop.title} style={[styles.mapStop, { left, top }]}>
-            <View style={[styles.node, { backgroundColor: reached ? colors.deepTeal : colors.card, borderColor: isCurrent ? colors.coral : reached ? colors.deepTeal : colors.border, transform: [{ scale: isCurrent ? pulse : 1 }] }]}>
-              {isCurrent ? <Image source={require('../assets/images/mascot/clock-base.png')} resizeMode="contain" style={styles.mascotOnMap} /> : <MaterialCommunityIcons name={reached ? 'check' : stop.icon} size={19} color={reached ? '#FFFFFF' : colors.muted} />}
-            </View>
-            <View style={[styles.stopCard, { backgroundColor: colors.card, borderColor: isCurrent ? `${colors.coral}80` : colors.border }]}>
-              <AppText variant="tiny" color={isCurrent ? colors.deepTeal : colors.muted} style={{ fontWeight: '800' }}>{`FASE ${index + 1}${isCurrent ? ' • VOCÊ ESTÁ AQUI' : ''}`}</AppText>
-              <AppText variant="small" style={{ fontWeight: isCurrent ? '800' : '600' }}>{stop.title}</AppText>
-              <AppText variant="tiny" color={colors.muted}>{stop.objective}</AppText>
-            </View>
-          </View>;
-        })}
+        <ScrollView contentContainerStyle={styles.mapScrollContent} showsVerticalScrollIndicator={false} contentOffset={{ x: 0, y: Math.max(0, MAP_COORDS[currentStop].y - 140) }}>
+          <View style={styles.mapCanvas}>
+            <View style={styles.softCloudOne} /><View style={styles.softCloudTwo} />
+            <Svg width={300} height={900} style={StyleSheet.absoluteFill}>
+              <Path d={MAP_PATH} fill="none" stroke={colors.border} strokeWidth={17} strokeLinecap="round" strokeDasharray="5 12" />
+              <Path d={MAP_PATH} fill="none" stroke={colors.teal} strokeWidth={17} strokeLinecap="round" strokeDasharray={missionCompleted > 0 ? '1000' : '0'} opacity={0.72} />
+            </Svg>
+            {MAP_STOPS.map((stop, index) => {
+              const reached = index < missionCompleted;
+              const isCurrent = index === currentStop;
+              const point = MAP_COORDS[index];
+              return <View key={stop.title} style={[styles.mapNode, { left: point.x - 31, top: point.y - 31 }]}>
+                <Animated.View style={[styles.node, { backgroundColor: reached ? colors.deepTeal : colors.card, borderColor: isCurrent ? colors.coral : reached ? colors.deepTeal : colors.border, transform: [{ scale: isCurrent ? pulse : 1 }] }]}>
+                  {isCurrent ? <Image source={require('../assets/images/mascot/clock-base.png')} resizeMode="contain" style={styles.mascotOnMap} /> : <MaterialCommunityIcons name={reached ? 'puzzle-check' : isCurrent ? stop.icon : 'lock-outline'} size={20} color={reached ? '#FFFFFF' : colors.muted} />}
+                </Animated.View>
+                <View style={[styles.stopCard, { backgroundColor: colors.card, borderColor: isCurrent ? `${colors.coral}80` : colors.border }]}><AppText variant="tiny" color={isCurrent ? colors.deepTeal : colors.muted} style={{ fontWeight: '800' }}>{`FASE ${index + 1}${isCurrent ? ' • VOCÊ ESTÁ AQUI' : ''}`}</AppText><AppText variant="small" style={{ fontWeight: isCurrent ? '800' : '600' }}>{stop.title}</AppText><AppText variant="tiny" color={colors.muted}>{stop.objective}</AppText></View>
+              </View>;
+            })}
+          </View>
+        </ScrollView>
         {levelUp ? <View style={[styles.levelUp, { backgroundColor: colors.deepTeal }]}><MaterialCommunityIcons name="puzzle-outline" size={16} color={colors.yellow} /><AppText variant="tiny" color="#FFFFFF" style={{ fontWeight: '800' }}>NOVA FASE! PEÇA DESBLOQUEADA</AppText></View> : null}
       </View>
 
       <View style={[styles.currentMission, { backgroundColor: `${colors.coral}10`, borderColor: `${colors.coral}55` }]}><Image source={require('../assets/images/mascot/clock-base.png')} resizeMode="contain" style={styles.missionMascot} /><View style={{ flex: 1, gap: 3 }}><AppText variant="tiny" color={colors.coral} style={{ fontWeight: '800' }}>VOCÊ ESTÁ NA FASE {currentStop + 1}</AppText><AppText variant="small" style={{ fontWeight: '800' }}>{MAP_STOPS[currentStop].title}</AppText><AppText variant="tiny" color={colors.muted}>Objetivo: {MAP_STOPS[currentStop].objective}.</AppText></View></View>
 
       <View style={styles.puzzleSummary}>
-        <View style={[styles.previewFrame, { borderColor: `${colors.teal}45`, backgroundColor: `${colors.deepTeal}08` }]}><Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="cover" style={styles.previewImage} /><View style={styles.previewShade} /><MaterialCommunityIcons name="puzzle-outline" size={20} color="#FFFFFF" /></View>
-        <View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '800' }}>Quadro do descanso</AppText><AppText variant="tiny" color={colors.muted}>{placedPieces}/6 peças montadas. {mirrorReviewed ? 'Espelho confirmado nesta semana.' : 'A peça vem depois da tarefa ser confirmada.'}</AppText></View>
-        {placedPieces > 0 ? <Pressable onPress={() => setBoardVisible(true)} accessibilityRole="button" accessibilityLabel="Visualizar quadro montado" style={[styles.viewBoardButton, { borderColor: colors.deepTeal }]}><MaterialCommunityIcons name="image-search-outline" size={18} color={colors.deepTeal} /><AppText variant="tiny" color={colors.deepTeal} style={{ fontWeight: '800' }}>VER QUADRO</AppText></Pressable> : null}
+        <View style={[styles.previewFrame, { borderColor: `${colors.teal}45`, backgroundColor: `${colors.deepTeal}08` }]}>{placedPieces === 6 ? <Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="cover" style={styles.previewImage} /> : <MaterialCommunityIcons name="image-lock-outline" size={22} color={colors.muted} />}</View>
+        <View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '800' }}>Quadro surpresa</AppText><AppText variant="tiny" color={colors.muted}>{placedPieces}/6 peças montadas. {placedPieces === 6 ? 'Imagem completa desbloqueada!' : 'A imagem só aparece quando todas as peças forem encaixadas.'}</AppText></View>
+        {placedPieces === 6 ? <Pressable onPress={() => setBoardVisible(true)} accessibilityRole="button" accessibilityLabel="Visualizar quadro montado" style={[styles.viewBoardButton, { borderColor: colors.deepTeal }]}><MaterialCommunityIcons name="image-search-outline" size={18} color={colors.deepTeal} /><AppText variant="tiny" color={colors.deepTeal} style={{ fontWeight: '800' }}>VER QUADRO</AppText></Pressable> : null}
       </View>
 
-      <View style={{ gap: 7 }}><View style={styles.progressHeader}><AppText variant="small" style={{ fontWeight: '700' }}>Fases do acompanhamento</AppText><AppText variant="small" color={colors.deepTeal} style={{ fontWeight: '800' }}>{summary.completed}/{summary.goal}</AppText></View><View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { width: `${Math.round(ratio * 100)}%`, backgroundColor: complete ? colors.teal : colors.coral }]} /></View></View>
+      <View style={{ gap: 7 }}><View style={styles.progressHeader}><AppText variant="small" style={{ fontWeight: '700' }}>Fases do acompanhamento</AppText><AppText variant="small" color={colors.deepTeal} style={{ fontWeight: '800' }}>{missionCompleted}/6</AppText></View><View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { width: `${Math.round((missionCompleted / 6) * 100)}%`, backgroundColor: complete ? colors.teal : colors.coral }]} /></View></View>
 
       <View style={[styles.mirrorMission, { borderColor: mirrorReviewed ? `${colors.teal}70` : colors.border, backgroundColor: mirrorReviewed ? `${colors.teal}10` : colors.card }]}><MaterialCommunityIcons name={mirrorReviewed ? 'check-circle' : 'file-search-outline'} size={22} color={mirrorReviewed ? colors.teal : colors.coral} /><View style={{ flex: 1, gap: 3 }}><AppText variant="small" style={{ fontWeight: '800' }}>{mirrorReviewed ? 'Espelho revisado nesta semana' : 'Missão atual: revisar o espelho'}</AppText><AppText variant="tiny" color={colors.muted}>{mirrorReviewed ? 'Você confirmou esta etapa e a recompensa já foi liberada.' : 'Abra o espelho, confira suas batidas e depois confirme aqui para liberar uma peça.'}</AppText></View></View>
       <View style={styles.actionRow}><ActionButton title="Abrir espelho" variant="outline" onPress={onOpenMirror} icon={<MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.deepTeal} />} /><ActionButton title={mirrorReviewed ? 'Peça já liberada' : 'Conferi e ganhar peça'} variant={mirrorReviewed ? 'secondary' : 'primary'} onPress={() => void confirmMirrorReview()} disabled={mirrorReviewed} icon={<MaterialCommunityIcons name={mirrorReviewed ? 'check' : 'puzzle-outline'} size={18} color={mirrorReviewed ? colors.deepTeal : '#FFFFFF'} />} /></View>
@@ -131,6 +153,11 @@ const styles = StyleSheet.create({
   icon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   phasePill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },
   map: { height: 500, borderRadius: 24, borderWidth: 1, overflow: 'hidden', position: 'relative' },
+  mapScrollContent: { paddingTop: 18, paddingBottom: 18 },
+  mapCanvas: { width: 300, height: 900, alignSelf: 'center', position: 'relative' },
+  mapNode: { position: 'absolute', width: 148, alignItems: 'center', zIndex: 2, gap: 5 },
+  softCloudOne: { position: 'absolute', top: 150, left: 12, width: 72, height: 24, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.38)' },
+  softCloudTwo: { position: 'absolute', top: 470, right: 10, width: 82, height: 28, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.32)' },
   mapTop: { position: 'absolute', top: 11, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, zIndex: 3 },
   routeLine: { position: 'absolute', width: 2, top: '12%', bottom: '8%', left: '50%', borderLeftWidth: 2, borderStyle: 'dashed' },
   mapStop: { position: 'absolute', width: 148, alignItems: 'center', transform: [{ translateX: -74 }, { translateY: -20 }], gap: 5, zIndex: 2 },
@@ -188,7 +215,7 @@ function PuzzleRewardModal({ visible, pieceIndex, onClose, onPlaced }: { visible
     },
   }));
   useEffect(() => { if (!visible) { placedRef.current = false; current.current = { x: 22, y: 178 }; position.setValue(current.current); setTimeout(() => setPlaced(false), 0); } }, [position, visible]);
-  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View style={styles.modalBackdrop}><SurfaceCard style={[styles.puzzleModal, { backgroundColor: colors.card }]}><View style={styles.modalTitle}><MaterialCommunityIcons name="puzzle-outline" size={25} color={colors.coral} /><AppText variant="subtitle">Peça {pieceIndex + 1} desbloqueada!</AppText></View><AppText variant="small" color={colors.muted}>Arraste a peça até o encaixe tracejado. Depois confirme para guardar a recompensa no quadro.</AppText><View style={[styles.puzzleBoard, { borderColor: `${colors.teal}55`, backgroundColor: `${colors.deepTeal}0A` }]}><Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="cover" style={styles.boardImage} /><View style={[styles.puzzleTarget, { borderColor: colors.coral }]}><Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="cover" style={styles.targetImage} /></View><Animated.View {...panResponder.panHandlers} style={[styles.puzzlePiece, { backgroundColor: colors.deepTeal, transform: position.getTranslateTransform() }]}><Image source={require('../assets/images/rest-day-clock-ui.png')} resizeMode="cover" style={styles.pieceImage} /><View style={styles.previewShade} /><MaterialCommunityIcons name="puzzle-outline" size={25} color="#FFFFFF" /></Animated.View></View>{placed ? <AppText variant="small" color={colors.deepTeal} style={{ textAlign: 'center', fontWeight: '800' }}>Peça encaixada. Ela ficará salva no seu quadro.</AppText> : <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Toque e arraste a peça para cima e para a direita.</AppText>}<ActionButton title={placed ? 'Montar peça no quadro' : 'Deixar para depois'} variant={placed ? 'secondary' : 'outline'} onPress={placed ? onPlaced : onClose} /></SurfaceCard></View></Modal>;
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View style={styles.modalBackdrop}><SurfaceCard style={[styles.puzzleModal, { backgroundColor: colors.card }]}><View style={styles.modalTitle}><MaterialCommunityIcons name="puzzle-outline" size={25} color={colors.coral} /><AppText variant="subtitle">Peça {pieceIndex + 1} desbloqueada!</AppText></View><AppText variant="small" color={colors.muted}>A imagem é surpresa. Encaixe a peça no espaço indicado; o quadro completo só será revelado ao montar as seis peças.</AppText><View style={[styles.puzzleBoard, { borderColor: `${colors.teal}55`, backgroundColor: `${colors.deepTeal}0A` }]}><View style={[styles.puzzleTarget, { borderColor: colors.coral, backgroundColor: `${colors.coral}12` }]}><MaterialCommunityIcons name="help" size={25} color={colors.coral} /></View><Animated.View {...panResponder.panHandlers} style={[styles.puzzlePiece, { backgroundColor: colors.deepTeal, transform: position.getTranslateTransform() }]}><MaterialCommunityIcons name="puzzle-outline" size={25} color="#FFFFFF" /></Animated.View></View>{placed ? <AppText variant="small" color={colors.deepTeal} style={{ textAlign: 'center', fontWeight: '800' }}>Peça encaixada. Ela ficará salva no quadro.</AppText> : <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Toque e arraste a peça para cima e para a direita.</AppText>}<ActionButton title={placed ? 'Montar peça no quadro' : 'Deixar para depois'} variant={placed ? 'secondary' : 'outline'} onPress={placed ? onPlaced : onClose} /></SurfaceCard></View></Modal>;
 }
 
 function BoardPreviewModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
