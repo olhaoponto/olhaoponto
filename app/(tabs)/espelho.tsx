@@ -13,6 +13,7 @@ import { loadDayStatuses } from '@/services/day-status-service';
 import { exportCsv, exportPdf } from '@/services/export-service';
 import { calculateDailyTotals, calculatePeriodTotals, formatMinutesHHMM, getBahiaDate, getNextPunch, validateEntries, validatePunch } from '@/utils/work-time';
 import { addCivilDays, getWeekDateRange } from '@/utils/day-status';
+import { getActiveWorkSchedule } from '@/utils/work-schedules';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 
 const ZONE = 'America/Bahia';
@@ -107,8 +108,9 @@ export default function EspelhoScreen() {
   }, [mode, month, periodRange.endDate, periodRange.startDate, retryCount, sessionInitialized, setEntries, userId]);
 
   const periodEntries = useMemo(() => entries.filter((entry) => entry.data >= periodRange.startDate && entry.data <= periodRange.endDate), [entries, periodRange.endDate, periodRange.startDate]);
-  const dailyTotals = useMemo(() => calculateDailyTotals(periodEntries), [periodEntries]);
-  const totals = useMemo(() => calculatePeriodTotals(periodEntries), [periodEntries]);
+  const workSchedule = useMemo(() => getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [profile?.almoco_minutos, profile?.preferencias_alerta]);
+  const dailyTotals = useMemo(() => calculateDailyTotals(periodEntries, new Date(), workSchedule), [periodEntries, workSchedule]);
+  const totals = useMemo(() => calculatePeriodTotals(periodEntries, new Date(), workSchedule), [periodEntries, workSchedule]);
   const totalByDay = new Map(dailyTotals.map((item) => [item.date, item]));
   const dates = useMemo(() => {
     if (mode === 'week') return Array.from({ length: 7 }, (_, index) => addCivilDays(periodRange.startDate, index));
@@ -214,7 +216,7 @@ export default function EspelhoScreen() {
         </View>
         <View style={styles.metricsRow}>
           <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Trabalhadas</AppText><AppText variant="subtitle">{reportLoading || visibleLoadError ? '—' : formatMinutesHHMM(totals.workedMinutes)}</AppText></View>
-          <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Extras acima de 8h/dia</AppText><AppText variant="subtitle" color={colors.coral}>{reportLoading || visibleLoadError ? '—' : formatMinutesHHMM(totals.overtimeMinutes)}</AppText></View>
+          <View style={styles.metric}><AppText variant="tiny" color={colors.muted}>Extras acima da jornada</AppText><AppText variant="subtitle" color={colors.coral}>{reportLoading || visibleLoadError ? '—' : formatMinutesHHMM(totals.overtimeMinutes)}</AppText></View>
         </View>
       </SurfaceCard>
 

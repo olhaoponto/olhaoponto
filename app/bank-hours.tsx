@@ -10,6 +10,7 @@ import { addBalanceAdjustment, loadBalanceAdjustments } from '@/services/bank-ho
 import { loadAllEntries } from '@/services/time-entry-service';
 import { calculateBankBalance } from '@/utils/bank-hours';
 import { formatMinutesHHMM } from '@/utils/work-time';
+import { getActiveWorkSchedule } from '@/utils/work-schedules';
 import type { BalanceAdjustment } from '@/types/app';
 
 type Direction = 'credito' | 'debito';
@@ -27,6 +28,7 @@ const signedTime = (minutes: number) => `${minutes > 0 ? '+' : minutes < 0 ? '�
 export default function BankHoursScreen() {
   const router = useRouter();
   const colors = useAppColors();
+  const profile = useAppStore((state) => state.profile);
   const session = useAppStore((state) => state.session);
   const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const [entries, setEntries] = useState<Awaited<ReturnType<typeof loadAllEntries>>['data']>(null);
@@ -92,7 +94,8 @@ export default function BankHoursScreen() {
     return () => { active = false; requestVersion.current += 1; };
   }, [session?.user.id, sessionInitialized, refresh, retryCount]);
 
-  const balance = useMemo(() => entries ? calculateBankBalance(entries, adjustments) : null, [entries, adjustments]);
+  const workSchedule = useMemo(() => getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [profile?.almoco_minutos, profile?.preferencias_alerta]);
+  const balance = useMemo(() => entries ? calculateBankBalance(entries, adjustments, new Date(), workSchedule) : null, [entries, adjustments, workSchedule]);
 
   const saveAdjustment = async () => {
     const hourValue = hours.trim() ? Number(hours) : 0;
@@ -130,12 +133,12 @@ export default function BankHoursScreen() {
           <AppText variant="small" color={colors.muted}>Saldo total acumulado</AppText>
           <AppText variant="hero" color={totalColor}>{signedTime(balance.totalMinutes)}</AppText>
           <View style={styles.breakdown}>
-            <View style={styles.breakdownCell}><AppText variant="tiny" color={colors.muted}>Estimado no aplicativo</AppText><AppText variant="subtitle">{signedTime(balance.appMinutes)}</AppText><AppText variant="tiny" color={colors.muted}>extras acima de 8h/dia</AppText></View>
+            <View style={styles.breakdownCell}><AppText variant="tiny" color={colors.muted}>Estimado no aplicativo</AppText><AppText variant="subtitle">{signedTime(balance.appMinutes)}</AppText><AppText variant="tiny" color={colors.muted}>extras acima da jornada</AppText></View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.breakdownCell}><AppText variant="tiny" color={colors.muted}>Ajustes externos</AppText><AppText variant="subtitle">{signedTime(balance.externalMinutes)}</AppText><AppText variant="tiny" color={colors.muted}>lançamentos registrados</AppText></View>
           </View>
         </SurfaceCard>
-        <AppText variant="tiny" color={colors.muted}>O valor estimado usa todos os dias carregados e soma apenas horas acima de 8h por dia. Confira o saldo oficial com sua empresa.</AppText>
+        <AppText variant="tiny" color={colors.muted}>O valor estimado usa todos os dias carregados e soma apenas horas acima da jornada configurada para cada dia. Confira o saldo oficial com sua empresa.</AppText>
       </> : null}
       {error ? <SurfaceCard tone="soft" style={{ gap: 10 }}><AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText><AppText variant="tiny" color={colors.muted}>O saldo completo só aparece quando o histórico do aplicativo e os ajustes externos são consultados com sucesso.</AppText>{sessionInitialized && !session ? <ActionButton title="Voltar ao login" onPress={() => router.replace('/login')} /> : !loading ? <ActionButton title="Tentar novamente" variant="outline" onPress={() => { setLoading(true); setRetryCount((count) => count + 1); }} /> : null}</SurfaceCard> : null}
       {notice ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{notice}</AppText> : null}

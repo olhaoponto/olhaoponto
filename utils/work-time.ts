@@ -1,3 +1,6 @@
+import { DEFAULT_WORK_SCHEDULE, getExpectedWorkMinutesForDate } from './work-schedules';
+import type { WorkSchedule } from '../types/app';
+
 export const DEFAULT_DAILY_LIMIT_MINUTES = 600;
 
 export type PunchType = 'entrada' | 'saida_almoco' | 'volta_almoco' | 'saida';
@@ -36,7 +39,6 @@ export interface PeriodTotals {
   days: DailyTotal[];
 }
 
-const NORMAL_WORKDAY_MINUTES = 480;
 const DEFAULT_LUNCH_MINUTES = 60;
 const PUNCH_TYPES: readonly PunchType[] = ['entrada', 'saida_almoco', 'volta_almoco', 'saida'];
 const BAHIA_TIME_ZONE = 'America/Bahia';
@@ -198,7 +200,11 @@ export function validateEntries(entries: readonly TimeEntry[], now: string | Dat
   return { valid: true, workedMinutes: calculateWorkedMinutes(accepted, now) };
 }
 
-export function calculateDailyTotals(entries: readonly TimeEntry[], now: string | Date = new Date()): DailyTotal[] {
+export function calculateDailyTotals(
+  entries: readonly TimeEntry[],
+  now: string | Date = new Date(),
+  workSchedule: WorkSchedule = DEFAULT_WORK_SCHEDULE,
+): DailyTotal[] {
   const grouped = new Map<string, TimeEntry[]>();
   for (const entry of entries) {
     const date = entry.data || getBahiaDate(entry.registrado_em);
@@ -208,13 +214,18 @@ export function calculateDailyTotals(entries: readonly TimeEntry[], now: string 
   }
   return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, dayEntries]) => {
     const minutes = calculateWorkedMinutes(dayEntries, getBahiaDate(now) === date ? now : new Date(Math.max(...dayEntries.map((item) => timestamp(item.registrado_em)))));
-    const overtime = Math.max(0, minutes - NORMAL_WORKDAY_MINUTES);
+    const expectedMinutes = getExpectedWorkMinutesForDate(workSchedule, date);
+    const overtime = Math.max(0, minutes - expectedMinutes);
     return { date, workedMinutes: minutes, overtimeMinutes: overtime, workedHHMM: formatMinutesHHMM(minutes), overtimeHHMM: formatMinutesHHMM(overtime) };
   });
 }
 
-export function calculatePeriodTotals(entries: readonly TimeEntry[], now: string | Date = new Date()): PeriodTotals {
-  const days = calculateDailyTotals(entries, now);
+export function calculatePeriodTotals(
+  entries: readonly TimeEntry[],
+  now: string | Date = new Date(),
+  workSchedule: WorkSchedule = DEFAULT_WORK_SCHEDULE,
+): PeriodTotals {
+  const days = calculateDailyTotals(entries, now, workSchedule);
   const workedMinutes = days.reduce((sum, day) => sum + day.workedMinutes, 0);
   const overtimeMinutes = days.reduce((sum, day) => sum + day.overtimeMinutes, 0);
   return { workedMinutes, overtimeMinutes, workedHHMM: formatMinutesHHMM(workedMinutes), overtimeHHMM: formatMinutesHHMM(overtimeMinutes), days };

@@ -12,18 +12,18 @@ describe('bank-hours', () => {
       entry('volta_almoco', '2026-11-03', '13:00'), entry('saida', '2026-11-03', '18:00'),
     ];
     expect(calculateBankBalance(entries, [{ saldo_minutos: 300 }, { saldo_minutos: -30 }], stamp('2026-11-03', '18:00')))
-      .toEqual({ appMinutes: 60, externalMinutes: 270, totalMinutes: 330 });
+      .toEqual({ appMinutes: 0, externalMinutes: 270, totalMinutes: 270 });
   });
 
   it('preserva saldos externos negativos quando não há horas extras calculadas', () => {
     expect(calculateBankBalance([], [{ saldo_minutos: -90 }])).toEqual({ appMinutes: 0, externalMinutes: -90, totalMinutes: -90 });
   });
 
-  it('calcula o exemplo de 2h no aplicativo mais 5h informadas pela empresa como 7h', () => {
+  it('calcula o exemplo de 1h no aplicativo mais 5h informadas pela empresa como 6h', () => {
     const entries = [
       entry('entrada', '2026-11-03', '08:00'), entry('saida_almoco', '2026-11-03', '12:00'),
       entry('volta_almoco', '2026-11-03', '13:00'), entry('saida', '2026-11-03', '19:00'),
     ];
-    expect(calculateBankBalance(entries, [{ saldo_minutos: 300 }], stamp('2026-11-03', '19:00')).totalMinutes).toBe(420);
+    expect(calculateBankBalance(entries, [{ saldo_minutos: 300 }], stamp('2026-11-03', '19:00')).totalMinutes).toBe(360);
   });
 });

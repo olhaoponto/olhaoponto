@@ -82,15 +82,20 @@ describe('work-time', () => {
     expect(validatePunch([], entry('entrada', '2026-11-04T02:30:00.000Z', '2026-11-04'), '2026-11-04T02:45:00.000Z').reason).toBe('wrong_date');
   });
 
-  it('calcula HH:MM, próximos passos e totais diários/mensais com extra acima de 8h', () => {
+  it('calcula HH:MM, próximos passos e extras acima da jornada do dia', () => {
     const dayOne = [entry('entrada', at(8)), entry('saida_almoco', at(12)), entry('volta_almoco', at(13)), entry('saida', at(17))];
     const dayTwo = [entry('entrada', at(8, 30, '2026-11-04')), entry('saida_almoco', at(12, 30, '2026-11-04')), entry('volta_almoco', at(13, 30, '2026-11-04')), entry('saida', at(18, 30, '2026-11-04'))];
     expect(formatMinutesHHMM(525)).toBe('08:45');
     expect(getNextPunch([entry('entrada', at(8))])).toBe('saida_almoco');
     expect(getNextPunch(dayOne)).toBeNull();
     const daily = calculateDailyTotals([...dayOne, ...dayTwo]);
-    expect(daily.map(({ workedMinutes, overtimeMinutes }) => [workedMinutes, overtimeMinutes])).toEqual([[480, 0], [540, 60]]);
-    expect(calculatePeriodTotals([...dayOne, ...dayTwo])).toMatchObject({ workedMinutes: 1020, overtimeMinutes: 60, workedHHMM: '17:00', overtimeHHMM: '01:00' });
+    expect(daily.map(({ workedMinutes, overtimeMinutes }) => [workedMinutes, overtimeMinutes])).toEqual([[480, 0], [540, 0]]);
+    expect(calculatePeriodTotals([...dayOne, ...dayTwo])).toMatchObject({ workedMinutes: 1020, overtimeMinutes: 0, workedHHMM: '17:00', overtimeHHMM: '00:00' });
+  });
+
+  it('considera 8h como jornada normal na sexta-feira', () => {
+    const friday = [entry('entrada', at(8, 0, '2026-11-06')), entry('saida_almoco', at(12, 0, '2026-11-06')), entry('volta_almoco', at(13, 0, '2026-11-06')), entry('saida', at(17, 30, '2026-11-06'))];
+    expect(calculateDailyTotals(friday)[0].overtimeMinutes).toBe(30);
   });
 
   it('valida um conjunto de quatro batidas em sequência', () => {
