@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import { LOCAL_MASCOT_MESSAGES } from './journey-game';
 
 export type MascotTheme = 'base' | 'christmas' | 'newyear' | 'carnival' | 'junina';
 
@@ -143,9 +144,13 @@ export function getDailyWelcome(date: Date = new Date(), options: WelcomeMessage
   const hour = Number(formatInTimeZone(date, TIME_ZONE, 'H'));
   const greeting = hour < 12 ? 'Bom dia!' : hour < 18 ? 'Boa tarde!' : 'Boa noite!';
   const themeMessages = messages[theme];
-  const message = selectMessage(themeMessages.lines, options.previousMessage, options.random ?? Math.random);
+  const localMessages = theme === 'base' ? LOCAL_MASCOT_MESSAGES : [];
+  const message = localMessages.length
+    ? selectMessage(localMessages.map((item) => item.texto), options.previousMessage, options.random ?? Math.random)
+    : selectMessage(themeMessages.lines, options.previousMessage, options.random ?? Math.random);
   const baseMascotRotation: MascotTheme[] = ['base', 'carnival', 'junina', 'newyear', 'christmas'];
-  const mascotTheme = theme === 'base' ? baseMascotRotation[themeMessages.lines.indexOf(message) % baseMascotRotation.length] : theme;
+  const pairedLocalMessage = localMessages.find((item) => item.texto === message);
+  const mascotTheme = theme === 'base' ? baseMascotRotation[(pairedLocalMessage?.pose ?? 0) % baseMascotRotation.length] : theme;
   return {
     dateKey,
     greeting,

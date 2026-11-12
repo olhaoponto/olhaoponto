@@ -3,6 +3,8 @@ import { formatInTimeZone } from 'date-fns-tz';
 import type { PunchType, TimeEntry } from '../types/app';
 import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
+import { awardPieceForEntry } from './journey-service';
+import { useAppStore } from '@/store/app-store';
 
 export interface ServiceResult<T> { data: T | null; error: string | null; }
 export type TimeEntryInput = Pick<TimeEntry, 'tipo'> & Partial<Pick<TimeEntry, 'registrado_em' | 'horario_informado_manual' | 'editado' | 'justificativa'>> & { user_id?: never; data?: never };
@@ -134,7 +136,15 @@ function makeRow(uid: string, input: TimeEntryInput): TimeEntry {
 }
 
 export async function insertTimeEntry(input: TimeEntryInput): Promise<ServiceResult<TimeEntry>> {
-  try { const uid = await currentUserId(); return await persistOrQueue(makeRow(uid, input)); }
+  try {
+    const uid = await currentUserId();
+    const result = await persistOrQueue(makeRow(uid, input));
+    if (result.data) {
+      const journey = await awardPieceForEntry(result.data);
+      if (journey) useAppStore.getState().bumpJourney(`Peça ganha! ${result.data.tipo === 'saida_almoco' ? 'Saída do almoço' : result.data.tipo === 'volta_almoco' ? 'Retorno do almoço' : result.data.tipo === 'entrada' ? 'Entrada' : 'Saída'} registrada`);
+    }
+    return result;
+  }
   catch (error) { return { data: null, error: friendly(error) }; }
 }
 

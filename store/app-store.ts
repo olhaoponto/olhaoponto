@@ -10,6 +10,8 @@ export interface AppState {
   loading: boolean;
   offline: boolean;
   error: string | null;
+  journeyVersion: number;
+  pieceNotice: string | null;
   setSession: (session: Session | null) => void;
   setSessionInitialized: (initialized: boolean) => void;
   setProfile: (profile: Profile | null) => void;
@@ -19,9 +21,11 @@ export interface AppState {
   setLoading: (loading: boolean) => void;
   setOffline: (offline: boolean) => void;
   setError: (error: string | null) => void;
+  bumpJourney: (notice?: string) => void;
+  clearPieceNotice: () => void;
   reset: () => void;
 }
-const initial = { session: null, sessionInitialized: false, profile: null, entries: [], loading: false, offline: false, error: null };
+const initial = { session: null, sessionInitialized: false, profile: null, entries: [], loading: false, offline: false, error: null, journeyVersion: 0, pieceNotice: null };
 export const useAppStore = create<AppState>((set) => ({
   ...initial,
   setSession: (session) => set({ session, sessionInitialized: true }),
@@ -33,5 +37,7 @@ export const useAppStore = create<AppState>((set) => ({
   setLoading: (loading) => set({ loading }),
   setOffline: (offline) => set({ offline }),
   setError: (error) => set({ error }),
+  bumpJourney: (notice) => set((state) => ({ journeyVersion: state.journeyVersion + 1, pieceNotice: notice ?? state.pieceNotice })),
+  clearPieceNotice: () => set({ pieceNotice: null }),
   reset: () => set({ ...initial }),
 }));
