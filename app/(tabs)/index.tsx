@@ -286,6 +286,8 @@ Enviado pelo Olha o Ponto.` }); }
           {todayEntries.length === 0 ? <Pressable onPress={() => setDayStatusModal(true)} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="calendar-alert" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Marcar falta, atestado ou folga</AppText></Pressable> : null}
         </SurfaceCard>
 
+        <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
+
         {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
         <SurfaceCard style={{ gap: 10 }}>
           <View style={styles.sectionHeading}><MaterialCommunityIcons name="food-apple-outline" size={23} color={colors.deepTeal} /><AppText variant="subtitle" style={{ flex: 1 }}>Combine o horário do almoço</AppText></View>
@@ -301,7 +303,6 @@ Enviado pelo Olha o Ponto.` }); }
       <HomeCommunications lunchMinutes={lunchMinutes} lunchStarted={lunchStarted} ended={ended} />
       {/* Compartilhamento da instalação fica oculto temporariamente; o componente permanece preservado para reativação futura. */}
       {/* <AppDownloadShareCard /> */}
-      <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
       <ConfettiBurst visible={celebrated} />
       <Modal visible={dayStatusModal} transparent animationType="fade" onRequestClose={() => setDayStatusModal(false)}>
         <View style={styles.accountMenuBackdrop}>
