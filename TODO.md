@@ -259,3 +259,12 @@ O usuário autorizou as migrations, o envio da branch de trabalho ao repositóri
 - [x] Recompensa: avanço de fase abre modal de peça de quebra-cabeça arrastável; encaixe gera feedback positivo.
 
 **Validação:** TypeScript, ESLint e 97 testes passaram; 1 teste legado de logout continua skip. A nova migration foi aplicada ao projeto `duqytmwhlrjqduzscgpa` como `20261110035335`.
+
+
+## 25. Cenários planos e Disputa da equipe — novembro de 2026
+
+- [x] Substituir os três cenários do mapa por ilustrações flat pastel 1080×1920, mantendo `cenario1.webp`, `cenario2.webp` e `cenario3.webp`; o cenário Praia do anexo foi copiado sem reconversão e validado por SHA-256.
+- [x] Implementar ranking opcional por equipe, com abas Semana/Geral, Top 5, posição do próprio usuário, cache offline e privacidade: apenas apelido, peças e quadros concluídos.
+- [x] Adicionar configuração de participação e apelido, explicação LGPD nos termos e herança da equipe na criação de usuários administrados.
+- [ ] Aplicar a migration `20261114100000_ranking_equipe.sql` somente após revisão e confirmação explícita; não publicar a Edge Function antes disso.
+- [ ] Fase 2 anotada em `TODO.md`: sequência de dias, selos mensais, desafio coletivo e notificação opcional de ultrapassagem.

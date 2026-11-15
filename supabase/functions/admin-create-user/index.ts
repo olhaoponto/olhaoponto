@@ -25,7 +25,7 @@ Deno.serve(async (req: Request) => {
     const { data: authData, error: authError } = await anon.auth.getUser(match[1]);
     if (authError || !authData.user) return json(401, { error: "Unauthorized" });
     const admin = createClient(url, env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: requester, error: profileError } = await admin.from("profiles").select("role,ativo").eq("id", authData.user.id).maybeSingle();
+    const { data: requester, error: profileError } = await admin.from("profiles").select("role,ativo,equipe_id").eq("id", authData.user.id).maybeSingle();
     if (profileError) return json(500, { error: "Unable to authorize request" });
     if (requester?.role !== "admin" || requester?.ativo !== true) return json(403, { error: "Forbidden" });
 
@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
       const conflict = createError?.code === "email_exists" || createError?.status === 422;
       return json(conflict ? 409 : 400, { error: conflict ? "Não foi possível criar usuário com esses dados" : "Não foi possível criar usuário" });
     }
-    const { error: updateError } = await admin.from("profiles").update({ nome, senha_provisoria: true }).eq("id", created.user.id);
+    const { error: updateError } = await admin.from("profiles").update({ nome, senha_provisoria: true, equipe_id: requester.equipe_id ?? authData.user.id }).eq("id", created.user.id);
     if (updateError) {
       await admin.auth.admin.deleteUser(created.user.id);
       return json(500, { error: "Não foi possível finalizar a criação do usuário" });

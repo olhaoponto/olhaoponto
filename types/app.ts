@@ -139,6 +139,10 @@ export interface Profile {
   limite_minutos: number;
   fuso: string;
   preferencias_alerta: AlertPreferences | null;
+  equipe_id?: string | null;
+  ranking_participa?: boolean;
+  ranking_apelido?: string | null;
+  ranking_aceite_em?: string | null;
 }
 
 export interface TimeEntry {

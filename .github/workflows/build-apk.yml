@@ -72,11 +72,12 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/olhaoponto.apk
 
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: olha-o-ponto-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: olhaoponto-apk
+          path: android/app/build/outputs/apk/release/olhaoponto.apk
           if-no-files-found: error

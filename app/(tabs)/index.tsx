@@ -15,6 +15,7 @@ import { loadDayStatuses, saveDayStatus, syncPendingDayStatuses } from '@/servic
 import { getCivilWeekday, getWeekDateRange } from '@/utils/day-status';
 import { getWeeklyMissionSummary } from '@/utils/weekly-mission';
 import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
+import { TeamRankingCard } from '@/components/TeamRankingCard';
 import { DayOutcomeCard } from '@/components/DayOutcomeCard';
 import { getExpectedWorkMinutesForDate, getWorkScheduleForDate, getScheduleEndAt } from '@/utils/work-schedules';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
@@ -287,6 +288,7 @@ Enviado pelo Olha o Ponto.` }); }
         </SurfaceCard>
 
         <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
+        <TeamRankingCard />
 
         {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
         <SurfaceCard style={{ gap: 10 }}>
