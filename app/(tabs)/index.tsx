@@ -14,7 +14,6 @@ import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 import { loadDayStatuses, saveDayStatus, syncPendingDayStatuses } from '@/services/day-status-service';
 import { getCivilWeekday, getWeekDateRange } from '@/utils/day-status';
 import { JourneyProgressCard } from '@/components/WeeklyMissionCard';
-import { TeamRankingCard } from '@/components/TeamRankingCard';
 import { DayOccurrenceCard, DayOutcomeCard } from '@/components/DayOutcomeCard';
 import { deleteDayOccurrence, loadDayOccurrence, saveDayOccurrence } from '@/services/day-occurrence-service';
 import type { DayOccurrence, OccurrenceReason } from '@/types/app';
@@ -318,7 +317,6 @@ Enviado pelo Olha o Ponto.` }); }
         </SurfaceCard>
 
         <JourneyProgressCard onOpen={() => router.push('/jornada')} />
-        <TeamRankingCard />
 
         {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
         {SHOW_LUNCH_SHARE_CARD ? <SurfaceCard style={{ gap: 10 }}>

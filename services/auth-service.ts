@@ -82,7 +82,7 @@ export async function getProfile(userId?: string): Promise<AuthResult<Profile>> 
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
-export async function updateProfile(updates: Partial<Pick<Profile, 'nome' | 'almoco_minutos' | 'limite_minutos' | 'fuso' | 'preferencias_alerta'>>): Promise<AuthResult<Profile>> {
+export async function updateProfile(updates: Partial<Pick<Profile, 'nome' | 'almoco_minutos' | 'limite_minutos' | 'fuso' | 'preferencias_alerta' | 'ranking_oculto'>>): Promise<AuthResult<Profile>> {
   const auth = await getAuthenticatedSession();
   const user = auth.session?.user;
   if (!user) return { data: null, error: auth.error || SESSION_REQUIRED_MESSAGE };

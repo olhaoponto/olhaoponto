@@ -47,8 +47,8 @@ export default function TermsScreen() {
         <AppText variant="body">As batidas ficam associadas à sua conta no Supabase e protegidas por regras de acesso. Você vê apenas seus próprios horários; a administração gerencia contas, mas não consulta batidas de outras pessoas. Não existe cadastro público: a conta é criada pela administração.</AppText>
       </SurfaceCard>
       <SurfaceCard>
-        <AppText variant="subtitle">Disputa opcional da equipe</AppText>
-        <AppText variant="body">Se você optar por participar, colegas da mesma equipe verão apenas seu apelido, posição e quantidade de peças encaixadas no jogo. Horários, batidas, e-mail e dados de jornada nunca aparecem. A disputa é recreativa e não é avaliação de desempenho; você pode sair quando quiser.</AppText>
+        <AppText variant="subtitle">Ranking de pontos</AppText>
+        <AppText variant="body">O ranking de pontos mostra aos colegas apenas seu primeiro nome, a inicial do sobrenome e seus pontos. Você pode sair em Configurações.</AppText>
       </SurfaceCard>
       <SurfaceCard>
         <AppText variant="subtitle">Seus direitos</AppText>

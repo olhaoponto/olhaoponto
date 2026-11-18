@@ -13,7 +13,7 @@ import type { AlertPreferences, WorkSchedule, WorkScheduleDayOverride, Workday }
 import { DEFAULT_WORK_SCHEDULE, getActiveWorkSchedule, getExpectedWorkMinutes, getWorkSchedules, validateWorkSchedule } from '@/utils/work-schedules';
 import { getLunchReturnWarningMinutes, parseLunchReturnWarningMinutes } from '@/utils/lunch-return';
 import { getLunchReminderMinutes, MAX_LUNCH_REMINDER_MINUTES, MIN_LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
-import { updateRankingPreference } from '@/services/ranking-service';
+import { updateRankingVisibility } from '@/services/ranking-service';
 
 const WORK_ALERT_OPTIONS = [
   { key: 'alerta_8h', label: 'Jornada completa (8h)' },
@@ -38,8 +38,6 @@ export default function ConfiguracoesScreen() {
   const [draftSchedule, setDraftSchedule] = useState<WorkSchedule>({ ...DEFAULT_WORK_SCHEDULE, id: 'schedule-draft' });
   const [customLunchReturnMinutes, setCustomLunchReturnMinutes] = useState('5');
   const [customLunchReminderMinutes, setCustomLunchReminderMinutes] = useState('240');
-  const [rankingNickname, setRankingNickname] = useState('');
-  const [rankingSaving, setRankingSaving] = useState(false);
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
   const schedules = getWorkSchedules(prefs, profile?.almoco_minutos ?? 60);
   const activeSchedule = getActiveWorkSchedule(prefs, profile?.almoco_minutos ?? 60);
@@ -54,8 +52,6 @@ export default function ConfiguracoesScreen() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setCustomLunchReminderMinutes(String(savedLunchReminderMinutes)); }, [profileId, savedLunchReminderMinutes]);
   useEffect(() => { if (profileId) void AsyncStorage.getItem(`olhaponto:${profileId}:biometric`).then((value) => setBiometricEnabled(value === 'true')).catch(() => setBiometricEnabled(false)); }, [profileId]);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setRankingNickname(profile?.ranking_apelido ?? ''); }, [profile?.ranking_apelido]);
 
   const savePreferences = async (patch: Partial<AlertPreferences>, columns: Record<string, number> = {}) => {
     if (!profile) return;
@@ -191,10 +187,9 @@ export default function ConfiguracoesScreen() {
       </SurfaceCard>
 
       <SurfaceCard>
-        <AppText variant="subtitle">Disputa da equipe</AppText>
-        <AppText variant="small" color={colors.muted}>Participação opcional e leve. Os colegas verão apenas seu apelido, posição e peças encaixadas — nunca horários, batidas ou dados pessoais.</AppText>
-        <PreferenceSwitch label="Participar da disputa da equipe" value={profile.ranking_participa === true} onChange={async (value) => { setRankingSaving(true); const result = await updateRankingPreference({ participa: value, apelido: value ? rankingNickname : null }); setRankingSaving(false); if (result.error) setError(result.error); else { setProfile({ ...profile, ranking_participa: value, ranking_apelido: value ? rankingNickname : null, ranking_aceite_em: value ? new Date().toISOString() : null }); setMessage(value ? 'Você entrou na disputa da equipe.' : 'Você saiu do ranking.'); } }} />
-        {profile.ranking_participa ? <><TextField label="Seu apelido (2 a 20 caracteres)" value={rankingNickname} onChangeText={setRankingNickname} maxLength={20} placeholder="Ex.: Relógio Azul" /><ActionButton title="Salvar apelido" variant="outline" loading={rankingSaving} onPress={async () => { setRankingSaving(true); const result = await updateRankingPreference({ participa: true, apelido: rankingNickname }); setRankingSaving(false); if (result.error) setError(result.error); else { setProfile({ ...profile, ranking_apelido: rankingNickname.trim() }); setMessage('Apelido atualizado.'); } }} /></> : null}
+        <AppText variant="subtitle">Ranking de pontos</AppText>
+        <AppText variant="small" color={colors.muted}>Seu primeiro nome e a inicial do sobrenome aparecem no ranking com seus pontos. Horários e batidas nunca aparecem.</AppText>
+        <PreferenceSwitch label="Aparecer no ranking" value={profile.ranking_oculto !== true} onChange={async (value) => { const result = await updateRankingVisibility(value); if (result.error) setError(result.error); else { setProfile({ ...profile, ranking_oculto: !value }); setMessage(value ? 'Você aparecerá no ranking.' : 'Você saiu do ranking.'); } }} />
       </SurfaceCard>
 
       <SurfaceCard>

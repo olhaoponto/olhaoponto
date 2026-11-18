@@ -3,27 +3,50 @@ import { supabase } from './supabase';
 import { getAuthenticatedSession } from './auth-session';
 
 export type RankingPeriod = 'semana' | 'geral';
-export type RankingRow = { posicao: number; apelido: string; pecas: number; quebra_cabecas: number; eh_voce: boolean };
+export type RankingRow = { posicao: number; nome: string; pontos: number; dias: number; eh_voce: boolean };
 export type RankingResult = { rows: RankingRow[]; cachedAt: string | null; offline: boolean; error: string | null };
-const key = (uid: string, period: RankingPeriod) => `olhaponto:${uid}:ranking:${period}`;
 
-export async function loadRanking(period: RankingPeriod): Promise<RankingResult> {
-  const session = await getAuthenticatedSession(); const uid = session.session?.user.id;
-  if (!uid) return { rows: [], cachedAt: null, offline: true, error: 'Sessão não disponível.' };
-  const cached = await AsyncStorage.getItem(key(uid, period)).catch(() => null);
-  const parse = (raw: string | null) => { try { return raw ? JSON.parse(raw) as { rows: RankingRow[]; cachedAt: string } : null; } catch { return null; } };
+const key = (uid: string, period: RankingPeriod) => `olhaponto:${uid}:ranking-pontos:${period}`;
+
+function parseCache(raw: string | null): { rows: RankingRow[]; cachedAt: string } | null {
   try {
-    const { data, error } = await supabase.rpc('ranking_equipe', { p_periodo: period });
-    if (!error && data) { const value = { rows: data as RankingRow[], cachedAt: new Date().toISOString() }; await AsyncStorage.setItem(key(uid, period), JSON.stringify(value)); return { ...value, offline: false, error: null }; }
-    const fallback = parse(cached); return { rows: fallback?.rows ?? [], cachedAt: fallback?.cachedAt ?? null, offline: true, error: error?.message ?? 'Não foi possível atualizar.' };
-  } catch (error) { const fallback = parse(cached); return { rows: fallback?.rows ?? [], cachedAt: fallback?.cachedAt ?? null, offline: true, error: error instanceof Error ? error.message : 'Sem conexão.' }; }
+    if (!raw) return null;
+    const value = JSON.parse(raw) as { rows?: unknown; cachedAt?: unknown };
+    if (!Array.isArray(value.rows) || typeof value.cachedAt !== 'string') return null;
+    return { rows: value.rows as RankingRow[], cachedAt: value.cachedAt };
+  } catch {
+    return null;
+  }
 }
 
-export async function updateRankingPreference(values: { participa: boolean; apelido: string | null }): Promise<{ error: string | null }> {
-  const session = await getAuthenticatedSession(); const uid = session.session?.user.id;
+export async function loadRanking(period: RankingPeriod): Promise<RankingResult> {
+  const session = await getAuthenticatedSession();
+  const uid = session.session?.user.id;
+  if (!uid) return { rows: [], cachedAt: null, offline: true, error: 'Sessão não disponível.' };
+  const cached = await AsyncStorage.getItem(key(uid, period)).catch(() => null);
+  try {
+    const { data, error } = await supabase.rpc('ranking_pontos', { p_periodo: period });
+    if (!error && data) {
+      const value = { rows: data as RankingRow[], cachedAt: new Date().toISOString() };
+      await AsyncStorage.setItem(key(uid, period), JSON.stringify(value));
+      return { ...value, offline: false, error: null };
+    }
+    const fallback = parseCache(cached);
+    return { rows: fallback?.rows ?? [], cachedAt: fallback?.cachedAt ?? null, offline: true, error: error?.message ?? 'Não foi possível atualizar.' };
+  } catch (error) {
+    const fallback = parseCache(cached);
+    return { rows: fallback?.rows ?? [], cachedAt: fallback?.cachedAt ?? null, offline: true, error: error instanceof Error ? error.message : 'Sem conexão.' };
+  }
+}
+
+export async function updateRankingVisibility(visible: boolean): Promise<{ error: string | null }> {
+  const session = await getAuthenticatedSession();
+  const uid = session.session?.user.id;
   if (!uid) return { error: 'Sessão não disponível.' };
-  const apelido = values.apelido?.trim() || null;
-  if (values.participa && (!apelido || !/^[A-Za-zÀ-ÿ0-9 ._-]{2,20}$/.test(apelido))) return { error: 'Use um apelido de 2 a 20 caracteres.' };
-  const { error } = await supabase.from('profiles').update({ ranking_participa: values.participa, ranking_apelido: values.participa ? apelido : null, ranking_aceite_em: values.participa ? new Date().toISOString() : null }).eq('id', uid);
-  return { error: error?.message ?? null };
+  try {
+    const { error } = await supabase.from('profiles').update({ ranking_oculto: !visible }).eq('id', uid);
+    return { error: error?.message ?? null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Não foi possível atualizar a visibilidade do ranking.' };
+  }
 }

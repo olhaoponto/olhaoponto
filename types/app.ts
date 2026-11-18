@@ -152,9 +152,7 @@ export interface Profile {
   fuso: string;
   preferencias_alerta: AlertPreferences | null;
   equipe_id?: string | null;
-  ranking_participa?: boolean;
-  ranking_apelido?: string | null;
-  ranking_aceite_em?: string | null;
+  ranking_oculto?: boolean;
 }
 
 export interface TimeEntry {

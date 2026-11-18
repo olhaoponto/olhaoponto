@@ -38,7 +38,7 @@ export function buildCsv(profile: Profile, entries: TimeEntry[], month: string):
 
 export async function exportJson(profile: Profile, entries: TimeEntry[], month: string): Promise<string> {
   const workSchedule = getActiveWorkSchedule(profile.preferencias_alerta, profile.almoco_minutos ?? 60);
-  const payload = { app: 'Olha o Ponto', exportado_em: new Date().toISOString(), periodo: month, perfil: { nome: profile.nome, email: profile.email, ranking_participa: profile.ranking_participa ?? false, ranking_apelido: profile.ranking_apelido ?? null, ranking_aceite_em: profile.ranking_aceite_em ?? null }, batidas: entries, totais: calculatePeriodTotals(entries, new Date(), workSchedule) };
+  const payload = { app: 'Olha o Ponto', exportado_em: new Date().toISOString(), periodo: month, perfil: { nome: profile.nome, email: profile.email }, batidas: entries, totais: calculatePeriodTotals(entries, new Date(), workSchedule) };
   const uri = `${FileSystem.cacheDirectory}olha-o-ponto-${month}.json`;
   await FileSystem.writeAsStringAsync(uri, JSON.stringify(payload, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
   if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Exportar meus dados' });
