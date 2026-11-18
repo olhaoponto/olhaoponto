@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -111,6 +111,19 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
   </SurfaceCard>;
 }
 
+export const JourneyProgressCard = memo(function JourneyProgressCard({ onOpen }: { onOpen: () => void }) {
+  const colors = useAppColors();
+  const journeyVersion = useAppStore((state) => state.journeyVersion);
+  const [state, setState] = useState<JourneyState | null>(null);
+  useEffect(() => { let active = true; void loadJourney().then((next) => { if (active) setState(next); }); return () => { active = false; }; }, [journeyVersion]);
+  const current = state?.pieces.filter((piece) => piece.nivel === state.level.nivel).length ?? 0;
+  return <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Complete seu quebra-cabeça — ${current}/${PECAS_POR_QUEBRA_CABECA} peças`}><SurfaceCard style={styles.progressCard}>
+    <View style={[styles.headerIcon, { backgroundColor: `${colors.teal}1F` }]}><MaterialCommunityIcons name="puzzle-outline" size={23} color={colors.teal} /></View>
+    <View style={styles.headerCopy}><AppText variant="subtitle">Complete seu quebra-cabeça</AppText><AppText variant="small" color={colors.muted}>{current}/{PECAS_POR_QUEBRA_CABECA} peças · toque para abrir sua jornada</AppText></View><MaterialCommunityIcons name="chevron-right" size={22} color={colors.deepTeal} />
+  </SurfaceCard></Pressable>;
+});
+
 const styles = StyleSheet.create({
+  progressCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
   container: { gap: 14, overflow: 'hidden' }, header: { flexDirection: 'row', alignItems: 'center', gap: 10 }, headerIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, gap: 2 }, eyebrow: { fontWeight: '800', letterSpacing: 1 }, bold: { fontWeight: '800' }, sectionTitle: { gap: 3 }, notice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, padding: 10 }, mapFrame: { height: 460, borderRadius: 24, borderWidth: 1, overflow: 'hidden', position: 'relative' }, mapScroll: { paddingVertical: 0 }, mapCanvas: { width: '100%', minWidth: MAP_WIDTH, height: MAP_HEIGHT, alignSelf: 'center', position: 'relative', overflow: 'hidden' }, scenarioImage: { position: 'absolute', left: 0, right: 0, width: '100%' }, mapShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(8,24,24,0.35)' }, mapNode: { position: 'absolute', width: 80, height: 80, alignItems: 'center', justifyContent: 'center', zIndex: 4 }, node: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, shadowColor: '#071F1D', shadowOpacity: 0.24, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }, nodeNumber: { position: 'absolute', bottom: 4, fontWeight: '800' }, whereButton: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 5, alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 7, zIndex: 8 }, expandButton: { position: 'absolute', left: 12, bottom: 12, borderWidth: 1, borderRadius: 12, padding: 8, zIndex: 8 }, missionPanel: { borderWidth: 1, borderRadius: 17, padding: 13, gap: 4 }, boardShell: { alignSelf: 'center', width: '100%', borderWidth: 1, borderRadius: 20, padding: 10, alignItems: 'center', gap: 9, overflow: 'hidden' }, boardMeta: { width: '100%', flexDirection: 'row', justifyContent: 'space-between' }, boardWrap: { width: BOARD_WIDTH, height: BOARD_HEIGHT, position: 'relative' }, slotHit: { position: 'absolute', alignItems: 'center', justifyContent: 'center', zIndex: 3 }, slotNumber: { minWidth: 25, height: 25, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, trayScroll: { width: '100%', gap: 8, alignItems: 'center', paddingHorizontal: 3 }, trayVisual: { width: 78, height: 78, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }, pieceBadge: { position: 'absolute', right: 4, top: 4, width: 21, height: 21, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, feedback: { minHeight: 18, textAlign: 'center' }, loading: { minHeight: 100, alignItems: 'center', justifyContent: 'center' }, modalTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, fullMapBackdrop: { flex: 1, backgroundColor: 'rgba(4,22,24,0.86)', justifyContent: 'flex-end' }, fullMapCard: { height: '92%', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 16, gap: 10 },
 });

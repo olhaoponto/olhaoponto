@@ -13,8 +13,7 @@ import { getLunchReminderMinutes } from '@/utils/alerts';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 import { loadDayStatuses, saveDayStatus, syncPendingDayStatuses } from '@/services/day-status-service';
 import { getCivilWeekday, getWeekDateRange } from '@/utils/day-status';
-import { getWeeklyMissionSummary } from '@/utils/weekly-mission';
-import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
+import { JourneyProgressCard } from '@/components/WeeklyMissionCard';
 import { TeamRankingCard } from '@/components/TeamRankingCard';
 import { DayOccurrenceCard, DayOutcomeCard } from '@/components/DayOutcomeCard';
 import { deleteDayOccurrence, loadDayOccurrence, saveDayOccurrence } from '@/services/day-occurrence-service';
@@ -103,7 +102,6 @@ export default function HomeScreen() {
   const shiftComplete = Boolean(!ended && scheduledEnd && now >= scheduledEnd);
   const dateLabel = friendlyDate(now);
   const weekRange = getWeekDateRange(today);
-  const weeklyMission = useMemo(() => getWeeklyMissionSummary(today, weekEntries, dayStatuses, profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [today, weekEntries, dayStatuses, profile?.preferencias_alerta, profile?.almoco_minutos]);
   useEffect(() => { if (session?.user.id) void loadDayOccurrence(today).then((result) => setOccurrence(result.data)); else setOccurrence(null); }, [session?.user.id, today]);
 
   const refreshDay = useCallback(async () => {
@@ -318,7 +316,7 @@ Enviado pelo Olha o Ponto.` }); }
           {todayEntries.length > 0 && !ended ? <Pressable onPress={() => { setOccurrenceTime(formatInTimeZone(now, profile?.fuso || ZONE, 'HH:mm')); setOccurrenceModal(true); }} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="alert-plus-outline" size={18} color={colors.error} /><AppText variant="small" color={colors.error}>Registrar intercorrência</AppText></Pressable> : null}
         </SurfaceCard>
 
-        <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
+        <JourneyProgressCard onOpen={() => router.push('/jornada')} />
         <TeamRankingCard />
 
         {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
