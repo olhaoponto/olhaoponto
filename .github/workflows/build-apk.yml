@@ -3,12 +3,11 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - feature/ranking-equipe
+    tags:
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -73,12 +72,18 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/olhaoponto.apk
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/olhaoponto.apk"
 
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: olhaoponto-apk
-          path: android/app/build/outputs/apk/release/olhaoponto.apk
+          path: olhaoponto.apk
           if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" olhaoponto.apk --generate-notes
