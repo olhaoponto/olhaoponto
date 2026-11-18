@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ImageBackground, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, ImageBackground, Pressable, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppText, ScreenShell } from '@/components/ui';
 import { getDailyWelcome, getWelcomeMessageStorageKey, type WelcomeScene } from '@/utils/welcome-message';
@@ -26,6 +26,8 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
   const openedAt = useMemo(() => new Date(), []);
   const [welcome, setWelcome] = useState(() => getDailyWelcome(openedAt));
   const [progress] = useState(() => new Animated.Value(0));
+  const [fade] = useState(() => new Animated.Value(0));
+  const [reduceMotion, setReduceMotion] = useState(false);
   const completed = useRef(false);
   const finish = useCallback(() => {
     if (completed.current) return;
@@ -53,13 +55,29 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
   }, [openedAt, userId]);
 
   useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => { if (active) setReduceMotion(enabled); });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { active = false; subscription.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) { fade.setValue(1); return undefined; }
+    fade.setValue(0);
+    const animation = Animated.timing(fade, { toValue: 1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [fade, reduceMotion]);
+
+  useEffect(() => {
     const animation = Animated.timing(progress, { toValue: 1, duration: DURATION_MS, useNativeDriver: false });
     animation.start(({ finished }) => { if (finished) finish(); });
     return () => animation.stop();
   }, [finish, progress]);
 
   return (
-    <ScreenShell scroll={false} edges={['top', 'bottom', 'left', 'right']} contentStyle={styles.page}>
+    <ScreenShell scroll={false} edges={['top', 'bottom', 'left', 'right']} contentStyle={[styles.page, { backgroundColor: '#E4F5F2' }]}>
+      <Animated.View style={[styles.animatedContent, { opacity: fade }]}>
       <ImageBackground source={sceneImages[welcome.scene]} resizeMode="cover" imageStyle={styles.sceneImage} style={styles.background}>
         <View style={styles.content}>
           <View style={styles.copy}>
@@ -80,12 +98,14 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
           </View>
         </View>
       </ImageBackground>
+      </Animated.View>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
   page: { paddingHorizontal: 0, paddingVertical: 0 },
+  animatedContent: { flex: 1 },
   background: { flex: 1, width: '100%', minHeight: '100%' },
   sceneImage: { bottom: 0 },
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 26, paddingTop: 28, paddingBottom: 20 },

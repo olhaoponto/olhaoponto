@@ -151,7 +151,7 @@ function AppStack() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: SchemeColors[colorScheme].background } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" options={{ gestureEnabled: false }} />
-        <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'fade', animationDuration: 350 }} />
         <Stack.Screen name="terms" />
         <Stack.Screen name="change-password" />
         <Stack.Screen name="auth/reset-password" />

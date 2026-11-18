@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { AppText, ScreenShell, useAppColors } from '@/components/ui';
@@ -9,7 +9,14 @@ import { getProfile } from '@/services/auth-service';
 import { useAppStore } from '@/store/app-store';
 
 const STEPS = ['Conectando ao banco...', 'Sincronizando batidas...', 'Preparando seu espelho de ponto...'];
+const MIN_SPLASH_MS = 1800;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function animateValue(value: Animated.Value, toValue: number, duration: number, useNativeDriver: boolean, easing?: (value: number) => number): Promise<void> {
+  return new Promise((resolve) => {
+    Animated.timing(value, { toValue, duration, easing, useNativeDriver }).start(() => resolve());
+  });
+}
 
 export default function SplashRoute() {
   const router = useRouter();
@@ -19,10 +26,32 @@ export default function SplashRoute() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [float] = useState(() => new Animated.Value(0));
+  const [contentOpacity] = useState(() => new Animated.Value(1));
+  const [progress] = useState(() => new Animated.Value(0));
+  const [stepOpacity] = useState(() => new Animated.Value(0.3));
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const startedAt = useRef(Date.now()).current;
+  const leaving = useRef(false);
   const setSession = useAppStore((state) => state.setSession);
   const setProfile = useAppStore((state) => state.setProfile);
   const setOffline = useAppStore((state) => state.setOffline);
   const mascotSize = Math.min(190, Math.max(145, width * 0.52), height * 0.25);
+
+  const leaveTo = useCallback(async (route: Href) => {
+    if (leaving.current) return;
+    leaving.current = true;
+    await pause(Math.max(0, MIN_SPLASH_MS - (Date.now() - startedAt)));
+    if (!reduceMotion) {
+      await Promise.all([
+        animateValue(contentOpacity, 0, 350, true, Easing.out(Easing.cubic)),
+        animateValue(progress, 1, 500, false, Easing.out(Easing.cubic)),
+      ]);
+    } else {
+      contentOpacity.setValue(0);
+      progress.setValue(1);
+    }
+    router.replace(route);
+  }, [contentOpacity, progress, reduceMotion, router, startedAt]);
 
   const continueStartup = useCallback(async () => {
     setBusy(true);
@@ -40,7 +69,7 @@ export default function SplashRoute() {
       if (!session) {
         setStep(2);
         await pause(250);
-        router.replace('/login');
+        await leaveTo('/login');
         return;
       }
 
@@ -72,28 +101,51 @@ export default function SplashRoute() {
         const auth = await LocalAuthentication.authenticateAsync({ promptMessage: 'Desbloqueie o Olha o Ponto', cancelLabel: 'Tentar novamente' });
         if (!auth.success) throw new Error('Não foi possível confirmar sua biometria. Tente novamente.');
       }
-      if (profile.senha_provisoria || session.user.user_metadata?.senha_provisoria === true) router.replace('/change-password');
-      else if (!profile.aceite_termos_em) router.replace('/terms');
-      else router.replace('/welcome');
+      if (profile.senha_provisoria || session.user.user_metadata?.senha_provisoria === true) await leaveTo('/change-password');
+      else if (!profile.aceite_termos_em) await leaveTo('/terms');
+      else await leaveTo('/welcome');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível iniciar o aplicativo.');
       setBusy(false);
     }
-  }, [router, setOffline, setProfile, setSession]);
+  }, [leaveTo, router, setOffline, setProfile, setSession]);
 
   useEffect(() => { void continueStartup(); }, [continueStartup]);
   useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => { if (active) setReduceMotion(enabled); });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { active = false; subscription.remove(); };
+  }, []);
+  useEffect(() => {
+    if (reduceMotion) { float.setValue(0); return undefined; }
     const animation = Animated.loop(Animated.sequence([
       Animated.timing(float, { toValue: 1, duration: 1000, useNativeDriver: true }),
       Animated.timing(float, { toValue: 0, duration: 1000, useNativeDriver: true }),
     ]));
     animation.start();
     return () => animation.stop();
-  }, [float]);
+  }, [float, reduceMotion]);
 
-  const progress = `${Math.round(((step + 1) / STEPS.length) * 100)}%` as `${number}%`;
+  useEffect(() => {
+    const target = (step + 1) / STEPS.length;
+    if (reduceMotion) { progress.setValue(target); return undefined; }
+    const animation = Animated.timing(progress, { toValue: target, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reduceMotion, step]);
+
+  useEffect(() => {
+    if (reduceMotion) { stepOpacity.setValue(1); return undefined; }
+    stepOpacity.setValue(0.3);
+    const animation = Animated.timing(stepOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, step, stepOpacity]);
+
   return (
     <ScreenShell scroll={false} contentStyle={[styles.container, { backgroundColor: '#E4F5F2' }]}>
+      <Animated.View style={[styles.screenContent, { opacity: contentOpacity }]}>
       <View style={styles.decorations} pointerEvents="none">
         <View style={[styles.cloud, styles.cloudOne]} /><View style={[styles.cloud, styles.cloudTwo]} /><View style={[styles.cloud, styles.cloudThree]} />
         <AppText color="#FFFFFFAA" style={[styles.star, styles.starOne]}>✦</AppText><AppText color="#FFFFFFAA" style={[styles.star, styles.starTwo]}>✧</AppText><AppText color="#FFFFFFAA" style={[styles.star, styles.starThree]}>·</AppText>
@@ -111,17 +163,19 @@ export default function SplashRoute() {
           <Pressable onPress={continueStartup} accessibilityRole="button" accessibilityLabel="Tentar novamente" style={styles.retry}><AppText color="#FFFFFF" style={styles.retryText}>{busy ? 'Tentando…' : 'Tentar novamente'}</AppText></Pressable>
           <Pressable onPress={() => router.replace('/login')} accessibilityRole="button" accessibilityLabel="Ir para o login"><AppText color="#0B4F5C" style={styles.loginText}>Ir para o login</AppText></Pressable>
         </View> : <>
-          <View style={styles.progressTrack} accessibilityLabel="Progresso de abertura" accessibilityRole="progressbar"><View style={[styles.progressFill, { width: progress }]}><View style={styles.clockDot}><View style={styles.clockHandShort} /><View style={styles.clockHandLong} /></View></View></View>
-          <AppText color="#0B4F5C" style={styles.step}>{STEPS[step]}</AppText>
+          <View style={styles.progressTrack} accessibilityLabel="Progresso de abertura" accessibilityRole="progressbar"><Animated.View style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}><View style={styles.clockDot}><View style={styles.clockHandShort} /><View style={styles.clockHandLong} /></View></Animated.View></View>
+          <Animated.View style={{ opacity: stepOpacity }}><AppText color="#0B4F5C" style={styles.step}>{STEPS[step]}</AppText></Animated.View>
           <ActivityIndicator color="#1E7F74" size="small" />
         </>}
       </View>
+      </Animated.View>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 24, overflow: 'hidden' },
+  container: { flex: 1, paddingHorizontal: 24, paddingVertical: 24, overflow: 'hidden' },
+  screenContent: { flex: 1, justifyContent: 'space-between' },
   decorations: StyleSheet.absoluteFill,
   cloud: { position: 'absolute', width: 112, height: 28, borderRadius: 22, backgroundColor: '#FFFFFF66' },
   cloudOne: { top: '13%', left: '-8%' }, cloudTwo: { top: '24%', right: '-10%', transform: [{ scale: 0.75 }] }, cloudThree: { bottom: '18%', left: '4%', transform: [{ scale: 0.55 }] },
