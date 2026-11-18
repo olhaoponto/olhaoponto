@@ -2,6 +2,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { LOCAL_MASCOT_MESSAGES } from './journey-game';
 
 export type MascotTheme = 'base' | 'christmas' | 'newyear' | 'carnival' | 'junina';
+export type WelcomeScene = 'bem-estar' | 'motivacao' | 'organizacao' | 'gratidao' | 'humor' | 'ponto' | 'natal' | 'anonovo' | 'carnaval' | 'junina';
 
 export interface DailyWelcome {
   dateKey: string;
@@ -9,6 +10,10 @@ export interface DailyWelcome {
   seasonLabel: string;
   message: string;
   theme: MascotTheme;
+  scene: WelcomeScene;
+  author: string;
+  accent: string;
+  /** Compatibilidade durante a migração da tela; a seleção visual usa scene. */
   mascotTheme: MascotTheme;
 }
 
@@ -19,6 +24,22 @@ export interface WelcomeMessageSelectionOptions {
 
 const TIME_ZONE = 'America/Bahia';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CATEGORY_SCENES: Record<string, { scene: WelcomeScene; label: string; author: string; accent: string }> = {
+  'bem-estar': { scene: 'bem-estar', label: 'BEM-ESTAR', author: '— Seu relógio, em pausa', accent: '#1E8E86' },
+  motivação: { scene: 'motivacao', label: 'MOTIVAÇÃO', author: '— Seu relógio, no caminho', accent: '#E4572E' },
+  organização: { scene: 'organizacao', label: 'ORGANIZAÇÃO', author: '— Seu relógio, com a agenda', accent: '#5B6CDB' },
+  gratidão: { scene: 'gratidao', label: 'GRATIDÃO', author: '— Seu relógio, de coração', accent: '#E0607E' },
+  humor: { scene: 'humor', label: 'BOM HUMOR', author: '— Seu relógio, sorrindo', accent: '#D98E00' },
+  ponto: { scene: 'ponto', label: 'SUA JORNADA', author: '— Seu relógio, peça a peça', accent: '#1E7F74' },
+  curiosidade: { scene: 'bem-estar', label: 'BEM-ESTAR', author: '— Seu relógio, em pausa', accent: '#1E8E86' },
+  dias: { scene: 'ponto', label: 'SUA JORNADA', author: '— Seu relógio, peça a peça', accent: '#1E7F74' },
+};
+const FESTIVE_SCENES: Record<Exclude<MascotTheme, 'base'>, { scene: WelcomeScene; author: string; accent: string }> = {
+  christmas: { scene: 'natal', author: '— Seu relógio, em clima de Natal', accent: '#C8433B' },
+  newyear: { scene: 'anonovo', author: '— Seu relógio, no novo ciclo', accent: '#5B6CDB' },
+  carnival: { scene: 'carnaval', author: '— Seu relógio, no ritmo da festa', accent: '#D6457E' },
+  junina: { scene: 'junina', author: '— Seu relógio, em clima junino', accent: '#D9531E' },
+};
 
 const messages: Record<MascotTheme, { label: string; lines: string[] }> = {
   base: {
@@ -148,15 +169,19 @@ export function getDailyWelcome(date: Date = new Date(), options: WelcomeMessage
   const message = localMessages.length
     ? selectMessage(localMessages.map((item) => item.texto), options.previousMessage, options.random ?? Math.random)
     : selectMessage(themeMessages.lines, options.previousMessage, options.random ?? Math.random);
-  const baseMascotRotation: MascotTheme[] = ['base', 'carnival', 'junina', 'newyear', 'christmas'];
   const pairedLocalMessage = localMessages.find((item) => item.texto === message);
-  const mascotTheme = theme === 'base' ? baseMascotRotation[(pairedLocalMessage?.pose ?? 0) % baseMascotRotation.length] : theme;
+  const festive = theme === 'base' ? null : FESTIVE_SCENES[theme];
+  const category = pairedLocalMessage ? CATEGORY_SCENES[pairedLocalMessage.categoria] : null;
+  const presentation = festive ?? category ?? CATEGORY_SCENES['bem-estar'];
   return {
     dateKey,
     greeting,
-    seasonLabel: themeMessages.label,
+    seasonLabel: festive ? themeMessages.label : category?.label ?? 'BEM-ESTAR',
     message,
     theme,
-    mascotTheme,
+    scene: presentation.scene,
+    author: presentation.author,
+    accent: presentation.accent,
+    mascotTheme: theme,
   };
 }
