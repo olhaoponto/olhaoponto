@@ -156,6 +156,7 @@ export function ActionButton({
   icon,
   style,
   accessibilityLabel,
+  textColor,
 }: {
   title: string;
   onPress: () => void | Promise<void>;
@@ -165,6 +166,7 @@ export function ActionButton({
   icon?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  textColor?: string;
 }) {
   const colors = useAppColors();
   const backgrounds = {
@@ -174,7 +176,7 @@ export function ActionButton({
     danger: colors.error,
     ghost: 'transparent',
   };
-  const foreground = variant === 'primary' || variant === 'danger' ? '#FFFFFF' : colors.deepTeal;
+  const foreground = textColor ?? (variant === 'primary' || variant === 'danger' ? '#FFFFFF' : colors.deepTeal);
   return (
     <Pressable
       accessibilityRole="button"

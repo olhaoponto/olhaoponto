@@ -58,6 +58,7 @@ export default function GlobalAlertOverlay() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [pendingTime, setPendingTime] = useState('');
+  const [exitTime, setExitTime] = useState('');
   const [dayStatus, setDayStatus] = useState<DayStatusRecord | null>(null);
   const [confirmCappedExit, setConfirmCappedExit] = useState(false);
   const [occurrence, setOccurrence] = useState<DayOccurrence | null>(null);
@@ -245,6 +246,22 @@ export default function GlobalAlertOverlay() {
     setMessage((result.data as typeof result.data & { _pending?: boolean })._pending ? 'Batida anterior guardada neste aparelho. Continue pela próxima etapa.' : 'Batida anterior registrada. Continue pela próxima etapa.');
   };
 
+  const recordManualExit = async () => {
+    if (!profile) return;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(exitTime)) { setMessage('Informe o horário de saída no formato HH:mm.'); return; }
+    const timestamp = fromZonedTime(`${today}T${exitTime}:00`, profile.fuso || zone).toISOString();
+    const candidate = { tipo: 'saida' as const, registrado_em: timestamp, data: today };
+    const validation = validatePunch(todayEntries, candidate, new Date(), limit);
+    if (!validation.valid) { setMessage(validation.message || 'Esse horário de saída não pode ser registrado.'); return; }
+    setSaving(true); setMessage('');
+    const result = await insertTimeEntry({ tipo: 'saida', registrado_em: timestamp, horario_informado_manual: true, justificativa: 'Horário de saída informado no alerta crítico.' });
+    setSaving(false);
+    if (result.error || !result.data) { setMessage(result.error || 'Não foi possível registrar a saída.'); return; }
+    useAppStore.getState().upsertEntry(result.data); setExitTime(''); setVisible(false);
+  };
+
+  const dismissWithoutExit = () => { setVisible(false); setConfirmCappedExit(false); setMessage(''); };
+
   if (!session || !profile || !charge || !activeAlert || !activeAlertEnabled || occurrenceClosed || completed || workedMinutes < Math.min(570, limit)) return null;
   const title = activeAlert.level === 'blocking'
     ? 'LIMITE ATINGIDO! Pare de trabalhar e bata o ponto de saída AGORA!'
@@ -262,6 +279,7 @@ export default function GlobalAlertOverlay() {
     ? `Registrar saída às ${formatClockTime(safeExit.latestAllowedTimestamp, profile.fuso || zone)}`
     : 'Registrar saída agora';
   const canDismiss = activeAlert.level !== 'blocking';
+  const isMissingPunch = getNextPunch(todayEntries) !== 'saida';
 
   return (
     <Modal visible={visible} animationType={critical ? 'fade' : 'slide'} transparent={false} statusBarTranslucent onRequestClose={close}>
@@ -278,12 +296,13 @@ export default function GlobalAlertOverlay() {
         {projected ? <AppText variant="small" color="#F8F5E9" style={styles.projected}>Horário-limite projetado: {new Intl.DateTimeFormat('pt-BR', { timeZone: zone, hour: '2-digit', minute: '2-digit' }).format(new Date(projected))}</AppText> : null}
         {message ? <AppText variant="small" color="#FFFFFF" style={styles.message}>{message}</AppText> : null}
         <View style={styles.actions}>
-          {activeAlert.level === 'blocking'
-            ? getNextPunch(todayEntries) === 'saida'
-              ? <ActionButton title={exitButtonTitle} onPress={recordExit} loading={saving} style={{ backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }} />
-              : <><AppText variant="small" color="#FFFFFF" style={{ textAlign: 'center' }}>Se ficou faltando uma batida anterior, complete-a na ordem para liberar a saída.</AppText><TextField label="Horário da próxima batida pendente (HH:mm)" value={pendingTime} onChangeText={setPendingTime} keyboardType="numbers-and-punctuation" maxLength={5} /><ActionButton title={`Registrar ${getNextPunch(todayEntries) ? getNextPunch(todayEntries)!.replace('_', ' ') : 'batida'} pendente`} onPress={recordPendingPunch} loading={saving} disabled={!pendingTime} style={{ backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }} /></>
-            : <ActionButton title="Entendido, já vou!" onPress={close} style={{ backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }} />}
-          {!canDismiss ? <AppText variant="tiny" color="#FFFFFF" style={{ textAlign: 'center' }}>Este alerta permanece aberto até registrar a saída.</AppText> : null}
+          {activeAlert.level === 'blocking' ? <>
+            {isMissingPunch ? <><AppText variant="small" color="#FFFFFF" style={{ textAlign: 'center' }}>Complete a batida anterior para liberar a saída.</AppText><TextField label="Horário da próxima batida pendente (HH:mm)" value={pendingTime} onChangeText={setPendingTime} keyboardType="numbers-and-punctuation" maxLength={5} /><ActionButton title={`Registrar ${getNextPunch(todayEntries)!.replace('_', ' ')}`} onPress={recordPendingPunch} loading={saving} disabled={!pendingTime} /></> : <ActionButton title={exitButtonTitle} onPress={recordExit} loading={saving} />}
+            <TextField label="Informar horário de saída (HH:mm)" value={exitTime} onChangeText={setExitTime} keyboardType="numbers-and-punctuation" maxLength={5} placeholder="Ex.: 18:00" />
+            <ActionButton title="Informar horário de saída" onPress={recordManualExit} loading={saving} disabled={!exitTime} variant="secondary" />
+            <ActionButton title="Sair sem registrar agora" onPress={dismissWithoutExit} variant="secondary" textColor="#173B39" />
+          </> : <ActionButton title="Entendido, já vou!" onPress={close} />}
+          {!canDismiss ? <AppText variant="tiny" color="#FFFFFF" style={{ textAlign: 'center' }}>Escolha uma ação acima; você também pode sair sem registrar agora.</AppText> : null}
         </View>
       </View>
     </Modal>
