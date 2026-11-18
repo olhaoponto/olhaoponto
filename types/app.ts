@@ -2,6 +2,18 @@ export type UserRole = 'admin' | 'user';
 export type PunchType = 'entrada' | 'saida_almoco' | 'volta_almoco' | 'saida';
 export type Workday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type DayStatus = 'working' | 'rest' | 'absence' | 'medical_leave';
+export type OccurrenceReason = 'Pessoal' | 'Saúde' | 'Trabalho externo' | 'Outro';
+export interface DayOccurrence {
+  id: string;
+  user_id: string;
+  work_date: string;
+  motivo: OccurrenceReason;
+  occurred_at: string;
+  observacao: string | null;
+  debito_minutos: number;
+  created_at: string;
+  _pending?: boolean;
+}
 
 export interface WorkScheduleDayOverride {
   start_time?: string;

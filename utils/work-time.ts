@@ -112,6 +112,15 @@ export function calculateWorkedSeconds(entries: readonly TimeEntry[], now: strin
   return Math.floor(seconds);
 }
 
+/** Débito da jornada prevista menos o tempo efetivamente trabalhado até o encerramento. */
+export function calculateOccurrenceDebitMinutes(
+  entries: readonly TimeEntry[],
+  occurredAt: string | Date,
+  expectedWorkMinutes: number,
+): number {
+  return Math.max(0, Math.floor(expectedWorkMinutes) - calculateWorkedMinutes(entries, occurredAt));
+}
+
 export function getNextPunch(entries: readonly TimeEntry[]): PunchType | null {
   const recorded = new Set(entries.map((entry) => entry.tipo));
   return PUNCH_TYPES.find((type) => !recorded.has(type)) ?? null;

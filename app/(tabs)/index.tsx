@@ -7,8 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { loadEntriesByDate, loadEntriesByMonth, insertTimeEntry, syncPendingEntries } from '@/services/time-entry-service';
-import { prepareLocalNotifications, scheduleDayNotifications } from '@/services/notification-service';
-import { calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
+import { cancelDayNotifications, prepareLocalNotifications, scheduleDayNotifications } from '@/services/notification-service';
+import { calculateOccurrenceDebitMinutes, calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
 import { getLunchReminderMinutes } from '@/utils/alerts';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 import { loadDayStatuses, saveDayStatus, syncPendingDayStatuses } from '@/services/day-status-service';
@@ -16,7 +16,9 @@ import { getCivilWeekday, getWeekDateRange } from '@/utils/day-status';
 import { getWeeklyMissionSummary } from '@/utils/weekly-mission';
 import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
 import { TeamRankingCard } from '@/components/TeamRankingCard';
-import { DayOutcomeCard } from '@/components/DayOutcomeCard';
+import { DayOccurrenceCard, DayOutcomeCard } from '@/components/DayOutcomeCard';
+import { deleteDayOccurrence, loadDayOccurrence, saveDayOccurrence } from '@/services/day-occurrence-service';
+import type { DayOccurrence, OccurrenceReason } from '@/types/app';
 import { getExpectedWorkMinutesForDate, getWorkScheduleForDate, getScheduleEndAt } from '@/utils/work-schedules';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
@@ -59,6 +61,11 @@ export default function HomeScreen() {
   const [savingDayStatus, setSavingDayStatus] = useState(false);
   const [dayStatusNotice, setDayStatusNotice] = useState('');
   const [sharingLunch, setSharingLunch] = useState(false);
+  const [occurrence, setOccurrence] = useState<DayOccurrence | null>(null);
+  const [occurrenceModal, setOccurrenceModal] = useState(false);
+  const [occurrenceReason, setOccurrenceReason] = useState<OccurrenceReason>('Pessoal');
+  const [occurrenceObservation, setOccurrenceObservation] = useState('');
+  const [savingOccurrence, setSavingOccurrence] = useState(false);
   const { width, height } = useWindowDimensions();
   const rotationEnabled = profile?.preferencias_alerta?.rotacao_contador !== false;
   const today = getBahiaDate(now);
@@ -87,6 +94,7 @@ export default function HomeScreen() {
   const lunchInProgress = todayEntries.some((entry) => entry.tipo === 'saida_almoco') && !todayEntries.some((entry) => entry.tipo === 'volta_almoco');
   const lunchStarted = todayEntries.some((entry) => entry.tipo === 'saida_almoco');
   const ended = todayEntries.some((entry) => entry.tipo === 'saida');
+  const occurrenceClosed = Boolean(occurrence);
   const progress = Math.min(1, workedMinutes / Math.max(1, limit));
   const alertColor = ended ? colors.teal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : workedMinutes >= 540 ? colors.coral : workedMinutes >= expectedWorkMinutes ? colors.warning : colors.teal;
   const eta = projectEndTime(todayEntries, limit, lunchMinutes);
@@ -95,6 +103,7 @@ export default function HomeScreen() {
   const dateLabel = friendlyDate(now);
   const weekRange = getWeekDateRange(today);
   const weeklyMission = useMemo(() => getWeeklyMissionSummary(today, weekEntries, dayStatuses, profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [today, weekEntries, dayStatuses, profile?.preferencias_alerta, profile?.almoco_minutos]);
+  useEffect(() => { if (session?.user.id) void loadDayOccurrence(today).then((result) => setOccurrence(result.data)); else setOccurrence(null); }, [session?.user.id, today]);
 
   const refreshDay = useCallback(async () => {
     if (!session?.user.id) return;
@@ -168,6 +177,7 @@ export default function HomeScreen() {
       workSchedule: activeSchedule,
       normalWorkMinutes: expectedWorkMinutes,
       timeZone: profile.fuso || ZONE,
+      dayClosed: occurrenceClosed,
       enabled: profile.preferencias_alerta?.enabled !== false,
       soundEnabled: profile.preferencias_alerta?.som !== false,
       vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
@@ -190,6 +200,22 @@ export default function HomeScreen() {
     } else {
       setSuccess(`${labels[nextPunch]} registrada às ${localTime(stamp)}.`);
     }
+  };
+
+  const handleOccurrence = async () => {
+    if (!session?.user.id || todayEntries.length === 0 || ended || occurrenceClosed) return;
+    setSavingOccurrence(true); setError('');
+    const occurredAt = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString();
+    const result = await saveDayOccurrence({ work_date: today, motivo: occurrenceReason, occurred_at: occurredAt, observacao: occurrenceObservation, debito_minutos: calculateOccurrenceDebitMinutes(todayEntries, occurredAt, expectedWorkMinutes) });
+    setSavingOccurrence(false);
+    if (!result.data) { setError(result.error || 'Não foi possível registrar a intercorrência.'); return; }
+    setOccurrence(result.data); setOccurrenceModal(false); setOccurrenceObservation(''); await cancelDayNotifications();
+    setSuccess(result.error || 'Intercorrência guardada neste aparelho; a sincronização será tentada depois.');
+  };
+  const undoOccurrence = async () => {
+    const result = await deleteDayOccurrence(today);
+    if (!result.data) { setError(result.error || 'Não foi possível desfazer a intercorrência.'); return; }
+    setOccurrence(null); setSuccess('Intercorrência desfeita. Os lembretes restantes voltaram.');
   };
 
   const handleChooseDayStatus = async (status: DayStatus) => {
@@ -258,7 +284,7 @@ Enviado pelo Olha o Ponto.` }); }
       {offline || pendingCount > 0 || pendingStatusCount > 0 ? <View style={[styles.offlineBanner, { backgroundColor: `${colors.warning}2B`, borderColor: `${colors.warning}70` }]}><MaterialCommunityIcons name="cloud-off-outline" size={20} color={colors.foreground} /><AppText variant="small" style={{ flex: 1 }}>{pendingCount || pendingStatusCount ? `${pendingCount ? `${pendingCount} batida(s)` : ''}${pendingCount && pendingStatusCount ? ' e ' : ''}${pendingStatusCount ? `${pendingStatusCount} situação(ões) do dia` : ''} aguardando sincronização.` : 'Modo offline: mostrando seus dados salvos neste aparelho.'}</AppText><StatusPill tone="yellow">OFFLINE</StatusPill></View> : null}
       {notificationStatus && (!notificationStatus.granted || !notificationStatus.exactAlarms) ? <SurfaceCard tone="soft" style={{ gap: 8 }}><AppText variant="small" color={colors.foreground}>{!notificationStatus.granted ? 'Ative as notificações para receber avisos quando o app estiver fechado.' : 'Notificações estão ativas, mas o Android pode entregar os alarmes com atraso enquanto Alarmes e lembretes não estiver liberado.'}</AppText>{Platform.OS !== 'web' ? <Pressable onPress={() => { void Linking.openSettings().catch(() => undefined); }} accessibilityRole="button"><AppText variant="small" color={colors.deepTeal}>Abrir configurações do aplicativo</AppText></Pressable> : null}</SurfaceCard> : null}
 
-      {shouldShowOutcome ? <DayOutcomeCard status={todayStatus?.status ?? null} weekendPrompt={weekendNeedsChoice} busy={savingDayStatus} dateLabel={dateLabel} onChoose={(status) => void handleChooseDayStatus(status)} onManage={() => setDayStatusModal(true)} /> : <>
+      {occurrence ? <DayOccurrenceCard occurrence={occurrence} onUndo={() => void undoOccurrence()} /> : shouldShowOutcome ? <DayOutcomeCard status={todayStatus?.status ?? null} weekendPrompt={weekendNeedsChoice} busy={savingDayStatus} dateLabel={dateLabel} onChoose={(status) => void handleChooseDayStatus(status)} onManage={() => setDayStatusModal(true)} /> : <>
         <SurfaceCard style={[styles.timerCard, { borderColor: `${alertColor}65` }]}>
           <View style={styles.timerHeader}><View style={{ gap: 4, flex: 1 }}><AppText variant="small" color={colors.muted}>Seu contador de hoje</AppText><AppText variant="subtitle">{lunchInProgress ? 'Pausa para o almoço' : ended ? 'Jornada encerrada' : 'Jornada em andamento'}</AppText></View><StatusPill tone={ended ? 'teal' : workedMinutes >= 570 ? 'danger' : workedMinutes >= expectedWorkMinutes ? 'yellow' : 'teal'}>{lunchInProgress ? 'PAUSADO' : ended ? 'FINALIZADO' : 'AO VIVO'}</StatusPill></View>
           <AppText variant="hero" style={[styles.clock, { color: alertColor }]} accessibilityLabel={`Tempo trabalhado ${elapsed(workedSeconds)}`}>{elapsed(workedSeconds)}</AppText>
@@ -281,10 +307,11 @@ Enviado pelo Olha o Ponto.` }); }
           {error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
           {success ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{success}</AppText> : null}
           {celebrated ? <View style={[styles.celebration, { backgroundColor: `${colors.teal}19` }]}><AppText variant="subtitle" color={colors.deepTeal}>Dia fechado com cuidado.</AppText><AppText variant="small" color={colors.muted}>Seu tempo pessoal começa agora. Bom descanso!</AppText></View> : null}
-          <ActionButton title={ended ? 'Jornada de hoje encerrada' : `BATER - ${nextPunch ? labels[nextPunch].toUpperCase() : ''}`} onPress={handlePunch} loading={loading} disabled={!nextPunch || !profile} icon={<MaterialCommunityIcons name={nextPunch === 'saida' ? 'door-open' : 'clock-check-outline'} size={21} color="#FFFFFF" />} style={{ minHeight: 62, borderRadius: 19, backgroundColor: ended ? colors.deepTeal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : colors.deepTeal }} />
+          <ActionButton title={ended ? 'Jornada de hoje encerrada' : `BATER - ${nextPunch ? labels[nextPunch].toUpperCase() : ''}`} onPress={handlePunch} loading={loading} disabled={!nextPunch || !profile || occurrenceClosed} icon={<MaterialCommunityIcons name={nextPunch === 'saida' ? 'door-open' : 'clock-check-outline'} size={21} color="#FFFFFF" />} style={{ minHeight: 62, borderRadius: 19, backgroundColor: ended ? colors.deepTeal : workedMinutes >= limit || workedMinutes >= 570 ? colors.error : colors.deepTeal }} />
           <Pressable onPress={() => { setManual((value) => !value); setError(''); }} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="pencil-outline" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>{manual ? 'Fechar horário manual' : 'Informar horário exato'}</AppText></Pressable>
           {manual && nextPunch ? <View style={{ gap: 12 }}><TextField label="Horário da batida (HH:mm)" value={manualTime} onChangeText={setManualTime} placeholder="Ex.: 08:00" keyboardType="numbers-and-punctuation" maxLength={5} accessibilityLabel="Horário exato da batida" /><AppText variant="tiny" color={colors.muted}>A data de hoje é usada automaticamente. Horários futuros, fora de ordem ou que ultrapassem o limite não serão registrados.</AppText></View> : null}
           {todayEntries.length === 0 ? <Pressable onPress={() => setDayStatusModal(true)} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="calendar-alert" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Marcar falta, atestado ou folga</AppText></Pressable> : null}
+          {todayEntries.length > 0 && !ended ? <Pressable onPress={() => setOccurrenceModal(true)} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="alert-plus-outline" size={18} color={colors.error} /><AppText variant="small" color={colors.error}>Registrar intercorrência</AppText></Pressable> : null}
         </SurfaceCard>
 
         <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
@@ -318,6 +345,9 @@ Enviado pelo Olha o Ponto.` }); }
             <ActionButton title="Cancelar" variant="ghost" onPress={() => setDayStatusModal(false)} disabled={savingDayStatus} />
           </SurfaceCard>
         </View>
+      </Modal>
+      <Modal visible={occurrenceModal} transparent animationType="fade" onRequestClose={() => setOccurrenceModal(false)}>
+        <View style={styles.accountMenuBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setOccurrenceModal(false)} accessibilityRole="button" accessibilityLabel="Fechar intercorrência" /><SurfaceCard style={styles.accountMenuCard}><View style={styles.accountMenuHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Registrar intercorrência</AppText><AppText variant="small" color={colors.muted}>O dia será encerrado sem criar uma batida.</AppText></View></View><AppText variant="small" color={colors.muted}>Motivo</AppText><View style={{ gap: 8 }}>{(['Pessoal', 'Saúde', 'Trabalho externo', 'Outro'] as OccurrenceReason[]).map((reason) => <Pressable key={reason} onPress={() => setOccurrenceReason(reason)} style={{ padding: 11, borderRadius: 12, borderWidth: 1, borderColor: occurrenceReason === reason ? colors.deepTeal : colors.border }}><AppText variant="small" color={occurrenceReason === reason ? colors.deepTeal : colors.foreground}>{reason}</AppText></Pressable>)}</View><TextField label="Observação (opcional)" value={occurrenceObservation} onChangeText={setOccurrenceObservation} multiline /><ActionButton title="Confirmar intercorrência" onPress={() => void handleOccurrence()} loading={savingOccurrence} /><ActionButton title="Cancelar" variant="ghost" onPress={() => setOccurrenceModal(false)} disabled={savingOccurrence} /></SurfaceCard></View>
       </Modal>
     </ScreenShell>
   );

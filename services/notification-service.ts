@@ -127,12 +127,12 @@ export async function scheduleMeetingNotifications(
 /** Recalcula agenda toda vez que o usuário bate ponto ou edita um horário. */
 export async function scheduleDayNotifications(
   entries: readonly TimeEntry[],
-  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; lunchReturnEnabled?: boolean; lunchReminderMinutes?: number; alertPreferences?: AlertPreferences | null; workSchedule?: WorkSchedule; normalWorkMinutes?: number; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
+  options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; lunchReturnEnabled?: boolean; lunchReminderMinutes?: number; alertPreferences?: AlertPreferences | null; workSchedule?: WorkSchedule; normalWorkMinutes?: number; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date; dayClosed?: boolean },
 ): Promise<void> {
-  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, normalWorkMinutes = 480, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
+  const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, normalWorkMinutes = 480, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date(), dayClosed = false } = options;
   const pauseReminderMinutes = getLunchReminderMinutes(lunchReminderMinutes ?? alertPreferences?.lunch_reminder_minutes);
   await cancelDayNotifications();
-  if (!enabled || entries.length === 0) return;
+  if (dayClosed || !enabled || entries.length === 0) return;
   const channelId = `work-alerts-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(channelId, {

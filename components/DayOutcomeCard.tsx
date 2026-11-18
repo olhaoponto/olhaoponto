@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, SurfaceCard, useAppColors } from '@/components/ui';
 import type { DayStatus } from '@/types/app';
+import type { DayOccurrence } from '@/types/app';
 
 const labels: Record<DayStatus, string> = {
   working: 'trabalho',
@@ -62,6 +63,19 @@ export function DayOutcomeCard({
 }
 
 export function dayStatusLabel(status: DayStatus): string { return labels[status]; }
+
+export function DayOccurrenceCard({ occurrence, onUndo }: { occurrence: DayOccurrence; onUndo: () => void }) {
+  const colors = useAppColors();
+  const time = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit' }).format(new Date(occurrence.occurred_at));
+  const hours = Math.floor(occurrence.debito_minutos / 60);
+  const minutes = occurrence.debito_minutos % 60;
+  return <SurfaceCard style={styles.card}>
+    <View style={styles.heading}><View style={[styles.icon, { backgroundColor: `${colors.coral}28` }]}><MaterialCommunityIcons name="alert-circle-outline" size={25} color={colors.error} /></View><View style={{ flex: 1, gap: 2 }}><AppText variant="tiny" color={colors.error} style={styles.kicker}>INTERCORRÊNCIA · {occurrence.motivo.toUpperCase()}</AppText><AppText variant="subtitle">Dia encerrado virtualmente</AppText></View></View>
+    <AppText variant="small" color={colors.muted}>Intercorrência registrada às {time} — débito de {hours}h {minutes}m.</AppText>
+    {occurrence.observacao ? <AppText variant="small" color={colors.muted}>{occurrence.observacao}</AppText> : null}
+    <ActionButton title="Desfazer" variant="outline" onPress={onUndo} />
+  </SurfaceCard>;
+}
 
 const styles = StyleSheet.create({
   card: { gap: 13, alignItems: 'stretch' },

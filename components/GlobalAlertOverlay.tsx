@@ -17,6 +17,8 @@ import { scheduleDayNotifications, scheduleMeetingNotifications } from '@/servic
 import { loadAgendaMeetings } from '@/services/agenda-service';
 import { ActionButton, AppText, TextField, useAppColors } from '@/components/ui';
 import { getLunchReturnWarningMinutes } from '@/utils/lunch-return';
+import { loadDayOccurrence } from '@/services/day-occurrence-service';
+import type { DayOccurrence } from '@/types/app';
 
 const zone = 'America/Bahia';
 function formatClock(totalSeconds: number) {
@@ -58,12 +60,14 @@ export default function GlobalAlertOverlay() {
   const [pendingTime, setPendingTime] = useState('');
   const [dayStatus, setDayStatus] = useState<DayStatusRecord | null>(null);
   const [confirmCappedExit, setConfirmCappedExit] = useState(false);
+  const [occurrence, setOccurrence] = useState<DayOccurrence | null>(null);
   const pulse = useSharedValue(0);
   const lastKey = useRef('');
   const previousCharge = useRef<string | undefined>(undefined);
   const today = getBahiaDate(now);
   const todayEntries = useMemo(() => entries.filter((entry) => entry.data === today), [entries, today]);
   const completed = todayEntries.some((entry) => entry.tipo === 'saida');
+  const occurrenceClosed = Boolean(occurrence);
   const limit = profile?.limite_minutos ?? 600;
   const activeSchedule = useMemo(() => {
     const schedule = getWorkScheduleForDate(profile?.preferencias_alerta, today, profile?.almoco_minutos ?? 60);
@@ -80,11 +84,11 @@ export default function GlobalAlertOverlay() {
   const workedMinutes = Math.floor(workedSeconds / 60);
   const activeAlert = workedMinutes < expectedWorkMinutes ? null : getCurrentAlert(workedMinutes, limit);
   const activeAlertEnabled = Boolean(activeAlert && isWorkAlertEnabled(activeAlert.minutes, limit, profile?.preferencias_alerta));
-  const key = session?.user.id && !completed && activeAlertEnabled ? `${session.user.id}:${displayKey(workedMinutes, limit)}` : '';
+  const key = session?.user.id && !completed && !occurrenceClosed && activeAlertEnabled ? `${session.user.id}:${displayKey(workedMinutes, limit)}` : '';
   const level = alertLevel(workedMinutes, limit);
   const remainingSeconds = Math.max(0, limit * 60 - workedSeconds);
-  const critical = activeAlertEnabled && (workedMinutes >= 590 || Boolean(activeAlert?.level === 'blocking'));
-  const urgent = activeAlertEnabled && workedMinutes >= 585;
+  const critical = !occurrenceClosed && activeAlertEnabled && (workedMinutes >= 590 || Boolean(activeAlert?.level === 'blocking'));
+  const urgent = !occurrenceClosed && activeAlertEnabled && workedMinutes >= 585;
   const pulseStyle = useAnimatedStyle(() => ({ opacity: urgent ? 0.04 + pulse.value * 0.05 : 0.05, transform: [{ scale: urgent ? 0.99 + pulse.value * 0.02 : 1 }] }));
 
   useEffect(() => {
@@ -102,6 +106,8 @@ export default function GlobalAlertOverlay() {
     return () => { active = false; };
   }, [session?.user.id, today, todayEntries.length]);
 
+  useEffect(() => { if (session?.user.id) void loadDayOccurrence(today).then((result) => setOccurrence(result.data)); else setOccurrence(null); }, [session?.user.id, today, todayEntries.length]);
+
   useEffect(() => {
     if (!session || !profile) return;
     void scheduleDayNotifications(todayEntries, {
@@ -115,12 +121,13 @@ export default function GlobalAlertOverlay() {
       workSchedule: activeSchedule,
       normalWorkMinutes: expectedWorkMinutes,
       timeZone: profile.fuso || zone,
+      dayClosed: occurrenceClosed,
       enabled: profile.preferencias_alerta?.enabled !== false,
       soundEnabled: profile.preferencias_alerta?.som !== false,
       vibrationEnabled: profile.preferencias_alerta?.vibracao !== false,
       now: new Date(),
     }).catch(() => undefined);
-  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, lunchReminderMinutes, activeSchedule, expectedWorkMinutes, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries]);
+  }, [session, profile, limit, lunchMinutes, lunchReturnWarningMinutes, lunchReminderMinutes, activeSchedule, expectedWorkMinutes, profile?.preferencias_alerta?.enabled, profile?.preferencias_alerta?.som, profile?.preferencias_alerta?.vibracao, todayEntries, occurrenceClosed]);
 
   useEffect(() => {
     const userId = session?.user.id;
@@ -232,7 +239,7 @@ export default function GlobalAlertOverlay() {
     setMessage((result.data as typeof result.data & { _pending?: boolean })._pending ? 'Batida anterior guardada neste aparelho. Continue pela próxima etapa.' : 'Batida anterior registrada. Continue pela próxima etapa.');
   };
 
-  if (!session || !profile || !charge || !activeAlert || !activeAlertEnabled || completed || workedMinutes < Math.min(570, limit)) return null;
+  if (!session || !profile || !charge || !activeAlert || !activeAlertEnabled || occurrenceClosed || completed || workedMinutes < Math.min(570, limit)) return null;
   const title = activeAlert.level === 'blocking'
     ? 'LIMITE ATINGIDO! Pare de trabalhar e bata o ponto de saída AGORA!'
     : workedMinutes >= 590
