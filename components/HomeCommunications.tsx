@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActionButton, AppText, ClockMascot, SurfaceCard, StatusPill, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import type { BroadcastMessage, LunchColleague, LunchInviteStatus, LunchInviteSummary, PointReminderSummary } from '@/types/app';
@@ -9,6 +10,7 @@ import { acknowledgeBroadcast, acknowledgePointReminder, cancelLunchInvite, canc
 import { recordMissionEvent } from '@/services/mission-progress-service';
 import { getBahiaDate } from '@/utils/work-time';
 import { chooseDefaultLunchSlot, formatLunchSummary, generateLunchSlots, validateLunchAt, type LunchSlot } from '@/utils/lunch-slots';
+import { addHiddenCommunicationId, parseHiddenCommunicationIds, serializeHiddenCommunicationIds } from '@/utils/hidden-communications';
 
 const zoneDefault = 'America/Bahia';
 function clock(value: string | Date, timeZone: string) {
@@ -40,7 +42,8 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
   const [selectedColleague, setSelectedColleague] = useState<LunchColleague | null>(null);
   const [lunchSlots, setLunchSlots] = useState<LunchSlot[]>([]);
   const [selectedLunchAt, setSelectedLunchAt] = useState<Date | null>(null);
-  const [dismissedExpired, setDismissedExpired] = useState<Set<string>>(new Set());
+  const [hiddenCommunicationIds, setHiddenCommunicationIds] = useState<Set<string>>(new Set());
+  const hiddenStorageKey = userId ? `olhaponto:${userId}:hidden-communications` : null;
 
   const refresh = useCallback(async () => {
     if (!userId) { setBroadcasts([]); setInvites([]); setPointReminders([]); return; }
@@ -53,11 +56,23 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
 
   useFocusEffect(useCallback(() => {
     focused.current = true;
+    if (hiddenStorageKey) {
+      void AsyncStorage.getItem(hiddenStorageKey).then((value) => {
+        if (focused.current) setHiddenCommunicationIds(new Set(parseHiddenCommunicationIds(value)));
+      }).catch(() => { if (focused.current) setHiddenCommunicationIds(new Set()); });
+    } else setHiddenCommunicationIds(new Set());
     void refresh();
     const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 30_000);
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') void refresh(); });
     return () => { focused.current = false; clearInterval(timer); listener.remove(); };
-  }, [refresh]));
+  }, [hiddenStorageKey, refresh]));
+
+  const hideCommunication = async (id: string) => {
+    if (!hiddenStorageKey) return;
+    const next = addHiddenCommunicationId([...hiddenCommunicationIds], id);
+    setHiddenCommunicationIds(new Set(next));
+    await AsyncStorage.setItem(hiddenStorageKey, serializeHiddenCommunicationIds(next));
+  };
 
   const dismissBroadcast = async (message: BroadcastMessage) => {
     if (!userId) return;
@@ -146,11 +161,11 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
   };
 
   const currentUserId = userId;
-  const expiredIncoming = invites.filter((invite) => invite.recipient_id === currentUserId && invite.status === 'pending' && new Date(invite.lunch_at).getTime() <= Date.now() && !dismissedExpired.has(invite.id)).slice(0, 3);
-  const incoming = invites.filter((invite) => invite.recipient_id === currentUserId && invite.status === 'pending' && new Date(invite.lunch_at).getTime() > Date.now()).slice(0, 3);
-  const recentOutgoing = invites.filter((invite) => invite.sender_id === currentUserId && invite.status !== 'cancelled').slice(0, 3);
-  const incomingReminders = pointReminders.filter((reminder) => reminder.recipient_id === currentUserId && reminder.status === 'pending').slice(0, 3);
-  const recentOutgoingReminders = pointReminders.filter((reminder) => reminder.sender_id === currentUserId && reminder.status !== 'cancelled').slice(0, 3);
+  const expiredIncoming = invites.filter((invite) => invite.recipient_id === currentUserId && invite.status === 'pending' && new Date(invite.lunch_at).getTime() <= Date.now() && !hiddenCommunicationIds.has(invite.id)).slice(0, 3);
+  const incoming = invites.filter((invite) => invite.recipient_id === currentUserId && invite.status === 'pending' && new Date(invite.lunch_at).getTime() > Date.now() && !hiddenCommunicationIds.has(invite.id)).slice(0, 3);
+  const recentOutgoing = invites.filter((invite) => invite.sender_id === currentUserId && invite.status !== 'cancelled' && !hiddenCommunicationIds.has(invite.id)).slice(0, 3);
+  const incomingReminders = pointReminders.filter((reminder) => reminder.recipient_id === currentUserId && reminder.status === 'pending' && !hiddenCommunicationIds.has(reminder.id)).slice(0, 3);
+  const recentOutgoingReminders = pointReminders.filter((reminder) => reminder.sender_id === currentUserId && reminder.status !== 'cancelled' && !hiddenCommunicationIds.has(reminder.id)).slice(0, 3);
   const timeZone = profile?.fuso || zoneDefault;
   useEffect(() => {
     if (!inviteModal || inviteStep !== 2 || !selectedLunchAt) return undefined;
@@ -190,7 +205,7 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
           <StatusPill tone="danger">CONVITE VENCIDO</StatusPill>
           <AppText variant="subtitle">Esse convite venceu</AppText>
           <AppText variant="small" color={colors.muted}>{invite.sender_name} convidou você para almoçar.</AppText>
-          <ActionButton title="Dispensar" variant="outline" onPress={() => setDismissedExpired((current) => new Set(current).add(invite.id))} />
+          <ActionButton title="Dispensar" variant="outline" onPress={() => void hideCommunication(invite.id)} icon={<MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.deepTeal} />} />
         </View>
       </SurfaceCard>)}
 
@@ -224,12 +239,13 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
           <AppText variant="small" color={colors.muted}>{invite.status === 'pending' ? 'Aguardando resposta do colega.' : invite.response_message || (invite.status === 'accepted' ? 'O colega aceitou o convite.' : invite.status === 'meeting' ? 'O colega tem uma reunião nesse horário.' : invite.status === 'cancelled' ? 'Você cancelou este convite.' : 'O colega não poderá ir.')}</AppText>
           <AppText variant="tiny" color={colors.muted}>{formatLunchSummary(invite.lunch_at, invite.return_at, timeZone)}</AppText>
           {invite.status === 'pending' ? <ActionButton title="Cancelar convite" variant="outline" onPress={() => void cancelInvite(invite)} loading={respondingId === invite.id} icon={<MaterialCommunityIcons name="close-circle-outline" size={18} color={colors.deepTeal} />} /> : null}
+          {invite.status !== 'pending' ? <ActionButton title="Apagar" variant="outline" onPress={() => void hideCommunication(invite.id)} icon={<MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.deepTeal} />} /> : null}
         </View>
       </SurfaceCard>)}
 
       {recentOutgoingReminders.map((reminder) => <SurfaceCard key={`reminder-out-${reminder.id}`} style={styles.messageCard}>
         <View style={styles.mascot}><ClockMascot size={48} /></View>
-        <View style={{ flex: 1, gap: 5 }}><AppText variant="subtitle">Lembrete para {reminder.recipient_name}</AppText><AppText variant="small" color={colors.muted}>{reminder.status === 'acknowledged' ? 'O colega confirmou o lembrete.' : reminder.status === 'cancelled' ? 'Você cancelou este lembrete.' : 'Aguardando o colega abrir e confirmar.'}</AppText>{reminder.status === 'pending' ? <ActionButton title="Cancelar lembrete" variant="outline" onPress={() => void cancelReminder(reminder)} loading={respondingId === reminder.id} /> : null}</View>
+        <View style={{ flex: 1, gap: 5 }}><AppText variant="subtitle">Lembrete para {reminder.recipient_name}</AppText><AppText variant="small" color={colors.muted}>{reminder.status === 'acknowledged' ? 'O colega confirmou o lembrete.' : reminder.status === 'cancelled' ? 'Você cancelou este lembrete.' : 'Aguardando o colega abrir e confirmar.'}</AppText>{reminder.status === 'pending' ? <ActionButton title="Cancelar lembrete" variant="outline" onPress={() => void cancelReminder(reminder)} loading={respondingId === reminder.id} /> : null}{reminder.status === 'acknowledged' ? <ActionButton title="Apagar" variant="outline" onPress={() => void hideCommunication(reminder.id)} icon={<MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.deepTeal} />} /> : null}</View>
       </SurfaceCard>)}
 
       <SurfaceCard style={styles.inviteCard}>

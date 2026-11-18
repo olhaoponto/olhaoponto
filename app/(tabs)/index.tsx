@@ -28,6 +28,7 @@ import { HomeCommunications } from '@/components/HomeCommunications';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
+const SHOW_LUNCH_SHARE_CARD = false;
 const labels: Record<PunchType, string> = { entrada: 'Entrada', saida_almoco: 'Saída para almoço', volta_almoco: 'Volta do almoço', saida: 'Saída' };
 const order: PunchType[] = ['entrada', 'saida_almoco', 'volta_almoco', 'saida'];
 function elapsed(seconds: number) {
@@ -320,13 +321,13 @@ Enviado pelo Olha o Ponto.` }); }
         <TeamRankingCard />
 
         {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
-        <SurfaceCard style={{ gap: 10 }}>
+        {SHOW_LUNCH_SHARE_CARD ? <SurfaceCard style={{ gap: 10 }}>
           <View style={styles.sectionHeading}><MaterialCommunityIcons name="food-apple-outline" size={23} color={colors.deepTeal} /><AppText variant="subtitle" style={{ flex: 1 }}>Combine o horário do almoço</AppText></View>
           <AppText variant="small" color={colors.muted}>Compartilhe pelo WhatsApp, mensagem ou outro app. Você escolhe o contato e confirma o envio; o Olha o Ponto não envia nada sozinho.</AppText>
           <ActionButton title="Avisar que estou saindo para almoçar" variant="secondary" onPress={() => void shareLunch(true)} loading={sharingLunch} icon={<MaterialCommunityIcons name="send-outline" size={18} color="#FFFFFF" />} />
           <ActionButton title="Compartilhar previsão a partir de agora" variant="outline" onPress={() => void shareLunch(false)} loading={sharingLunch} icon={<MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.deepTeal} />} />
           <AppText variant="tiny" color={colors.muted}>Sem horário fixo: após bater a saída, o retorno é calculado pela hora real registrada mais {lunchMinutes} min de intervalo.</AppText>
-        </SurfaceCard>
+        </SurfaceCard> : null}
         <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       </>}
       {shouldShowOutcome && error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
