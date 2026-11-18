@@ -24,7 +24,7 @@ export default function ResumoScreen() {
   const session = useAppStore((state) => state.session);
   const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const entries = useAppStore((state) => state.entries);
-  const setEntries = useAppStore((state) => state.setEntries);
+  const mergeEntries = useAppStore((state) => state.mergeEntries);
   const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,7 +45,7 @@ export default function ResumoScreen() {
       try {
         const result = await loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`));
         if (!active) return;
-        if (result.data) setEntries(result.data);
+        if (result.data) mergeEntries(result.data);
         if (result.error && result.data?.length) {
           setSyncNotice('Sem conexão com o Supabase. Exibindo os registros salvos neste aparelho; tente sincronizar novamente.');
           setError('');
@@ -58,7 +58,7 @@ export default function ResumoScreen() {
       } finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [month, userId, sessionInitialized, retryCount, setEntries]);
+  }, [month, userId, sessionInitialized, retryCount, mergeEntries]);
 
   const changeMonth = (amount: -1 | 1) => {
     const next = formatInTimeZone(amount < 0 ? subMonths(new Date(`${month}-15T12:00:00Z`), 1) : addMonths(new Date(`${month}-15T12:00:00Z`), 1), ZONE, 'yyyy-MM');

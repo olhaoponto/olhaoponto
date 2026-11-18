@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { getDaysInMonth, subMonths, addMonths } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
@@ -35,8 +35,9 @@ export default function EspelhoScreen() {
   const session = useAppStore((state) => state.session);
   const sessionInitialized = useAppStore((state) => state.sessionInitialized);
   const entries = useAppStore((state) => state.entries);
-  const setEntries = useAppStore((state) => state.setEntries);
+  const mergeEntries = useAppStore((state) => state.mergeEntries);
   const upsertEntry = useAppStore((state) => state.upsertEntry);
+  const removeEntry = useAppStore((state) => state.removeEntry);
   const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
   const [weekAnchor, setWeekAnchor] = useState(() => getBahiaDate(new Date()));
   const [mode, setMode] = useState<MirrorMode>('month');
@@ -58,10 +59,10 @@ export default function EspelhoScreen() {
   const [retroTime, setRetroTime] = useState('');
   const [retroReason, setRetroReason] = useState('');
   const [dayStatuses, setDayStatuses] = useState<DayStatusRecord[]>([]);
+  const focusInitialized = useRef(false);
 
   const userId = session?.user.id;
   const authUnavailable = sessionInitialized && !userId;
-  const reportLoading = !sessionInitialized || (!authUnavailable && loading);
   const visibleLoadError = authUnavailable ? 'Sua sessão não está ativa. Entre novamente para consultar o espelho.' : loadError;
   const periodRange = useMemo(() => mode === 'month'
     ? (() => {
@@ -88,9 +89,10 @@ export default function EspelhoScreen() {
           loadDayStatuses(periodRange.startDate, periodRange.endDate),
         ]);
         if (!alive) return;
-        if (result.data) setEntries(result.data);
+        if (result.data) mergeEntries(result.data);
         if (statusResult.data) setDayStatuses(statusResult.data);
-        if (result.error && result.data?.length) {
+        const hasCurrentPeriodEntries = useAppStore.getState().entries.some((entry) => entry.data >= periodRange.startDate && entry.data <= periodRange.endDate);
+        if (result.error && (result.data?.length || hasCurrentPeriodEntries)) {
           setSyncNotice('Sem conexão com o Supabase. Exibindo os registros salvos neste aparelho; tente sincronizar novamente.');
           setLoadError('');
         } else if (result.error) {
@@ -105,9 +107,20 @@ export default function EspelhoScreen() {
       } finally { if (alive) setLoading(false); }
     })();
     return () => { alive = false; };
-  }, [mode, month, periodRange.endDate, periodRange.startDate, retryCount, sessionInitialized, setEntries, userId]);
+  }, [mode, month, periodRange.endDate, periodRange.startDate, retryCount, sessionInitialized, mergeEntries, userId]);
+
+  useFocusEffect(useCallback(() => {
+    if (!focusInitialized.current) {
+      focusInitialized.current = true;
+      return undefined;
+    }
+    setRetryCount((value) => value + 1);
+    return undefined;
+  }, []));
 
   const periodEntries = useMemo(() => entries.filter((entry) => entry.data >= periodRange.startDate && entry.data <= periodRange.endDate), [entries, periodRange.endDate, periodRange.startDate]);
+  const hasPeriodEntries = periodEntries.length > 0;
+  const reportLoading = !sessionInitialized || (!authUnavailable && loading && !hasPeriodEntries);
   const workSchedule = useMemo(() => getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [profile?.almoco_minutos, profile?.preferencias_alerta]);
   const dailyTotals = useMemo(() => calculateDailyTotals(periodEntries, new Date(), workSchedule), [periodEntries, workSchedule]);
   const totals = useMemo(() => calculatePeriodTotals(periodEntries, new Date(), workSchedule), [periodEntries, workSchedule]);
@@ -164,7 +177,7 @@ export default function EspelhoScreen() {
     const result = await deleteTimeEntry(deleteTarget.id);
     setSaving(false);
     if (result.error) { setNotice(result.error); setDeleteTarget(null); return; }
-    setEntries(periodEntries.filter((entry) => entry.id !== deleteTarget.id));
+    removeEntry(deleteTarget.id);
     setDeleteTarget(null);
     setNotice('Batida removida.');
   };
@@ -189,7 +202,7 @@ export default function EspelhoScreen() {
     const result = await insertTimeEntry({ tipo: next, registrado_em: stamp, horario_informado_manual: true, justificativa: retroReason.trim() });
     setSaving(false);
     if (result.error || !result.data) { setNotice(result.error || 'Não foi possível salvar a batida.'); return; }
-    setEntries([...periodEntries.filter((entry) => entry.id !== result.data!.id), result.data].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
+    upsertEntry(result.data);
     setRetroTime(''); setRetroReason(''); setRetroOpen(false);
     setNotice((result.data as TimeEntry & { _pending?: boolean })._pending ? 'Batida esquecida guardada no aparelho e aguardando sincronização.' : 'Batida esquecida registrada com justificativa.');
   };

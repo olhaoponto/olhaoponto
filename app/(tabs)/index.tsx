@@ -42,7 +42,7 @@ export default function HomeScreen() {
   const profile = useAppStore((state) => state.profile);
   const session = useAppStore((state) => state.session);
   const storeEntries = useAppStore((state) => state.entries);
-  const setEntries = useAppStore((state) => state.setEntries);
+  const mergeEntries = useAppStore((state) => state.mergeEntries);
   const upsertEntry = useAppStore((state) => state.upsertEntry);
   const setOffline = useAppStore((state) => state.setOffline);
   const offline = useAppStore((state) => state.offline);
@@ -108,13 +108,13 @@ export default function HomeScreen() {
     if (!session?.user.id) return;
     const result = await loadEntriesByDate(new Date());
     if (result.data) {
-      setEntries(result.data);
+      mergeEntries(result.data);
       const currentDate = getBahiaDate(new Date());
       setWeekEntries((current) => [...current.filter((entry) => entry.data !== currentDate), ...result.data!].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
     }
     setOffline(Boolean(result.error));
     if (result.error && !result.data?.length) setError('Sem conexão no momento. As batidas salvas neste aparelho continuam disponíveis.');
-  }, [session?.user.id, setEntries, setOffline]);
+  }, [session?.user.id, mergeEntries, setOffline]);
 
   const refreshWeek = useCallback(async () => {
     if (!session?.user.id) return;
@@ -162,7 +162,7 @@ export default function HomeScreen() {
     setLoading(false);
     if (result.error || !result.data) { setError(result.error || 'Não foi possível salvar a batida.'); return; }
     const updated = [...todayEntries.filter((entry) => entry.id !== result.data!.id), result.data].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em));
-    setEntries(updated);
+    mergeEntries(updated);
     setWeekEntries((current) => [...current.filter((entry) => entry.data !== today || entry.id !== result.data!.id), result.data!].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
     upsertEntry(result.data);
     void scheduleDayNotifications(updated, {

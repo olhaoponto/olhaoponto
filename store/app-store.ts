@@ -16,6 +16,7 @@ export interface AppState {
   setSessionInitialized: (initialized: boolean) => void;
   setProfile: (profile: Profile | null) => void;
   setEntries: (entries: TimeEntry[]) => void;
+  mergeEntries: (entries: TimeEntry[]) => void;
   upsertEntry: (entry: TimeEntry) => void;
   removeEntry: (id: string) => void;
   setLoading: (loading: boolean) => void;
@@ -26,13 +27,19 @@ export interface AppState {
   reset: () => void;
 }
 const initial = { session: null, sessionInitialized: false, profile: null, entries: [], loading: false, offline: false, error: null, journeyVersion: 0, pieceNotice: null };
+export function mergeEntries(current: readonly TimeEntry[], incoming: readonly TimeEntry[]): TimeEntry[] {
+  const byId = new Map(current.map((entry) => [entry.id, entry]));
+  incoming.forEach((entry) => byId.set(entry.id, entry));
+  return [...byId.values()].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em));
+}
 export const useAppStore = create<AppState>((set) => ({
   ...initial,
   setSession: (session) => set({ session, sessionInitialized: true }),
   setSessionInitialized: (sessionInitialized) => set({ sessionInitialized }),
   setProfile: (profile) => set({ profile }),
   setEntries: (entries) => set({ entries }),
-  upsertEntry: (entry) => set((state) => ({ entries: [...state.entries.filter((row) => row.id !== entry.id), entry] })),
+  mergeEntries: (incoming) => set((state) => ({ entries: mergeEntries(state.entries, incoming) })),
+  upsertEntry: (entry) => set((state) => ({ entries: mergeEntries(state.entries, [entry]) })),
   removeEntry: (id) => set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) })),
   setLoading: (loading) => set({ loading }),
   setOffline: (offline) => set({ offline }),
