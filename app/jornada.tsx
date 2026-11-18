@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ActionButton, AppText, ScreenShell } from '@/components/ui';
 import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
+import { RankingPodium } from '@/components/RankingPodium';
 import { useAppStore } from '@/store/app-store';
 import { loadAllEntries } from '@/services/time-entry-service';
 import { loadDayStatuses } from '@/services/day-status-service';
@@ -36,6 +37,6 @@ export default function JourneyScreen() {
     <ActionButton title="Voltar para Hoje" variant="ghost" onPress={() => router.back()} icon={<MaterialCommunityIcons name="arrow-left" size={19} color="#0B6A63" />} />
     <AppText variant="title">Sua jornada</AppText>
     <AppText variant="small" color="#607875">O mapa e o quebra-cabeça ficam aqui para a Home continuar rápida e focada no registro do ponto.</AppText>
-    {loading ? <AppText variant="small" color="#607875">Carregando seu caminho…</AppText> : <WeeklyMissionCard summary={summary} onOpenMirror={() => router.push('/(tabs)/espelho')} />}
+    {loading ? <AppText variant="small" color="#607875">Carregando seu caminho…</AppText> : <><WeeklyMissionCard summary={summary} onOpenMirror={() => router.push('/(tabs)/espelho')} /><RankingPodium /></>}
   </ScreenShell>;
 }
