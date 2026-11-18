@@ -35,7 +35,7 @@ function label(value: Date, timeZone: string): string {
 export function generateLunchSlots(now: Date, timeZone: string): LunchSlot[] {
   const earliest = new Date(now.getTime() + SLOT_MINUTES * 60_000);
   let candidate = toLocalSlot(earliest, timeZone);
-  const limit = now.getTime() + MAX_AHEAD_MINUTES * 60_000;
+  const limit = toLocalSlot(new Date(now.getTime() + MAX_AHEAD_MINUTES * 60_000), timeZone).getTime();
   const slots: LunchSlot[] = [];
   while (candidate.getTime() <= limit) {
     if (candidate.getTime() >= earliest.getTime()) slots.push({ value: candidate, label: label(candidate, timeZone) });

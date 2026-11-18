@@ -28,8 +28,8 @@ describe('lunch slots', () => {
 
   it('limita os horários ao intervalo de quatro horas', () => {
     const slots = generateLunchSlots(nowAt('2026-11-18T09:03:00'), zone);
-    expect(slots.at(-1)?.label).toBe('13:00');
-    expect(slots.some((slot) => slot.label === '13:15')).toBe(false);
+    expect(slots.at(-1)?.label).toBe('13:15');
+    expect(slots.some((slot) => slot.label === '13:30')).toBe(false);
   });
 
   it('valida passado e antecedência mínima de dez minutos', () => {
