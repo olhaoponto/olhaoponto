@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { calculateOccurrenceDebitMinutes, type TimeEntry } from '../utils/work-time';
+import { describe, expect, it } from 'vitest';
+import { calculateOccurrenceDebitMinutes, type TimeEntry, validateOccurrenceTime } from '../utils/work-time';
 
 describe('intercorrência', () => {
   const entry = (tipo: TimeEntry['tipo'], day: string, time: string): TimeEntry => ({ tipo, data: day, registrado_em: `${day}T${time}:00-03:00` });
@@ -15,16 +15,9 @@ describe('intercorrência', () => {
     const entries = [entry('entrada', '2026-11-02', '08:00')];
     expect(calculateOccurrenceDebitMinutes(entries, '2026-11-02T18:00:00-03:00', 540)).toBe(0);
   });
-});
-
-it('não agenda notificações após a intercorrência', async () => {
-  vi.resetModules();
-  const schedule = vi.fn().mockResolvedValue('id');
-  const cancel = vi.fn().mockResolvedValue(undefined);
-  const getScheduled = vi.fn().mockResolvedValue([]);
-  vi.doMock('expo-notifications', () => ({ setNotificationHandler: vi.fn(), scheduleNotificationAsync: schedule, cancelScheduledNotificationAsync: cancel, getAllScheduledNotificationsAsync: getScheduled, setNotificationChannelAsync: vi.fn(), getPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }), AndroidImportance: { MAX: 5 }, SchedulableTriggerInputTypes: { DATE: 'date' } }));
-  vi.doMock('react-native', () => ({ Platform: { OS: 'ios' } }));
-  const { scheduleDayNotifications } = await import('../services/notification-service');
-  await scheduleDayNotifications([{ tipo: 'entrada', data: '2026-11-02', registrado_em: '2026-11-02T08:00:00-03:00' }], { dayClosed: true, now: new Date('2026-11-02T12:00:00-03:00') });
-  expect(schedule).not.toHaveBeenCalled();
+  it('rejeita encerramento futuro ou anterior à primeira batida', () => {
+    const entries = [entry('entrada', '2026-11-02', '08:00')];
+    expect(validateOccurrenceTime(entries, '2026-11-02T18:01:00-03:00', '2026-11-02T18:00:00-03:00')).toBe('O horário de encerramento não pode ser futuro.');
+    expect(validateOccurrenceTime(entries, '2026-11-02T07:59:00-03:00', '2026-11-02T18:00:00-03:00')).toBe('O horário de encerramento não pode ser anterior à primeira batida.');
+  });
 });

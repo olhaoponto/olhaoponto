@@ -23,6 +23,7 @@ vi.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: { DATE: 'date' },
 }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('../services/day-occurrence-service', () => ({ isDayOccurrenceActive: vi.fn().mockResolvedValue(false) }));
 
 import { scheduleDayNotifications, scheduleMeetingNotifications } from '../services/notification-service';
 import { DEFAULT_WORK_SCHEDULE } from '../utils/work-schedules';
@@ -138,6 +139,11 @@ describe('scheduleDayNotifications', () => {
     expect(mocks.cancelScheduled).toHaveBeenCalledTimes(1);
     expect(mocks.cancelScheduled).toHaveBeenCalledWith('work-reminder');
     expect(mocks.cancelScheduled).not.toHaveBeenCalledWith('meeting-reminder');
+  });
+
+  it('não agenda alertas quando o dia foi encerrado por intercorrência', async () => {
+    await scheduleDayNotifications([entry('entrada', '08:00')], { userId: 'user-1', dayClosed: true, now: new Date('2026-11-05T12:00:00-03:00') });
+    expect(mocks.schedule).not.toHaveBeenCalled();
   });
 
   it('agenda um lembrete local por reunião para o usuário atual', async () => {

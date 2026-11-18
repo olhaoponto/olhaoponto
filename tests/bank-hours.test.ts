@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculateBankBalance } from '../utils/bank-hours';
 import type { TimeEntry } from '../utils/work-time';
+import { DEFAULT_WORK_SCHEDULE } from '../utils/work-schedules';
 
 const stamp = (day: string, time: string) => `${day}T${time}:00-03:00`;
 const entry = (kind: TimeEntry['tipo'], day: string, time: string): TimeEntry => ({ tipo: kind, data: day, registrado_em: stamp(day, time) });
@@ -25,5 +26,10 @@ describe('bank-hours', () => {
       entry('volta_almoco', '2026-11-03', '13:00'), entry('saida', '2026-11-03', '19:00'),
     ];
     expect(calculateBankBalance(entries, [{ saldo_minutos: 300 }], stamp('2026-11-03', '19:00')).totalMinutes).toBe(360);
+  });
+
+  it('inclui intercorrência como débito próprio sem alterar o saldo externo', () => {
+    expect(calculateBankBalance([], [{ saldo_minutos: 60 }], new Date(), DEFAULT_WORK_SCHEDULE, [{ debito_minutos: 90 }]))
+      .toMatchObject({ externalMinutes: 60, occurrenceMinutes: -90, totalMinutes: -30 });
   });
 });

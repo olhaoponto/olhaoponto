@@ -121,6 +121,14 @@ export function calculateOccurrenceDebitMinutes(
   return Math.max(0, Math.floor(expectedWorkMinutes) - calculateWorkedMinutes(entries, occurredAt));
 }
 
+export function validateOccurrenceTime(entries: readonly TimeEntry[], occurredAt: string | Date, now: string | Date = new Date()): string | null {
+  const value = occurredAt instanceof Date ? occurredAt.getTime() : timestamp(occurredAt);
+  const current = now instanceof Date ? now.getTime() : timestamp(now);
+  if (!Number.isFinite(value) || value > current) return 'O horário de encerramento não pode ser futuro.';
+  const first = entries.reduce<number | null>((min, entry) => { const item = timestamp(entry.registrado_em); return Number.isFinite(item) && (min === null || item < min) ? item : min; }, null);
+  return first !== null && value < first ? 'O horário de encerramento não pode ser anterior à primeira batida.' : null;
+}
+
 export function getNextPunch(entries: readonly TimeEntry[]): PunchType | null {
   const recorded = new Set(entries.map((entry) => entry.tipo));
   return PUNCH_TYPES.find((type) => !recorded.has(type)) ?? null;

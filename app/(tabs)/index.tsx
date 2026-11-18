@@ -8,7 +8,7 @@ import { ActionButton, AppText, PageHeading, ScreenShell, StatusPill, SurfaceCar
 import { useAppStore } from '@/store/app-store';
 import { loadEntriesByDate, loadEntriesByMonth, insertTimeEntry, syncPendingEntries } from '@/services/time-entry-service';
 import { cancelDayNotifications, prepareLocalNotifications, scheduleDayNotifications } from '@/services/notification-service';
-import { calculateOccurrenceDebitMinutes, calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validatePunch, type PunchType } from '@/utils/work-time';
+import { calculateOccurrenceDebitMinutes, calculateWorkedMinutes, calculateWorkedSeconds, formatMinutesHHMM, getBahiaDate, getNextPunch, projectEndTime, validateOccurrenceTime, validatePunch, type PunchType } from '@/utils/work-time';
 import { getLunchReminderMinutes } from '@/utils/alerts';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 import { loadDayStatuses, saveDayStatus, syncPendingDayStatuses } from '@/services/day-status-service';
@@ -65,6 +65,7 @@ export default function HomeScreen() {
   const [occurrenceModal, setOccurrenceModal] = useState(false);
   const [occurrenceReason, setOccurrenceReason] = useState<OccurrenceReason>('Pessoal');
   const [occurrenceObservation, setOccurrenceObservation] = useState('');
+  const [occurrenceTime, setOccurrenceTime] = useState('');
   const [savingOccurrence, setSavingOccurrence] = useState(false);
   const { width, height } = useWindowDimensions();
   const rotationEnabled = profile?.preferencias_alerta?.rotacao_contador !== false;
@@ -204,8 +205,11 @@ export default function HomeScreen() {
 
   const handleOccurrence = async () => {
     if (!session?.user.id || todayEntries.length === 0 || ended || occurrenceClosed) return;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(occurrenceTime)) { setError('Informe o horário de encerramento no formato HH:mm.'); return; }
+    const occurredAt = fromZonedTime(`${today}T${occurrenceTime}:00`, profile?.fuso || ZONE).toISOString();
+    const timeError = validateOccurrenceTime(todayEntries, occurredAt, now);
+    if (timeError) { setError(timeError); return; }
     setSavingOccurrence(true); setError('');
-    const occurredAt = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString();
     const result = await saveDayOccurrence({ work_date: today, motivo: occurrenceReason, occurred_at: occurredAt, observacao: occurrenceObservation, debito_minutos: calculateOccurrenceDebitMinutes(todayEntries, occurredAt, expectedWorkMinutes) });
     setSavingOccurrence(false);
     if (!result.data) { setError(result.error || 'Não foi possível registrar a intercorrência.'); return; }
@@ -311,7 +315,7 @@ Enviado pelo Olha o Ponto.` }); }
           <Pressable onPress={() => { setManual((value) => !value); setError(''); }} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="pencil-outline" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>{manual ? 'Fechar horário manual' : 'Informar horário exato'}</AppText></Pressable>
           {manual && nextPunch ? <View style={{ gap: 12 }}><TextField label="Horário da batida (HH:mm)" value={manualTime} onChangeText={setManualTime} placeholder="Ex.: 08:00" keyboardType="numbers-and-punctuation" maxLength={5} accessibilityLabel="Horário exato da batida" /><AppText variant="tiny" color={colors.muted}>A data de hoje é usada automaticamente. Horários futuros, fora de ordem ou que ultrapassem o limite não serão registrados.</AppText></View> : null}
           {todayEntries.length === 0 ? <Pressable onPress={() => setDayStatusModal(true)} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="calendar-alert" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Marcar falta, atestado ou folga</AppText></Pressable> : null}
-          {todayEntries.length > 0 && !ended ? <Pressable onPress={() => setOccurrenceModal(true)} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="alert-plus-outline" size={18} color={colors.error} /><AppText variant="small" color={colors.error}>Registrar intercorrência</AppText></Pressable> : null}
+          {todayEntries.length > 0 && !ended ? <Pressable onPress={() => { setOccurrenceTime(formatInTimeZone(now, profile?.fuso || ZONE, 'HH:mm')); setOccurrenceModal(true); }} accessibilityRole="button" style={styles.manualToggle}><MaterialCommunityIcons name="alert-plus-outline" size={18} color={colors.error} /><AppText variant="small" color={colors.error}>Registrar intercorrência</AppText></Pressable> : null}
         </SurfaceCard>
 
         <WeeklyMissionCard summary={weeklyMission} onOpenMirror={() => router.replace('/(tabs)/espelho')} />
@@ -347,7 +351,7 @@ Enviado pelo Olha o Ponto.` }); }
         </View>
       </Modal>
       <Modal visible={occurrenceModal} transparent animationType="fade" onRequestClose={() => setOccurrenceModal(false)}>
-        <View style={styles.accountMenuBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setOccurrenceModal(false)} accessibilityRole="button" accessibilityLabel="Fechar intercorrência" /><SurfaceCard style={styles.accountMenuCard}><View style={styles.accountMenuHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Registrar intercorrência</AppText><AppText variant="small" color={colors.muted}>O dia será encerrado sem criar uma batida.</AppText></View></View><AppText variant="small" color={colors.muted}>Motivo</AppText><View style={{ gap: 8 }}>{(['Pessoal', 'Saúde', 'Trabalho externo', 'Outro'] as OccurrenceReason[]).map((reason) => <Pressable key={reason} onPress={() => setOccurrenceReason(reason)} style={{ padding: 11, borderRadius: 12, borderWidth: 1, borderColor: occurrenceReason === reason ? colors.deepTeal : colors.border }}><AppText variant="small" color={occurrenceReason === reason ? colors.deepTeal : colors.foreground}>{reason}</AppText></Pressable>)}</View><TextField label="Observação (opcional)" value={occurrenceObservation} onChangeText={setOccurrenceObservation} multiline /><ActionButton title="Confirmar intercorrência" onPress={() => void handleOccurrence()} loading={savingOccurrence} /><ActionButton title="Cancelar" variant="ghost" onPress={() => setOccurrenceModal(false)} disabled={savingOccurrence} /></SurfaceCard></View>
+        <View style={styles.accountMenuBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setOccurrenceModal(false)} accessibilityRole="button" accessibilityLabel="Fechar intercorrência" /><SurfaceCard style={styles.accountMenuCard}><View style={styles.accountMenuHeading}><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Registrar intercorrência</AppText><AppText variant="small" color={colors.muted}>O dia será encerrado sem criar uma batida.</AppText></View></View><AppText variant="small" color={colors.muted}>Motivo</AppText><View style={{ gap: 8 }}>{(['Pessoal', 'Saúde', 'Trabalho externo', 'Outro'] as OccurrenceReason[]).map((reason) => <Pressable key={reason} onPress={() => setOccurrenceReason(reason)} style={{ padding: 11, borderRadius: 12, borderWidth: 1, borderColor: occurrenceReason === reason ? colors.deepTeal : colors.border }}><AppText variant="small" color={occurrenceReason === reason ? colors.deepTeal : colors.foreground}>{reason}</AppText></Pressable>)}</View><TextField label="Horário de encerramento (HH:mm)" value={occurrenceTime} onChangeText={setOccurrenceTime} keyboardType="numbers-and-punctuation" maxLength={5} placeholder="Ex.: 17:30" /><TextField label="Observação (opcional)" value={occurrenceObservation} onChangeText={setOccurrenceObservation} multiline /><ActionButton title="Confirmar intercorrência" onPress={() => void handleOccurrence()} loading={savingOccurrence} /><ActionButton title="Cancelar" variant="ghost" onPress={() => setOccurrenceModal(false)} disabled={savingOccurrence} /></SurfaceCard></View>
       </Modal>
     </ScreenShell>
   );

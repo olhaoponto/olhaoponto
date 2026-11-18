@@ -106,7 +106,13 @@ export default function GlobalAlertOverlay() {
     return () => { active = false; };
   }, [session?.user.id, today, todayEntries.length]);
 
-  useEffect(() => { if (session?.user.id) void loadDayOccurrence(today).then((result) => setOccurrence(result.data)); else setOccurrence(null); }, [session?.user.id, today, todayEntries.length]);
+  useEffect(() => {
+    let active = true;
+    const refreshOccurrence = () => { if (session?.user.id) void loadDayOccurrence(today).then((result) => { if (active) setOccurrence(result.data); }); else setOccurrence(null); };
+    refreshOccurrence();
+    const timer = setInterval(refreshOccurrence, 30_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [session?.user.id, today, todayEntries.length]);
 
   useEffect(() => {
     if (!session || !profile) return;

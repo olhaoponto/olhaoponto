@@ -6,6 +6,8 @@ import { getScheduleEndAt } from '../utils/work-schedules';
 import type { AlertPreferences, AgendaMeeting, WorkSchedule } from '../types/app';
 import { parseAgendaReminderMinutes } from '../utils/agenda';
 import { calculateLunchReturnTimes } from '../utils/lunch-return';
+import { getBahiaDate } from '../utils/work-time';
+import { isDayOccurrenceActive } from './day-occurrence-service';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -132,6 +134,7 @@ export async function scheduleDayNotifications(
   const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, normalWorkMinutes = 480, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date(), dayClosed = false } = options;
   const pauseReminderMinutes = getLunchReminderMinutes(lunchReminderMinutes ?? alertPreferences?.lunch_reminder_minutes);
   await cancelDayNotifications();
+  if (userId && await isDayOccurrenceActive(userId, getBahiaDate(now))) return;
   if (dayClosed || !enabled || entries.length === 0) return;
   const channelId = `work-alerts-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
   if (Platform.OS === 'android') {
