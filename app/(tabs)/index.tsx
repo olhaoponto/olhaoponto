@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, Linking, Modal, Platform, Pressable, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Network from 'expo-network';
 import * as Haptics from 'expo-haptics';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -24,6 +25,7 @@ import { AccountMenuButton } from '@/components/AccountMenuButton';
 import { useRouter } from 'expo-router';
 import { calculateLunchReturnTimes, getLunchReturnWarningMinutes } from '@/utils/lunch-return';
 import { HomeCommunications } from '@/components/HomeCommunications';
+import { checkForAppUpdate, type AppUpdate } from '@/services/update-service';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
@@ -66,6 +68,7 @@ export default function HomeScreen() {
   const [occurrenceObservation, setOccurrenceObservation] = useState('');
   const [occurrenceTime, setOccurrenceTime] = useState('');
   const [savingOccurrence, setSavingOccurrence] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState<AppUpdate | null>(null);
   const { width, height } = useWindowDimensions();
   const rotationEnabled = profile?.preferencias_alerta?.rotacao_contador !== false;
   const today = getBahiaDate(now);
@@ -103,6 +106,29 @@ export default function HomeScreen() {
   const dateLabel = friendlyDate(now);
   const weekRange = getWeekDateRange(today);
   useEffect(() => { if (session?.user.id) void loadDayOccurrence(today).then((result) => setOccurrence(result.data)); else setOccurrence(null); }, [session?.user.id, today]);
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !session?.user.id) return undefined;
+    let active = true;
+    const run = async () => {
+      const userId = session.user.id;
+      const checkedKey = `olhaponto:${userId}:update-check-date`;
+      const dismissedKey = `olhaponto:${userId}:update-dismissed-version`;
+      try {
+        if (await AsyncStorage.getItem(checkedKey) === today) return;
+        await AsyncStorage.setItem(checkedKey, today);
+        const result = await checkForAppUpdate();
+        if (!active || !result || await AsyncStorage.getItem(dismissedKey) === result.version) return;
+        setAvailableUpdate(result);
+      } catch { /* A atualização é opcional e não deve interromper o uso do app. */ }
+    };
+    void run();
+    return () => { active = false; };
+  }, [session?.user.id, today]);
+  const dismissAvailableUpdate = () => {
+    if (!session?.user.id || !availableUpdate) return;
+    void AsyncStorage.setItem(`olhaponto:${session.user.id}:update-dismissed-version`, availableUpdate.version).catch(() => undefined);
+    setAvailableUpdate(null);
+  };
 
   const refreshDay = useCallback(async () => {
     if (!session?.user.id) return;
@@ -282,6 +308,14 @@ Enviado pelo Olha o Ponto.` }); }
       <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<AccountMenuButton />} />
 
       <TabNavigationCard />
+      {Platform.OS === 'android' && availableUpdate ? <SurfaceCard tone="soft" style={{ gap: 8 }}>
+        <AppText variant="subtitle">Nova versão {availableUpdate.version} disponível</AppText>
+        <AppText variant="small" color={colors.muted}>Atualize o app para receber as melhorias mais recentes.</AppText>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <ActionButton title="Atualizar" onPress={() => { void Linking.openURL(availableUpdate.apkUrl).catch(() => undefined); }} style={{ flex: 1 }} />
+          <ActionButton title="Depois" variant="outline" onPress={dismissAvailableUpdate} style={{ flex: 1 }} />
+        </View>
+      </SurfaceCard> : null}
 
       {offline || pendingCount > 0 || pendingStatusCount > 0 ? <View style={[styles.offlineBanner, { backgroundColor: `${colors.warning}2B`, borderColor: `${colors.warning}70` }]}><MaterialCommunityIcons name="cloud-off-outline" size={20} color={colors.foreground} /><AppText variant="small" style={{ flex: 1 }}>{pendingCount || pendingStatusCount ? `${pendingCount ? `${pendingCount} batida(s)` : ''}${pendingCount && pendingStatusCount ? ' e ' : ''}${pendingStatusCount ? `${pendingStatusCount} situação(ões) do dia` : ''} aguardando sincronização.` : 'Modo offline: mostrando seus dados salvos neste aparelho.'}</AppText><StatusPill tone="yellow">OFFLINE</StatusPill></View> : null}
       {notificationStatus && (!notificationStatus.granted || !notificationStatus.exactAlarms) ? <SurfaceCard tone="soft" style={{ gap: 8 }}><AppText variant="small" color={colors.foreground}>{!notificationStatus.granted ? 'Ative as notificações para receber avisos quando o app estiver fechado.' : 'Notificações estão ativas, mas o Android pode entregar os alarmes com atraso enquanto Alarmes e lembretes não estiver liberado.'}</AppText>{Platform.OS !== 'web' ? <Pressable onPress={() => { void Linking.openSettings().catch(() => undefined); }} accessibilityRole="button"><AppText variant="small" color={colors.deepTeal}>Abrir configurações do aplicativo</AppText></Pressable> : null}</SurfaceCard> : null}

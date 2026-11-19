@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Appearance, Modal, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Appearance, Linking, Modal, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { DEFAULT_WORK_SCHEDULE, getActiveWorkSchedule, getExpectedWorkMinutes, g
 import { getLunchReturnWarningMinutes, parseLunchReturnWarningMinutes } from '@/utils/lunch-return';
 import { getLunchReminderMinutes, MAX_LUNCH_REMINDER_MINUTES, MIN_LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
 import { updateRankingVisibility } from '@/services/ranking-service';
+import { checkForAppUpdate, getInstalledVersion, type AppUpdate } from '@/services/update-service';
 
 const WORK_ALERT_OPTIONS = [
   { key: 'alerta_8h', label: 'Jornada completa (8h)' },
@@ -38,6 +39,9 @@ export default function ConfiguracoesScreen() {
   const [draftSchedule, setDraftSchedule] = useState<WorkSchedule>({ ...DEFAULT_WORK_SCHEDULE, id: 'schedule-draft' });
   const [customLunchReturnMinutes, setCustomLunchReturnMinutes] = useState('5');
   const [customLunchReminderMinutes, setCustomLunchReminderMinutes] = useState('240');
+  const [appUpdate, setAppUpdate] = useState<AppUpdate | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState('');
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
   const schedules = getWorkSchedules(prefs, profile?.almoco_minutos ?? 60);
   const activeSchedule = getActiveWorkSchedule(prefs, profile?.almoco_minutos ?? 60);
@@ -45,6 +49,15 @@ export default function ConfiguracoesScreen() {
   const profileId = profile?.id;
   const savedLunchReturnMinutes = getLunchReturnWarningMinutes(prefs.lunch_return_warning_minutes);
   const savedLunchReminderMinutes = getLunchReminderMinutes(prefs.lunch_reminder_minutes);
+
+  const verifyAppUpdate = async () => {
+    if (Platform.OS !== 'android') return;
+    setCheckingUpdate(true); setUpdateMessage('');
+    const result = await checkForAppUpdate();
+    setAppUpdate(result);
+    setUpdateMessage(result ? `Nova versão ${result.version} disponível.` : 'Você já está usando a versão mais recente ou não foi possível consultar agora.');
+    setCheckingUpdate(false);
+  };
 
   // Keep the editable field aligned with the saved profile preference.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -191,6 +204,18 @@ export default function ConfiguracoesScreen() {
         <AppText variant="small" color={colors.muted}>Seu primeiro nome e a inicial do sobrenome aparecem no ranking com seus pontos. Horários e batidas nunca aparecem.</AppText>
         <PreferenceSwitch label="Aparecer no ranking" value={profile.ranking_oculto !== true} onChange={async (value) => { const result = await updateRankingVisibility(value); if (result.error) setError(result.error); else { setProfile({ ...profile, ranking_oculto: !value }); setMessage(value ? 'Você aparecerá no ranking.' : 'Você saiu do ranking.'); } }} />
       </SurfaceCard>
+
+      {Platform.OS === 'android' ? <SurfaceCard>
+        <AppText variant="subtitle">Atualização do app</AppText>
+        <AppText variant="small" color={colors.muted}>Versão instalada: {getInstalledVersion()}</AppText>
+        {appUpdate ? <>
+          <AppText variant="small" color={colors.deepTeal}>Nova versão {appUpdate.version} disponível</AppText>
+          <AppText variant="small" color={colors.muted}>O Android vai baixar o arquivo; toque nele para instalar.</AppText>
+          <ActionButton title="Atualizar" onPress={() => { void Linking.openURL(appUpdate.apkUrl).catch(() => undefined); }} />
+        </> : null}
+        {updateMessage ? <AppText variant="small" color={appUpdate ? colors.deepTeal : colors.muted}>{updateMessage}</AppText> : null}
+        <ActionButton title="Verificar atualização" variant="outline" onPress={() => void verifyAppUpdate()} loading={checkingUpdate} />
+      </SurfaceCard> : null}
 
       <SurfaceCard>
         <AppText variant="subtitle">Alertas, aparência e segurança</AppText>
