@@ -204,9 +204,8 @@ export default function RootLayout() {
       </trpc.Provider>
     </GestureHandlerRootView>
   );
-  const webContent = <View style={{ flex: 1, width: '100%', maxWidth: 480, backgroundColor: '#F6FAF8' }}>{content}</View>;
   const providers = Platform.OS === 'web'
-    ? <SafeAreaProvider initialMetrics={providerInitialMetrics}><View style={{ flex: 1, alignItems: 'center', backgroundColor: '#E4F5F2' }}><SafeAreaFrameContext.Provider value={frame}><SafeAreaInsetsContext.Provider value={insets}>{webContent}</SafeAreaInsetsContext.Provider></SafeAreaFrameContext.Provider></View></SafeAreaProvider>
+    ? <SafeAreaProvider initialMetrics={providerInitialMetrics}><SafeAreaFrameContext.Provider value={frame}><SafeAreaInsetsContext.Provider value={insets}>{content}</SafeAreaInsetsContext.Provider></SafeAreaFrameContext.Provider></SafeAreaProvider>
     : <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>;
   return <ThemeProvider>{providers}</ThemeProvider>;
 }
