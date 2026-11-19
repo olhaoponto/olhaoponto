@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, ImageBackground, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppText, ScreenShell } from '@/components/ui';
 import { getDailyWelcome, getWelcomeMessageStorageKey, type WelcomeScene } from '@/utils/welcome-message';
 import { useAppStore } from '@/store/app-store';
 
 const DURATION_MS = 11500;
+const webSceneImageStyle = { width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center bottom' } as any;
 const sceneImages: Record<WelcomeScene, number> = {
   'bem-estar': require('../assets/boasvindas/bem-estar.webp'),
   motivacao: require('../assets/boasvindas/motivacao.webp'),
@@ -78,7 +79,7 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
   return (
     <ScreenShell scroll={false} edges={['top', 'bottom', 'left', 'right']} contentStyle={[styles.page, { backgroundColor: '#E4F5F2' }]}>
       <Animated.View style={[styles.animatedContent, { opacity: fade }]}>
-      <ImageBackground source={sceneImages[welcome.scene]} resizeMode="cover" imageStyle={styles.sceneImage} style={styles.background}>
+      <ImageBackground source={sceneImages[welcome.scene]} resizeMode="cover" imageStyle={[styles.sceneImage, Platform.OS === 'web' ? webSceneImageStyle : undefined]} style={[styles.background, Platform.OS === 'web' ? styles.backgroundWeb : undefined]}>
         <View style={styles.content}>
           <View style={styles.copy}>
             <View style={[styles.accentBar, { backgroundColor: welcome.accent }]} />
@@ -107,6 +108,7 @@ const styles = StyleSheet.create({
   page: { paddingHorizontal: 0, paddingVertical: 0 },
   animatedContent: { flex: 1 },
   background: { flex: 1, width: '100%', minHeight: '100%' },
+  backgroundWeb: { height: '100%', width: '100%' },
   sceneImage: { bottom: 0 },
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 26, paddingTop: 28, paddingBottom: 20 },
   copy: { maxWidth: 520, paddingTop: 4 },
