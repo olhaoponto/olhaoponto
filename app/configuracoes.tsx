@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Appearance, Modal, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Appearance, Modal, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -132,6 +132,7 @@ export default function ConfiguracoesScreen() {
   };
 
   const toggleBiometrics = async (value: boolean) => {
+    if (Platform.OS === 'web') { setError('A biometria está disponível somente no APK mobile.'); return; }
     if (value) {
       const [hardware, enrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
       if (!hardware || !enrolled) { setError('Cadastre uma biometria nas configurações do aparelho antes de ativar esta opção.'); return; }

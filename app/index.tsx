@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -97,7 +97,7 @@ export default function SplashRoute() {
         return;
       }
       const biometricEnabled = await AsyncStorage.getItem(`olhaponto:${session.user.id}:biometric`).catch(() => null);
-      if (biometricEnabled === 'true') {
+      if (biometricEnabled === 'true' && Platform.OS !== 'web') {
         const auth = await LocalAuthentication.authenticateAsync({ promptMessage: 'Desbloqueie o Olha o Ponto', cancelLabel: 'Tentar novamente' });
         if (!auth.success) throw new Error('Não foi possível confirmar sua biometria. Tente novamente.');
       }

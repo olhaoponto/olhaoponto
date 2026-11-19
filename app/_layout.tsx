@@ -40,7 +40,7 @@ function SessionBridge() {
         state.setProfile(null);
         state.setEntries([]);
         state.setOffline(false);
-        void Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
+        if (Platform.OS !== 'web') void Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
       } else if (state.profile && state.profile.id !== session.user.id) {
         state.setProfile(null);
         state.setEntries([]);
@@ -112,6 +112,7 @@ function AppStack() {
     if (preferredTheme === 'dark' || preferredTheme === 'light') setColorScheme(preferredTheme);
   }, [preferredTheme, setColorScheme]);
   useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
     const consume = (response: Notifications.NotificationResponse) => {
       const request = response.notification.request;
       const dedupeKey = `${request.identifier}:${response.actionIdentifier}`;
