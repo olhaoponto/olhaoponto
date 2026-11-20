@@ -19,7 +19,7 @@ export function AvatarUnlockModal() {
   const [visible, setVisible] = useState(false);
   const scale = useRef(new Animated.Value(0.86)).current;
   useEffect(() => {
-    if (!profile?.id || journeyVersion === 0) return;
+    if (!profile?.id) return;
     let active = true;
     void getProgress().then((progress) => getUnseenUnlockedAvatars(progress)).then((avatars) => {
       if (active && avatars.length) { setQueue(avatars); setVisible(true); }

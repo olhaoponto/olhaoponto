@@ -4,7 +4,7 @@ import { AVATARS, isUnlocked } from '@/utils/avatar-catalog';
 import { getAuthenticatedSession } from '@/services/auth-session';
 import { loadJourney } from '@/services/journey-service';
 import { supabase } from '@/services/supabase';
-import { avatarStorageKeys, nextPieceCount } from '@/utils/avatar-storage';
+import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
 
 const selectedKey = (userId: string) => avatarStorageKeys(userId).selected;
 const seenKey = (userId: string) => avatarStorageKeys(userId).seen;
@@ -57,7 +57,7 @@ export async function getProgress(): Promise<AvatarProgress> {
   const [counter, journey, steps, levels] = await Promise.all([
     readNumber(piecesKey(uid)),
     loadJourney(),
-    readNumber(stepsKey(uid)),
+    AsyncStorage.getItem(stepsKey(uid)).then(parseCycles),
     supabase.from('jornada_niveis').select('concluido_em').eq('usuario_id', uid).not('concluido_em', 'is', null).limit(100),
   ]);
   const journeyPieces = journey?.pieces.length ?? 0;

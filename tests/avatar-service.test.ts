@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avatarStorageKeys, nextPieceCount } from '@/utils/avatar-storage';
+import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
 
 describe('avatar service', () => {
   it('usa namespaces separados por usuário', () => {
@@ -16,5 +16,11 @@ describe('avatar service', () => {
     expect(nextPieceCount(7)).toBe(8);
     expect(nextPieceCount(-4)).toBe(1);
     expect(nextPieceCount(2.9)).toBe(3);
+  });
+
+  it('lê totalCycles do JSON persistido', () => {
+    expect(parseCycles('{"lastRewardedEndDate":"2026-11-19","totalCycles":3}')).toBe(3);
+    expect(parseCycles(null)).toBe(0);
+    expect(parseCycles('não é JSON')).toBe(0);
   });
 });
