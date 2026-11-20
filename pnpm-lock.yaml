@@ -183,6 +183,12 @@ importers:
         specifier: ^5.0.16
         version: 5.0.16(@types/react@19.2.18)(react@19.2.3)
     devDependencies:
+      '@dicebear/collection':
+        specifier: 9.4.2
+        version: 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/core':
+        specifier: 9.4.3
+        version: 9.4.3
       '@expo/ngrok':
         specifier: ^4.1.3
         version: 4.1.3
@@ -225,6 +231,9 @@ importers:
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
+      sharp:
+        specifier: ^0.35.5
+        version: 0.35.5(@types/node@22.19.3)
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19(tsx@4.21.0)(yaml@2.8.2)
@@ -775,6 +784,202 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
+  '@dicebear/adventurer-neutral@9.4.2':
+    resolution: {integrity: sha512-5xgkG/mNL4j3Q4SJGQLBU/KnU90tng8Ze5ofThD+55wi0oeY/nSAUowg6UFCmHrktjifj/MEx3CQqbpcPWtfIA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/adventurer@9.4.2':
+    resolution: {integrity: sha512-jqYp834ZmGDA9HBBDQAdgF1O2UTCwHF4vVrktXWa2Dppp1JczPL5HnVOWsjtrLmXNn61Wd6OLmBb2e6rhzp3ig==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/avataaars-neutral@9.4.2':
+    resolution: {integrity: sha512-/eNrp0YCNJRwQXqOloLm1+3Ss2C+pMpUQIGkbEnGsP1UK+13Ge80ggDDof1HpdqvG9HAZcKa7hnbG/0HSwyDSw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/avataaars@9.4.2':
+    resolution: {integrity: sha512-3x9jKFkOkFSPmpTbt9xvhiU2E1GX7beCSsX0tXRUShj8x6+5Ks9yBRT1VlkySbnXrZ/GglADGg7vJ/D2uIx1Yw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/big-ears-neutral@9.4.2':
+    resolution: {integrity: sha512-M8Ozmzza4eY4hpLOYULgJxMYmBA0CsBnrE15/xw6LZkEREXnrX5z0NJsf8hUfdyF6BWZ+RBgzoiav32DAC5zcg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/big-ears@9.4.2':
+    resolution: {integrity: sha512-mNfz3ppNA7UBq0IO3nXCiV5pFPG7c1DfzRB0foNU2Wo1XXT8FIcSY2BvDlYqorZTOUOz7dHb0vx06hqvG0HP5w==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/big-smile@9.4.2':
+    resolution: {integrity: sha512-hmT5i7rcPPhStjZyg28pbIhdTnnMBzK3RObI0vKCpY30EFrzaPkkdDL6Ck5fAFBdvDIW1EpOJkenyR0XPmhgbQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/bottts-neutral@9.4.2':
+    resolution: {integrity: sha512-kFNwWt6j+gzZ5n5Pz7WVwePubREAQOF8ZwWA9ztwVYDVMLnOChWbAofy5FED4j5md2MXFH2EgLCFCMr5K2BmIA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/bottts@9.4.2':
+    resolution: {integrity: sha512-tsx+dII7EFUCVA8URj66G1GqORCCVduCAx4dY2prEY2IeFianVpkntXuFsWZ9BBGx1NZFndvDith5oTwKMQPbQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/collection@9.4.2':
+    resolution: {integrity: sha512-KArubv7if8H7j9sIfpDK2hJJqrdNVR5zMPAMOSpIU2JPyXx8TC9o5wsmXb8il5wOHgaS9Q/cla7jUNIiDD7Gsg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/core@9.4.3':
+    resolution: {integrity: sha512-9ITrQI57k3p5hKuU8HZJ1d0kPdrmTKEJDOdlKQ8CpaChbtmnD1R+dtWmNz5IesYThXM8F64pJ0ZvJ2rsY8Hciw==}
+    engines: {node: '>=18.0.0'}
+
+  '@dicebear/croodles-neutral@9.4.2':
+    resolution: {integrity: sha512-oG5IeUdtiYshQ89gkAVcl5w3xAEi5UZX2fTzIyelpBPCG176l7VuuFzlxi2umnB3E6LVHYy06DXvUo/p+rXB2Q==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/croodles@9.4.2':
+    resolution: {integrity: sha512-6VoO0JviIf7dKKMBTL/SMXxWhnXHaZuzufX90G0nXxS77ELG1YkGNMaZzawizN4C09Gbya2gJkozqrWiJN/aGw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/dylan@9.4.2':
+    resolution: {integrity: sha512-1vQvRu9x9DrwFxhFaIU2rf0EUL04yDTbAt7fHyAjM0mEsKzTD4mRNf95tCRuavCoW6W48u7A/OY6jyIub6kxLQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/fun-emoji@9.4.2':
+    resolution: {integrity: sha512-kqB6LPkdYCdEU/mwbyz34xLzoNUKL6ARcoo3fr5ASq9D6ZE07qIKybC3xv5+CPz7VmspJ1Q3c/VVWVMDRP7Twg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/glass@9.4.2':
+    resolution: {integrity: sha512-z5qUogHQ1b6UJ2zCqT848mU2U9DKbVDhiX6GPDjD7tYLisCCJVisH9p6WyNdHvflUd4SHkA6gRqVJIh2v2HnTA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/icons@9.4.2':
+    resolution: {integrity: sha512-QSMMz0NA03ypSGhXC8HQX8FSj8lYT+/5yqH+/N03OH2IjL0q7wwGZ7nqsrtlRp76O5WqMTwGfSbTUUYPjFr+Xw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/identicon@9.4.2':
+    resolution: {integrity: sha512-JVDSmZsv11mSWqwAktK5x9Bslht2xY3TFUn8xzu6slAYe1Z7hEXZ76eb+UJ6F4qEzdwZ7xPWzAS6Nb0Y3A0pww==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/initials@9.4.2':
+    resolution: {integrity: sha512-yePuIUasmwtl9IrtB6rEzE/zb5fImKP/neW0CdcTC2MwLgMuP1GLHEGRgg1zI8exIh+PMv1YdLGyyUuRTE2Qpw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/lorelei-neutral@9.4.2':
+    resolution: {integrity: sha512-yspanTthA5vh6iCdeLzn6xZ4yYMYRcfcxblcgSvHTF1ut0bjAXtw5SXzZ6aJTrJWiHkzYOQuTOR6GVYiW80Q7w==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/lorelei@9.4.2':
+    resolution: {integrity: sha512-YMv6vnriW6VLFDsreKuOnUFFno6SRe7+7X7R7zPY0rZ+MaHX9V3jcioIG+1PSjIHEDfOLUHpr5vd1JBWv8y7UA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/micah@9.4.2':
+    resolution: {integrity: sha512-e4D3W/OlChSsLo7Llwsy0J18vk0azJqF/uFoY+EKACCNHBc1HGNsqVvu2CTf+OWOA8wTyAK6UkjBN5p01r7D+g==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/miniavs@9.4.2':
+    resolution: {integrity: sha512-wLwyFNNUnDRd3BbhSBhXR0XEpX8sG0/xDA5M/OkDoapLqZnnI48YLUSDd2N5QTAVMmcSEuZOYxkcnj7WW79vlg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/notionists-neutral@9.4.2':
+    resolution: {integrity: sha512-AyD9kEfVxQUwDGf4Op059gVmYIOAkTKg3dtE9h9mEKP7zl/kMy5B67BFFOo7sB0mXCjzAegZ6ekGU02E8+hIHw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/notionists@9.4.2':
+    resolution: {integrity: sha512-ZCySq+nxcD/x4xyYgytcj2N9uY3gxrL+qpnmOdp2BdA221KacVrxlsUPpIgEMqxS2rMmBQXfxg129Pzn4ycIpA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/open-peeps@9.4.2':
+    resolution: {integrity: sha512-i01tLgtp2g937T81sVeAOVlqsCtiTck/Kw20g7hN80+7xrXjOUepz2HPLy3HeiMjwjMGRy5o54kSd0/8Ht4Dqg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/personas@9.4.2':
+    resolution: {integrity: sha512-NJlkvI5F5gugt6t2+7QrYNTwQC7+4IQZS3vG0dYk2BncxOHax0BuLovdSdiAesTL4ZkytFYIydWmKmV2/xcUwg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/pixel-art-neutral@9.4.2':
+    resolution: {integrity: sha512-9e9Lz554uQvWaXV2P17ss+hPa6rTyuAKBtB8zk8ECjHiZzIl61N/KcTVLZ4dILVZwj7gYriaLo16QEqvL2GJCg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/pixel-art@9.4.2':
+    resolution: {integrity: sha512-peHf7oKICDgBZ8dUyj+txPnS7VZEWgvKE+xW4mNQqBt6dYZIjmva2shOVHn0b1JU+FDxMx3uIkWVixKdUq4WGg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/rings@9.4.2':
+    resolution: {integrity: sha512-Pc3ymWrRDQPJFNrbbLt7RJrzGvUuuxUiDkrfLhoVE+B6mZWEL1PC78DPbS1yUWYLErJOpJuM2GSwXmTbVjWf+g==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/shapes@9.4.2':
+    resolution: {integrity: sha512-AFL6jAaiLztvcqyq+ds+lWZu6Vbp3PlGWhJeJRm842jxtiluJpl6r4f6nUXP2fdMz7MNpDzXfLooQK9E04NbUQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/thumbs@9.4.2':
+    resolution: {integrity: sha512-ccWvDBqbkWS5uzHbsg5L6uML6vBfX7jT3J3jHCQksvz8haHItxTK02w+6e1UavZUsvza4lG5X/XY3eji3siJ4Q==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
+  '@dicebear/toon-head@9.4.2':
+    resolution: {integrity: sha512-lwFeSXyAnaKnCfMt9TiJwnD1cXQUGkey/0h6i/+4TVHVMCz5/Ri5u1ynovPNHy1SnBf858QwoXHkxilGLwQX/g==}
+    engines: {node: '>=16.0.0'}
+    peerDependencies:
+      '@dicebear/core': ^9.0.0
+
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
 
@@ -784,6 +989,9 @@ packages:
 
   '@emnapi/core@1.7.1':
     resolution: {integrity: sha512-o1uhUASyo921r2XtHYOHy7gdkGLge8ghBEQHMWmyJFoXlpU58kIrhhN3w26lpQb6dspetweapMn2CSNwQ8I4wg==}
+
+  '@emnapi/runtime@1.11.3':
+    resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
 
   '@emnapi/runtime@1.7.1':
     resolution: {integrity: sha512-PVtJr5CmLwYAU9PZDMITZoR5iAOShYREoR45EyyLrbntV50mdePTgUn4AmOw90Ifcj+x2kRjdzr1HP3RrNiHGA==}
@@ -1712,6 +1920,152 @@ packages:
   '@humanwhocodes/retry@0.4.3':
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
+
+  '@img/colour@1.1.0':
+    resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
+    engines: {node: '>=18'}
+
+  '@img/sharp-darwin-arm64@0.35.5':
+    resolution: {integrity: sha512-QRUlFQ0WxvdWyqqG/WtI3iupfD5rBzmCHXSdPsY91sAtVtTo7Q4cb6zOccZ3gqEqkr0f1As1ehLqmEpDsRf+lg==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@img/sharp-darwin-x64@0.35.5':
+    resolution: {integrity: sha512-+BR255RhDlpygUpOc/Jdt1nT6DQ3XG/ERo5wbcdOf5Q320dKtPCKPLR1LJs9VGXRaMa8l1uUa0tkCNOXiAxZUw==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@img/sharp-freebsd-wasm32@0.35.5':
+    resolution: {integrity: sha512-Y/z91nEZ4uIBX5X3nfTovjU9lHNKFYbL2lpHCLVNmXQK03VIZvXBBt0KxbPGp2SdGSF+2mQU4e+hQaWOt86iAw==}
+    engines: {node: '>=20.9.0'}
+    os: [freebsd]
+
+  '@img/sharp-libvips-darwin-arm64@1.3.4':
+    resolution: {integrity: sha512-5R89nBYiRdUlSWJxPhO+GVtaXzXSxKnRu/xqMn3KTA3L9EB9Oy/P+Nn2f2vlhPuUdy/Zusb2DarbyTpGCfEDuw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@img/sharp-libvips-darwin-x64@1.3.4':
+    resolution: {integrity: sha512-iR2OKH80yi0U+dUplyh3/xdpFvps6YkCwsXenIJxqxR1v9o+xtKTGbS9H7cps+2Vxjc8B1j96p75NmTGjIhtpQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@img/sharp-libvips-linux-arm64@1.3.4':
+    resolution: {integrity: sha512-Y3dgX/6lE2QhQb+Gxy0WZxfg9MEm/JBjamZpS2IklP7xIQoKN4hzAm7KcMVGtaVDt3neE9OKBC7vAfonA/Lr1A==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@img/sharp-libvips-linux-arm@1.3.4':
+    resolution: {integrity: sha512-LmRtTsOHuvM2+wlO2Db37dx5MiZhB0FvSunciw48YjdOkZz9KAiRbm8ujeMOA1INqmei5NapFxYEK1D1ZSidmw==}
+    cpu: [arm]
+    os: [linux]
+
+  '@img/sharp-libvips-linux-ppc64@1.3.4':
+    resolution: {integrity: sha512-Le6boB8Tai0Nis+gIxIpKx68UDVVIqdR8Tin5Yf1z2LJJQLDJvCDRqRu+jC2qCoD+eIomonmOwB4smBRxfVpYQ==}
+    cpu: [ppc64]
+    os: [linux]
+
+  '@img/sharp-libvips-linux-riscv64@1.3.4':
+    resolution: {integrity: sha512-aHkkIEHPRdQEegJN20MLmGtxYD9R2wQr3Cwpddnu5+YKMt6Uzax7S9h5gpZTo8wyrGuZSlfQ63OevL5mTyOC7Q==}
+    cpu: [riscv64]
+    os: [linux]
+
+  '@img/sharp-libvips-linux-s390x@1.3.4':
+    resolution: {integrity: sha512-ra/mB6MikESDUO7Yg+Mi95bFBb9GsObURuhnOv3OqknjGe9sZrG8tCe9q0xSIGrtLgvgw0gKnFWcK4blSgQOuQ==}
+    cpu: [s390x]
+    os: [linux]
+
+  '@img/sharp-libvips-linux-x64@1.3.4':
+    resolution: {integrity: sha512-GJ//SSXbnwSDes02umB3nDJLFcQzw8a18V8fyhqr6tV515tOEMdImjjxj1AoafMRz56F3PHgftnj1QEKSU1zkw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@img/sharp-libvips-linuxmusl-arm64@1.3.4':
+    resolution: {integrity: sha512-hvulFwtjUcagsis6BBxHwGFwWoNZjgYmULGVrZcyfNbjA8hKILbRxGg15/7w5HDyXHXUos/j6baAWqnCyQ2DWA==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@img/sharp-libvips-linuxmusl-x64@1.3.4':
+    resolution: {integrity: sha512-6zXKeE/p39I1AmA3cJG35eyBGNqNddLnUXjhwBnsGjFPWqf5VKkDBEqaEkPDoTEtkxwi2vv8Tcr2mDyP4So7Fg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@img/sharp-linux-arm64@0.35.5':
+    resolution: {integrity: sha512-LYVx5JTsOM2CBzmxreh+nl64/3H6Xb09iSLknqH47z2T2DFFxDeFLP5y4dJwe6H7uGQlHPyEEtIqyo3DYsRwdQ==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@img/sharp-linux-arm@0.35.5':
+    resolution: {integrity: sha512-LEaXK2WdXVK5ykcw0buWyPMsmLLL2vpHLD6yrNSW+JGEL3BZPA4tpKN6iaMc4AxTTAoaX/sU1rOL51lcIz48ZQ==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm]
+    os: [linux]
+
+  '@img/sharp-linux-ppc64@0.35.5':
+    resolution: {integrity: sha512-QVxAAq8evVRI9ia2vqgwrmWucn5Dfv+JdWzj75pD8omHLPSP7f8p20O8jxzjCcuCEQEOtYOZUmX1hkiZ0kdevA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [ppc64]
+    os: [linux]
+
+  '@img/sharp-linux-riscv64@0.35.5':
+    resolution: {integrity: sha512-LtdreXguaavKODPIfzJ4kffx7UNt1omwtK0rch4EBbbSTXPnxWmYSayXdLJw0fJzQ97kHt1gL/yh4tvU+nCyRQ==}
+    engines: {node: '>=20.9.0'}
+    cpu: [riscv64]
+    os: [linux]
+
+  '@img/sharp-linux-s390x@0.35.5':
+    resolution: {integrity: sha512-UZasTOFiYzotTsGOCu42BfUzP6Tu6Do/947iRm1RsLKvlllxwGcn4RN27LibGWceix4Y+Pmw3jsnTcCQIgWjqA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [s390x]
+    os: [linux]
+
+  '@img/sharp-linux-x64@0.35.5':
+    resolution: {integrity: sha512-SxFtLTeJInhAA9Q836kux2vZNeOBQEx658qvbboZScr0wIARym3IcGmW7KpVD5sbVg0Ojy+udFQdayYIZyoNog==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@img/sharp-linuxmusl-arm64@0.35.5':
+    resolution: {integrity: sha512-9HbMclmI1zlNkFRs3z9/eBtDjfD0sGlrX1z6b1qwmiFY5ElDLh4BC0LPBdVp7z1DXFiKlIcznf+ZlsuZzLxQqg==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@img/sharp-linuxmusl-x64@0.35.5':
+    resolution: {integrity: sha512-4KOphqB035HrVdqLZfCgMzzERrQkkzOwRhl4OAkRO1YCldbaFjySXMaK534Mo0V+LndnlJk+sbUyLeU0ULyD1A==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@img/sharp-wasm32@0.35.5':
+    resolution: {integrity: sha512-Ptsga1su4tQx+LLF1ECS9U6nz5kmrXKo6XVbtR48Ke3ZRxxgaWBu7IDtEe1quo8hiupwm6WFqxVlXaSf7IINGQ==}
+    engines: {node: '>=20.9.0'}
+
+  '@img/sharp-webcontainers-wasm32@0.35.5':
+    resolution: {integrity: sha512-hfhF/FmoQyTUkA0bIKFOtw536BQSeBMe6BF6QyWlrPxT754+TFLaZ7sKKTfvvM0yJgKgaYTwnFCIZ/GuDw5SUA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [wasm32]
+
+  '@img/sharp-win32-arm64@0.35.5':
+    resolution: {integrity: sha512-X4t7g+7ZA5DKblCBEXGjUqqemj4vczING/5viFwAL8h4N3qYeyjwdCvRLHi4EdOUI+2Z7UFlp1VM+p/AuEtm6Q==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@img/sharp-win32-ia32@0.35.5':
+    resolution: {integrity: sha512-5Zm82LoBc43nhwNybZlG7Y1KO//Zhsn306fQl29ZOuStHLGTo3BWL83q3cznX0poxSAMuYL1On/BHBxkBeKr6A==}
+    engines: {node: ^20.9.0}
+    cpu: [ia32]
+    os: [win32]
+
+  '@img/sharp-win32-x64@0.35.5':
+    resolution: {integrity: sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
+    os: [win32]
 
   '@isaacs/ttlcache@1.4.1':
     resolution: {integrity: sha512-RQgQ4uQ+pLbqXfOmieB91ejmLwvSgv9nLx6sT6sD83s7umBypgg+OIBOBbEUiJXrfpnp9j0mRhYYdzp9uqq3lA==}
@@ -5507,6 +5861,15 @@ packages:
   shallowequal@1.1.0:
     resolution: {integrity: sha512-y0m1JoUZSlPAjXVtPPW70aZWfIL/dSP7AFkRnniLCrK/8MDKog3TySTBmckD+RObVxH0v4Tox67+F14PdED2oQ==}
 
+  sharp@0.35.5:
+    resolution: {integrity: sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      '@types/node': '*'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
     engines: {node: '>=8'}
@@ -6876,6 +7239,169 @@ snapshots:
   '@csstools/css-tokenizer@3.0.4':
     optional: true
 
+  '@dicebear/adventurer-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/adventurer@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/avataaars-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/avataaars@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/big-ears-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/big-ears@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/big-smile@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/bottts-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/bottts@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/collection@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/adventurer': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/adventurer-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/avataaars': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/avataaars-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/big-ears': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/big-ears-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/big-smile': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/bottts': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/bottts-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/core': 9.4.3
+      '@dicebear/croodles': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/croodles-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/dylan': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/fun-emoji': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/glass': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/icons': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/identicon': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/initials': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/lorelei': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/lorelei-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/micah': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/miniavs': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/notionists': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/notionists-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/open-peeps': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/personas': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/pixel-art': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/pixel-art-neutral': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/rings': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/shapes': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/thumbs': 9.4.2(@dicebear/core@9.4.3)
+      '@dicebear/toon-head': 9.4.2(@dicebear/core@9.4.3)
+
+  '@dicebear/core@9.4.3':
+    dependencies:
+      '@types/json-schema': 7.0.15
+
+  '@dicebear/croodles-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/croodles@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/dylan@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/fun-emoji@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/glass@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/icons@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/identicon@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/initials@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/lorelei-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/lorelei@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/micah@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/miniavs@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/notionists-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/notionists@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/open-peeps@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/personas@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/pixel-art-neutral@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/pixel-art@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/rings@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/shapes@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/thumbs@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
+  '@dicebear/toon-head@9.4.2(@dicebear/core@9.4.3)':
+    dependencies:
+      '@dicebear/core': 9.4.3
+
   '@drizzle-team/brocli@0.10.2': {}
 
   '@egjs/hammerjs@2.0.17':
@@ -6885,6 +7411,11 @@ snapshots:
   '@emnapi/core@1.7.1':
     dependencies:
       '@emnapi/wasi-threads': 1.1.0
+      tslib: 2.8.1
+    optional: true
+
+  '@emnapi/runtime@1.11.3':
+    dependencies:
       tslib: 2.8.1
     optional: true
 
@@ -7306,7 +7837,7 @@ snapshots:
       prompts: 2.4.2
       resolve-from: 5.0.0
       sandbox-cli-detector: 0.2.0
-      semver: 7.7.3
+      semver: 7.8.5
       send: 0.19.2
       slugify: 1.6.6
       stacktrace-parser: 0.1.11
@@ -7366,7 +7897,7 @@ snapshots:
       debug: 4.4.3
       getenv: 2.0.0
       glob: 13.0.0
-      semver: 7.7.3
+      semver: 7.8.5
       slugify: 1.6.6
       xcode: 3.0.1
       xml2js: 0.6.0
@@ -7386,7 +7917,7 @@ snapshots:
       getenv: 2.0.0
       glob: 13.0.0
       resolve-workspace-root: 2.0.0
-      semver: 7.7.3
+      semver: 7.8.5
       slugify: 1.6.6
     transitivePeerDependencies:
       - supports-color
@@ -7434,7 +7965,7 @@ snapshots:
       ignore: 5.3.2
       minimatch: 10.2.6
       resolve-from: 5.0.0
-      semver: 7.7.3
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
 
@@ -7446,7 +7977,7 @@ snapshots:
       getenv: 2.0.0
       jimp-compact: 0.16.1
       parse-png: 2.1.0
-      semver: 7.7.3
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -7733,6 +8264,112 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
+
+  '@img/colour@1.1.0': {}
+
+  '@img/sharp-darwin-arm64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-darwin-arm64': 1.3.4
+    optional: true
+
+  '@img/sharp-darwin-x64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-darwin-x64': 1.3.4
+    optional: true
+
+  '@img/sharp-freebsd-wasm32@0.35.5':
+    dependencies:
+      '@img/sharp-wasm32': 0.35.5
+    optional: true
+
+  '@img/sharp-libvips-darwin-arm64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-darwin-x64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-arm64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-arm@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-ppc64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-riscv64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-s390x@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-x64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linuxmusl-arm64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linuxmusl-x64@1.3.4':
+    optional: true
+
+  '@img/sharp-linux-arm64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-arm64': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-arm@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-arm': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-ppc64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-ppc64': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-riscv64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-riscv64': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-s390x@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-s390x': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-x64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-x64': 1.3.4
+    optional: true
+
+  '@img/sharp-linuxmusl-arm64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linuxmusl-arm64': 1.3.4
+    optional: true
+
+  '@img/sharp-linuxmusl-x64@0.35.5':
+    optionalDependencies:
+      '@img/sharp-libvips-linuxmusl-x64': 1.3.4
+    optional: true
+
+  '@img/sharp-wasm32@0.35.5':
+    dependencies:
+      '@emnapi/runtime': 1.11.3
+    optional: true
+
+  '@img/sharp-webcontainers-wasm32@0.35.5':
+    dependencies:
+      '@img/sharp-wasm32': 0.35.5
+    optional: true
+
+  '@img/sharp-win32-arm64@0.35.5':
+    optional: true
+
+  '@img/sharp-win32-ia32@0.35.5':
+    optional: true
+
+  '@img/sharp-win32-x64@0.35.5':
+    optional: true
 
   '@isaacs/ttlcache@1.4.1': {}
 
@@ -8055,7 +8692,7 @@ snapshots:
       metro: 0.84.6
       metro-config: 0.84.6
       metro-core: 0.84.6
-      semver: 7.7.3
+      semver: 7.8.5
     optionalDependencies:
       '@react-native/metro-config': 0.86.3(@babel/core@7.28.5)
     transitivePeerDependencies:
@@ -8445,7 +9082,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.70.0
       debug: 4.4.3
       minimatch: 10.2.6
-      semver: 7.7.3
+      semver: 7.8.5
       tinyglobby: 0.2.15
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -10484,7 +11121,7 @@ snapshots:
 
   is-bun-module@2.0.0:
     dependencies:
-      semver: 7.7.3
+      semver: 7.8.5
 
   is-callable@1.2.7: {}
 
@@ -11686,7 +12323,7 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3)
       react-native-reanimated: 4.5.1(react-native-worklets@0.10.1(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
-      semver: 7.7.3
+      semver: 7.8.5
       tailwindcss: 3.4.19(tsx@4.21.0)(yaml@2.8.2)
     optionalDependencies:
       react-native-safe-area-context: 5.7.0(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -12088,6 +12725,39 @@ snapshots:
   sf-symbols-typescript@2.2.0: {}
 
   shallowequal@1.1.0: {}
+
+  sharp@0.35.5(@types/node@22.19.3):
+    dependencies:
+      '@img/colour': 1.1.0
+      detect-libc: 2.1.2
+      semver: 7.8.5
+    optionalDependencies:
+      '@img/sharp-darwin-arm64': 0.35.5
+      '@img/sharp-darwin-x64': 0.35.5
+      '@img/sharp-freebsd-wasm32': 0.35.5
+      '@img/sharp-libvips-darwin-arm64': 1.3.4
+      '@img/sharp-libvips-darwin-x64': 1.3.4
+      '@img/sharp-libvips-linux-arm': 1.3.4
+      '@img/sharp-libvips-linux-arm64': 1.3.4
+      '@img/sharp-libvips-linux-ppc64': 1.3.4
+      '@img/sharp-libvips-linux-riscv64': 1.3.4
+      '@img/sharp-libvips-linux-s390x': 1.3.4
+      '@img/sharp-libvips-linux-x64': 1.3.4
+      '@img/sharp-libvips-linuxmusl-arm64': 1.3.4
+      '@img/sharp-libvips-linuxmusl-x64': 1.3.4
+      '@img/sharp-linux-arm': 0.35.5
+      '@img/sharp-linux-arm64': 0.35.5
+      '@img/sharp-linux-ppc64': 0.35.5
+      '@img/sharp-linux-riscv64': 0.35.5
+      '@img/sharp-linux-s390x': 0.35.5
+      '@img/sharp-linux-x64': 0.35.5
+      '@img/sharp-linuxmusl-arm64': 0.35.5
+      '@img/sharp-linuxmusl-x64': 0.35.5
+      '@img/sharp-webcontainers-wasm32': 0.35.5
+      '@img/sharp-win32-arm64': 0.35.5
+      '@img/sharp-win32-ia32': 0.35.5
+      '@img/sharp-win32-x64': 0.35.5
+      '@types/node': 22.19.3
 
   shebang-command@2.0.0:
     dependencies:

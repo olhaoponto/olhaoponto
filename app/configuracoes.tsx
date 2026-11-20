@@ -243,6 +243,11 @@ export default function ConfiguracoesScreen() {
         <View style={styles.choices}>{(['system', 'light', 'dark'] as const).map((theme) => <Pressable key={theme} onPress={() => chooseTheme(theme)} accessibilityRole="button" accessibilityState={{ selected: selectedTheme === theme }} style={[styles.choice, { borderColor: selectedTheme === theme ? colors.deepTeal : colors.border, backgroundColor: selectedTheme === theme ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={selectedTheme === theme ? colors.deepTeal : colors.foreground}>{theme === 'system' ? 'Sistema' : theme === 'light' ? 'Claro' : 'Escuro'}</AppText></Pressable>)}</View>
       </SurfaceCard>
 
+      <SurfaceCard>
+        <AppText variant="subtitle">Créditos dos avatares</AppText>
+        <AppText variant="small" color={colors.muted}>DiceBear; estilos Open Peeps, Micah, Adventurer, Toon Head, Big Smile, Avataaars, Lorelei, Notionists, Bottts, Pixel Art e Fun Emoji (licenças CC0, CC BY 4.0 e uso livre).</AppText>
+      </SurfaceCard>
+
       <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Olha o Ponto · versão 1.0.1</AppText>
 
       <Modal visible={scheduleModal} transparent animationType="fade" onRequestClose={() => setScheduleModal(false)}>
