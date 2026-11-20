@@ -15,7 +15,6 @@ const shiftCivilDate = (civilDate: string, amount: number) => {
   return new Date(Date.UTC(year, month - 1, day + amount, 12)).toISOString().slice(0, 10);
 };
 const MASCOT = require('../assets/images/mascot/clock-base.png');
-const percent = (value: number) => `${value}%` as `${number}%`;
 
 export default function SevenStepsScreen() {
   const router = useRouter();
@@ -24,6 +23,7 @@ export default function SevenStepsScreen() {
   const [now] = useState(() => new Date());
   const [state, setState] = useState<SevenStepsState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sceneW, setSceneW] = useState(0);
   const jump = useRef(new Animated.Value(0)).current;
   const ringPulse = useRef(new Animated.Value(0)).current;
   const today = useMemo(() => getBahiaDate(now), [now]);
@@ -50,16 +50,26 @@ export default function SevenStepsScreen() {
       if (active) {
         setState(next);
         setLoading(false);
-        jump.setValue(0);
-        Animated.sequence([
-          Animated.delay(80),
-          Animated.timing(jump, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(jump, { toValue: 0, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-        ]).start();
       }
     }).catch(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [profile, today, jump]);
+
+  const step = Math.min(state?.step ?? 0, 7);
+  const currentIndex = state?.completed ? 6 : Math.min(step, 6);
+  const currentStone = STONES[currentIndex];
+
+  useEffect(() => {
+    jump.setValue(0);
+    if (loading || !state) return undefined;
+    const animation = Animated.sequence([
+      Animated.delay(80),
+      Animated.timing(jump, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(jump, { toValue: 0, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [currentIndex, loading, state?.completed, jump]);
 
   useEffect(() => {
     const animation = Animated.loop(Animated.sequence([
@@ -70,28 +80,24 @@ export default function SevenStepsScreen() {
     return () => animation.stop();
   }, [ringPulse]);
 
-  const step = Math.min(state?.step ?? 0, 7);
-  const currentIndex = state?.completed ? 6 : Math.min(step, 6);
-  const currentStone = STONES[currentIndex];
-  const mascotStyle = {
-    left: percent((currentStone.x / SCENE_W) * 100),
-    top: percent(((currentStone.y - 8) / SCENE_H) * 100),
-    width: percent((58 / SCENE_W) * 100),
-    aspectRatio: 1,
-    marginLeft: percent(-(58 / SCENE_W) * 50),
-    marginTop: percent(-(58 / SCENE_W) * 100),
-    transform: [{ translateY: jump.interpolate({ inputRange: [0, 1], outputRange: [0, -42] }) }],
-  };
-  const ringStyle = {
-    left: percent((currentStone.x / SCENE_W) * 100),
-    top: percent(((currentStone.y + 8) / SCENE_H) * 100),
-    width: percent((62 / SCENE_W) * 100),
-    aspectRatio: 1,
-    marginLeft: percent(-(62 / SCENE_W) * 50),
-    marginTop: percent(-(62 / SCENE_W) * 50),
+  const scale = sceneW / SCENE_W;
+  const mascotSize = 58 * scale;
+  const ringSize = 62 * scale;
+  const mascotStyle = sceneW > 0 ? {
+    left: currentStone.x * scale - mascotSize / 2,
+    top: (currentStone.y - 8) * scale - mascotSize,
+    width: mascotSize,
+    height: mascotSize,
+    transform: [{ translateY: jump.interpolate({ inputRange: [0, 1], outputRange: [0, -42 * scale] }) }],
+  } : null;
+  const ringStyle = sceneW > 0 ? {
+    left: currentStone.x * scale - ringSize / 2,
+    top: (currentStone.y + 8) * scale - ringSize / 2,
+    width: ringSize,
+    height: ringSize,
     opacity: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.9] }),
     transform: [{ scale: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] }) }],
-  };
+  } : null;
 
   return (
     <ScreenShell contentStyle={styles.content}>
@@ -105,10 +111,10 @@ export default function SevenStepsScreen() {
           <View style={styles.stats}><AppText variant="small" color={colors.deepTeal}>Dias {step}/7</AppText><AppText variant="small" color={colors.muted}>Ciclos {state?.totalCycles ?? 0}</AppText></View>
         </View>
       </SurfaceCard>
-      <View style={styles.sceneWrap} accessibilityLabel="Caminho do Sete Passos no rio">
+      <View onLayout={({ nativeEvent }) => setSceneW(nativeEvent.layout.width)} style={styles.sceneWrap} accessibilityLabel="Caminho do Sete Passos no rio">
         <SceneArt step={step} completed={!!state?.completed} />
-        {!loading && state && !state.completed ? <Animated.View style={[styles.currentRing, ringStyle]} /> : null}
-        {!loading && state ? <Animated.View style={[styles.mascot, mascotStyle]}><Image source={MASCOT} resizeMode="contain" style={styles.mascotImage} accessibilityLabel="Mascote relógio sobre a pedra atual" /></Animated.View> : null}
+        {!loading && state && !state.completed && ringStyle ? <Animated.View style={[styles.currentRing, ringStyle]} /> : null}
+        {!loading && state && mascotStyle ? <Animated.View style={[styles.mascot, mascotStyle]}><Image source={MASCOT} resizeMode="contain" style={styles.mascotImage} accessibilityLabel="Mascote relógio sobre a pedra atual" /></Animated.View> : null}
         {loading ? <View style={styles.loading}><AppText variant="small" color="#FFFFFF">Preparando seu caminho...</AppText></View> : null}
       </View>
       {state?.completed ? <SurfaceCard tone="soft" style={styles.message}><AppText variant="subtitle" color={colors.deepTeal}>Parabéns, você chegou ao fim!</AppText><AppText variant="small" color={colors.muted}>Seu desafio foi concluído e uma peça bônus foi adicionada à jornada.</AppText></SurfaceCard> : <AppText variant="small" color={colors.muted} style={styles.gentle}>Cada dia resolvido conta um passo. Vá no seu ritmo.</AppText>}
