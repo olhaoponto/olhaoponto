@@ -43,4 +43,28 @@ describe('seven steps', () => {
     const result = computeSevenSteps('2026-11-06', weekdays.flatMap(fullDay), [], undefined, '2026-11-06');
     expect(result).toMatchObject({ step: 0, completed: false, rewardDue: false });
   });
+
+  it('não quebra a sequência por uma folga de 10 dias atrás', () => {
+    const result = computeSevenSteps('2026-11-19', [
+      ...fullDay('2026-11-11'), ...fullDay('2026-11-12'), ...fullDay('2026-11-13'),
+      ...fullDay('2026-11-16'), ...fullDay('2026-11-17'), ...fullDay('2026-11-18'), ...fullDay('2026-11-19'),
+    ], [status('2026-11-09', 'rest')]);
+    expect(result).toMatchObject({ step: 7, completed: true, lastResolvedDate: '2026-11-19' });
+  });
+
+  it('conta a sequência atravessando a virada de mês', () => {
+    const result = computeSevenSteps('2026-11-04', [
+      ...fullDay('2026-10-29'), ...fullDay('2026-10-30'), ...fullDay('2026-11-02'),
+      ...fullDay('2026-11-03'), ...fullDay('2026-11-04'),
+    ], []);
+    expect(result.step).toBe(5);
+    expect(result.lastResolvedDate).toBe('2026-11-04');
+  });
+
+  it('mantém a sequência anterior quando hoje está pendente', () => {
+    const result = computeSevenSteps('2026-11-19', [
+      ...fullDay('2026-11-17'), ...fullDay('2026-11-18'), row('2026-11-19', 'entrada'),
+    ], []);
+    expect(result).toMatchObject({ step: 2, completed: false, lastResolvedDate: '2026-11-18' });
+  });
 });

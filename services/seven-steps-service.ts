@@ -4,7 +4,7 @@ import { getAuthenticatedSession } from '@/services/auth-session';
 import { awardBonusPiece } from '@/services/journey-service';
 import { computeSevenSteps, type SevenStepsResult } from '@/utils/seven-steps';
 
-const storageKey = (userId: string) => `olhaponto:${userId}:sete-passos`;
+const storageKey = (userId: string) => `olhaoponto:${userId}:sete-passos`;
 
 type StoredSevenSteps = { lastRewardedEndDate: string | null; totalCycles: number };
 export type SevenStepsState = SevenStepsResult & { rewardGranted: boolean; totalCycles: number };

@@ -60,6 +60,8 @@ export default function HomeScreen() {
   const [notificationStatus, setNotificationStatus] = useState<{ granted: boolean; exactAlarms: boolean } | null>(null);
   const [weekEntries, setWeekEntries] = useState<TimeEntry[]>([]);
   const [dayStatuses, setDayStatuses] = useState<DayStatusRecord[]>([]);
+  const [sevenStepsEntries, setSevenStepsEntries] = useState<TimeEntry[]>([]);
+  const [sevenStepsStatuses, setSevenStepsStatuses] = useState<DayStatusRecord[]>([]);
   const [dayStatusModal, setDayStatusModal] = useState(false);
   const [savingDayStatus, setSavingDayStatus] = useState(false);
   const [dayStatusNotice, setDayStatusNotice] = useState('');
@@ -147,15 +149,27 @@ export default function HomeScreen() {
   const refreshWeek = useCallback(async () => {
     if (!session?.user.id) return;
     const months = [...new Set([weekRange.startDate.slice(0, 7), weekRange.endDate.slice(0, 7)])];
+    const sevenStepsStart = shiftCivilDate(today, -20);
+    const sevenStepsMonths = [...new Set([sevenStepsStart.slice(0, 7), today.slice(0, 7)])];
     const [entryResults, statusResult] = await Promise.all([
       Promise.all(months.map((month) => loadEntriesByMonth(`${month}-01`))),
       loadDayStatuses(shiftCivilDate(today, -6), today),
+    ]);
+    const [sevenStepsEntryResults, sevenStepsStatusResult] = await Promise.all([
+      Promise.all(sevenStepsMonths.map((month) => loadEntriesByMonth(`${month}-01`))),
+      loadDayStatuses(sevenStepsStart, today),
     ]);
     const byId = new Map<string, TimeEntry>();
     for (const result of entryResults) for (const entry of result.data ?? []) byId.set(entry.id, entry);
     mergeEntries([...byId.values()]);
     setWeekEntries([...byId.values()].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
     if (statusResult.data) setDayStatuses(statusResult.data);
+    const sevenStepsById = new Map<string, TimeEntry>();
+    for (const result of sevenStepsEntryResults) for (const entry of result.data ?? []) {
+      if (entry.data >= sevenStepsStart && entry.data <= today) sevenStepsById.set(entry.id, entry);
+    }
+    setSevenStepsEntries([...sevenStepsById.values()].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
+    if (sevenStepsStatusResult.data) setSevenStepsStatuses(sevenStepsStatusResult.data);
   }, [session?.user.id, today, weekRange.startDate, weekRange.endDate, mergeEntries]);
 
   useEffect(() => {
@@ -365,7 +379,7 @@ Enviado pelo Olha o Ponto.` }); }
         </SurfaceCard> : null}
         <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       </>}
-      <SevenStepsCard civilDate={today} entries={storeEntries} statuses={dayStatuses} preferences={profile?.preferencias_alerta} />
+      <SevenStepsCard civilDate={today} entries={sevenStepsEntries} statuses={sevenStepsStatuses} preferences={profile?.preferencias_alerta} />
       {shouldShowOutcome && error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
       {dayStatusNotice ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{dayStatusNotice}</AppText> : null}
       <HomeCommunications lunchMinutes={lunchMinutes} lunchStarted={lunchStarted} ended={ended} />
