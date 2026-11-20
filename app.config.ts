@@ -60,7 +60,7 @@ const config: ExpoConfig = {
   owner: "edingtonmaquine",
   name: env.appName,
   slug: env.appSlug,
-  version: "1.3.7",
+  version: "1.3.9",
   extra: {
     ...publicRuntime,
     eas: {
@@ -79,7 +79,7 @@ const config: ExpoConfig = {
       }
   },
   android: {
-    versionCode: 14,
+    versionCode: 15,
     softwareKeyboardLayoutMode: "resize",
     adaptiveIcon: {
       backgroundColor: "#FAF8EF",

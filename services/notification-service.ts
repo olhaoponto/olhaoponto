@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { fromZonedTime } from 'date-fns-tz';
 import { ALERT_THRESHOLDS, getLunchReminderMinutes, isWorkAlertEnabled } from '../utils/alerts';
 import { calculateWorkedSeconds, formatMinutesHHMM, type TimeEntry } from '../utils/work-time';
 import { getScheduleEndAt } from '../utils/work-schedules';
@@ -8,6 +9,7 @@ import { parseAgendaReminderMinutes } from '../utils/agenda';
 import { calculateLunchReturnTimes } from '../utils/lunch-return';
 import { getBahiaDate } from '../utils/work-time';
 import { isDayOccurrenceActive } from './day-occurrence-service';
+import { loadStreak } from './streak-service';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -71,7 +73,7 @@ function makeTrigger(date: Date, channelId: string): Notifications.DateTriggerIn
 
 export async function cancelDayNotifications(): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  const workTypes = new Set(['shift-complete', 'lunch-start', 'lunch-return', 'work-alert']);
+  const workTypes = new Set(['shift-complete', 'lunch-start', 'lunch-return', 'work-alert', 'streak-risk']);
   const identifiers = scheduled
     .filter((notification) => workTypes.has(String(notification.content.data?.type ?? '')))
     .map((notification) => notification.identifier);
@@ -135,6 +137,23 @@ export async function scheduleDayNotifications(
   const pauseReminderMinutes = getLunchReminderMinutes(lunchReminderMinutes ?? alertPreferences?.lunch_reminder_minutes);
   await cancelDayNotifications();
   if (userId && await isDayOccurrenceActive(userId, getBahiaDate(now))) return;
+  if (userId && !dayClosed && enabled && alertPreferences?.enabled !== false) {
+    try {
+      const streak = await loadStreak(getBahiaDate(now));
+      const fireAt = fromZonedTime(`${getBahiaDate(now)}T18:00:00`, timeZone);
+      if (streak?.emRisco && streak.atual >= 3 && fireAt.getTime() > now.getTime()) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Sua sequência está em risco',
+            body: `Sua sequência de ${streak.atual} dias termina hoje.`,
+            sound: soundEnabled ? 'default' : false,
+            data: { type: 'streak-risk', user_id: userId, days: streak.atual },
+          },
+          trigger: makeTrigger(fireAt, 'work-alert'),
+        });
+      }
+    } catch { /* a sequência não pode interromper os demais alertas */ }
+  }
   if (dayClosed || !enabled || entries.length === 0) return;
   const channelId = `work-alerts-${soundEnabled ? 'sound' : 'silent'}-${vibrationEnabled ? 'vibrate' : 'quiet'}`;
   if (Platform.OS === 'android') {

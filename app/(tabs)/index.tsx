@@ -28,6 +28,7 @@ import { calculateLunchReturnTimes, getLunchReturnWarningMinutes } from '@/utils
 import { HomeCommunications } from '@/components/HomeCommunications';
 import { checkForAppUpdate, type AppUpdate } from '@/services/update-service';
 import { ClockProgressBar } from '@/components/ClockProgressBar';
+import { StreakBadge } from '@/components/StreakBadge';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
@@ -316,6 +317,7 @@ Enviado pelo Olha o Ponto.` }); }
             <ClockProgressBar progress={progress} color={alertColor} height={12} />
             <AppText variant="small" color={colors.muted}>{ended && timeFor('saida') ? `Saída registrada às ${localTime(timeFor('saida')!.registrado_em)}` : `Jornada ${activeSchedule.start_time}–${activeSchedule.end_time} · almoço ${activeSchedule.lunch_minutes} min`}</AppText>
           </SurfaceCard>
+          <StreakBadge />
         </View>
       </ScreenShell>
     );
@@ -349,6 +351,7 @@ Enviado pelo Olha o Ponto.` }); }
           {workedMinutes >= expectedWorkMinutes && workedMinutes < 570 ? <View style={[styles.alertBanner, { backgroundColor: workedMinutes >= 540 ? `${colors.coral}20` : `${colors.warning}2B` }]}><MaterialCommunityIcons name={workedMinutes >= 540 ? 'alert-circle-outline' : 'check-circle-outline'} size={21} color={workedMinutes >= 540 ? colors.error : colors.deepTeal} /><AppText variant="small" style={{ flex: 1, fontWeight: '600' }}>{workedMinutes >= 540 ? 'A jornada prevista foi concluída. Planeje sua saída.' : `Jornada prevista completa (${formatMinutesHHMM(expectedWorkMinutes)}). A partir daqui é hora extra.`}</AppText></View> : null}
           {shiftComplete ? <View style={[styles.alertBanner, { backgroundColor: `${colors.coral}20` }]}><MaterialCommunityIcons name="calendar-check-outline" size={21} color={colors.error} /><AppText variant="small" style={{ flex: 1, fontWeight: '700' }}>Sua jornada programada terminou às {activeSchedule.end_time}. Registre a saída no relógio da empresa e no aplicativo.</AppText></View> : null}
         </SurfaceCard>
+        <StreakBadge />
 
           {profile?.preferencias_alerta?.alerta_pausa_almoco === true && workedMinutes >= lunchReminderMinutes && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou {formatMinutesHHMM(lunchReminderMinutes)}. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
         <SurfaceCard>

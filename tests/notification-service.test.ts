@@ -24,6 +24,7 @@ vi.mock('expo-notifications', () => ({
 }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 vi.mock('../services/day-occurrence-service', () => ({ isDayOccurrenceActive: vi.fn().mockResolvedValue(false) }));
+vi.mock('../services/streak-service', () => ({ loadStreak: vi.fn().mockResolvedValue(null) }));
 
 import { scheduleDayNotifications, scheduleMeetingNotifications } from '../services/notification-service';
 import { DEFAULT_WORK_SCHEDULE } from '../utils/work-schedules';

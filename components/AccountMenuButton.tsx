@@ -10,6 +10,7 @@ import { useAppStore } from '@/store/app-store';
 import { APP_ROUTES } from '@/utils/app-routes';
 import { AVATARS, isUnlocked, type Avatar, type AvatarProgress } from '@/utils/avatar-catalog';
 import { getProgress, getSelectedAvatarId, setSelectedAvatar } from '@/services/avatar-service';
+import { StreakBadge } from '@/components/StreakBadge';
 
 const rarityColor = { comum: '#9CA3AF', raro: '#3B82F6', epico: '#8B5CF6', lendario: '#D4A72C' } as const;
 function missingText(avatar: Avatar, progress: AvatarProgress) {
@@ -83,6 +84,7 @@ export function AccountMenuButton() {
                 <MaterialCommunityIcons name="close" size={22} color={colors.muted} />
               </Pressable>
             </View>
+            <StreakBadge compact />
             <View style={styles.avatarPicker}>
               <UserAvatar size={64} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ alignSelf: 'stretch', width: '100%', maxWidth: '100%', flexGrow: 0 }} contentContainerStyle={styles.avatarStrip}>
