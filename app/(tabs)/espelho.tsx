@@ -9,7 +9,7 @@ import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, 
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
 import { deleteTimeEntry, insertTimeEntry, loadEntriesByDateRange, loadEntriesByMonth, updateTimeEntry } from '@/services/time-entry-service';
-import { loadDayStatuses } from '@/services/day-status-service';
+import { isValidCivilDate, loadDayStatuses, saveDayStatus } from '@/services/day-status-service';
 import { exportCsv, exportPdf } from '@/services/export-service';
 import { calculateDailyTotals, calculatePeriodTotals, formatMinutesHHMM, getBahiaDate, getNextPunch, validateEntries, validatePunch } from '@/utils/work-time';
 import { addCivilDays, getWeekDateRange } from '@/utils/day-status';
@@ -28,6 +28,7 @@ const fullDateLabel = (key: string) => new Intl.DateTimeFormat('pt-BR', { timeZo
 const weekLabel = (startDate: string, endDate: string) => `${formatInTimeZone(new Date(`${startDate}T12:00:00Z`), ZONE, 'dd/MM')} – ${formatInTimeZone(new Date(`${endDate}T12:00:00Z`), ZONE, 'dd/MM/yyyy')}`;
 
 type MirrorMode = 'month' | 'week';
+type RetroKind = 'entry' | Exclude<DayStatus, 'working'>;
 
 export default function EspelhoScreen() {
   const colors = useAppColors();
@@ -56,8 +57,8 @@ export default function EspelhoScreen() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
   const [notice, setNotice] = useState('');
-  const [tab, setTab] = useState<'grid' | 'table'>('table');
   const [retroOpen, setRetroOpen] = useState(false);
+  const [retroKind, setRetroKind] = useState<RetroKind>('entry');
   const [retroDate, setRetroDate] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM-dd'));
   const [retroTime, setRetroTime] = useState('');
   const [retroReason, setRetroReason] = useState('');
@@ -188,16 +189,44 @@ export default function EspelhoScreen() {
     setNotice('Batida removida.');
   };
 
+  const refreshStatuses = async () => {
+    const result = await loadDayStatuses(periodRange.startDate, periodRange.endDate);
+    if (result.data) setDayStatuses(result.data);
+    return result;
+  };
+
+  const saveStatusForDay = async (date: string, status: Exclude<DayStatus, 'working'> | 'working') => {
+    if (!isValidCivilDate(date)) { setNotice('A data selecionada não é válida.'); return; }
+    if (periodEntries.some((entry) => entry.data === date)) { setNotice('Remova as batidas deste dia antes de adicionar uma marcação.'); return; }
+    setSaving(true); setNotice('');
+    const result = await saveDayStatus(date, status);
+    const refreshed = await refreshStatuses();
+    setSaving(false);
+    if (!result.data) { setNotice(result.error || refreshed.error || 'Não foi possível salvar a marcação.'); return; }
+    setNotice(result.error ? 'Marcação salva neste aparelho; será sincronizada quando houver conexão.' : status === 'working' ? 'Marcação removida.' : `${STATUS_LABELS[status]} registrada.`);
+  };
+
   const saveRetroactive = async () => {
     if (!profile || mode !== 'month') return;
     setNotice('');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(retroDate) || formatInTimeZone(new Date(`${retroDate}T12:00:00Z`), ZONE, 'yyyy-MM-dd') !== retroDate) { setNotice('Informe uma data válida no formato AAAA-MM-DD.'); return; }
+    if (!isValidCivilDate(retroDate) || formatInTimeZone(new Date(`${retroDate}T12:00:00Z`), ZONE, 'yyyy-MM-dd') !== retroDate) { setNotice('Informe uma data válida no formato AAAA-MM-DD.'); return; }
     if (!retroDate.startsWith(month)) { setNotice('Escolha uma data dentro do mês selecionado.'); return; }
     const today = formatInTimeZone(new Date(), ZONE, 'yyyy-MM-dd');
     if (retroDate > today) { setNotice('Não é permitido registrar batidas em uma data futura.'); return; }
+    const dayEntries = periodEntries.filter((entry) => entry.data === retroDate);
+    if (retroKind !== 'entry') {
+      if (dayEntries.length) { setNotice('Este dia já tem batidas e não pode receber uma marcação.'); return; }
+      setSaving(true);
+      const result = await saveDayStatus(retroDate, retroKind);
+      const refreshed = await refreshStatuses();
+      setSaving(false);
+      if (!result.data) { setNotice(result.error || refreshed.error || 'Não foi possível salvar a marcação.'); return; }
+      setRetroKind('entry'); setRetroOpen(false);
+      setNotice(result.error ? 'Marcação salva neste aparelho; será sincronizada quando houver conexão.' : `${STATUS_LABELS[retroKind]} registrada.`);
+      return;
+    }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(retroTime)) { setNotice('Informe o horário no formato HH:mm.'); return; }
     if (retroReason.trim().length < 3) { setNotice('Inclua uma justificativa curta para a batida esquecida.'); return; }
-    const dayEntries = periodEntries.filter((entry) => entry.data === retroDate);
     const next = getNextPunch(dayEntries);
     if (!next) { setNotice('Este dia já tem as quatro batidas. Edite uma existente se precisar corrigir.'); return; }
     const stamp = fromZonedTime(`${retroDate}T${retroTime}:00`, profile.fuso || ZONE).toISOString();
@@ -236,12 +265,10 @@ export default function EspelhoScreen() {
           <View style={{ flex: 1, gap: 2 }}><AppText variant="subtitle" style={{ textTransform: 'capitalize' }}>{dayLabel(date)}</AppText><AppText variant="tiny" color={colors.muted}>{fullDateLabel(date)} · {rows.length ? rows.some((entry) => entry.editado) ? 'Contém batida editada' : rows.some((entry) => entry.horario_informado_manual) ? 'Contém horário manual' : 'Batidas registradas' : personalStatus ? STATUS_LABELS[personalStatus] : 'Sem registro'}</AppText></View>
           {personalStatus ? <StatusPill tone={personalStatus === 'absence' ? 'yellow' : personalStatus === 'medical_leave' ? 'coral' : 'teal'}>{STATUS_LABELS[personalStatus]}</StatusPill> : daily ? <StatusPill tone={standout ? 'danger' : 'teal'}>{daily.workedHHMM} trabalhadas</StatusPill> : null}
         </View>
-        {tab === 'table' ? <View style={styles.tableRow}>{TYPES.map((type) => {
-          const entry = find(type);
-          return <View key={type} style={styles.tableCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small" style={{ fontWeight: '600' }}>{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>;
-        })}</View> : <View style={styles.compactList}>{TYPES.map((type) => { const entry = find(type); return <View key={type} style={styles.compactCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small">{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>; })}</View>}
+        <View style={styles.compactList}>{TYPES.map((type) => { const entry = find(type); return <View key={type} style={styles.compactCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small">{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>; })}</View>
         {rows.filter((entry) => entry.justificativa).map((entry) => <AppText key={`note-${entry.id}`} variant="tiny" color={colors.muted}>{LABELS[entry.tipo]} · {entry.justificativa}</AppText>)}
         <View style={styles.dayFooter}><View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>{daily ? <AppText variant="tiny" color={colors.muted}>Extras: {daily.overtimeHHMM}</AppText> : personalStatus ? <AppText variant="tiny" color={colors.muted}>{STATUS_LABELS[personalStatus]}</AppText> : <AppText variant="tiny" color={colors.muted}>—</AppText>}{rows.some((entry) => entry.horario_informado_manual) ? <StatusPill tone="yellow">MANUAL</StatusPill> : null}</View>{mode === 'month' ? <View style={{ flexDirection: 'row', gap: 6 }}>{rows.map((entry) => <Pressable key={entry.id} onPress={() => startEdit(entry)} accessibilityRole="button" accessibilityLabel={`Editar ${LABELS[entry.tipo]} ${timeLabel(entry.registrado_em)}`} style={styles.iconButton}><MaterialCommunityIcons name="pencil-outline" size={16} color={colors.deepTeal} /></Pressable>)}</View> : null}</View>
+        {mode === 'month' ? <View style={styles.statusActions}><ActionButton title="Folga" variant="outline" onPress={() => void saveStatusForDay(date, 'rest')} disabled={saving || rows.length > 0} style={styles.statusButton} /><ActionButton title="Falta" variant="outline" onPress={() => void saveStatusForDay(date, 'absence')} disabled={saving || rows.length > 0} style={styles.statusButton} /><ActionButton title="Atestado" variant="outline" onPress={() => void saveStatusForDay(date, 'medical_leave')} disabled={saving || rows.length > 0} style={styles.statusButton} /><ActionButton title="Remover marcação" variant="outline" onPress={() => void saveStatusForDay(date, 'working')} disabled={saving || !personalStatus} style={styles.statusButton} /></View> : null}
       </SurfaceCard>
     );
   };
@@ -269,10 +296,8 @@ export default function EspelhoScreen() {
         </View>
         {mode === 'month' ? <View style={{ flexDirection: 'row', gap: 8 }}><ActionButton title={exporting === 'pdf' ? 'Gerando…' : 'PDF'} variant="outline" loading={exporting === 'pdf'} onPress={() => handleExport('pdf')} style={styles.smallButton} /><ActionButton title={exporting === 'csv' ? 'Gerando…' : 'CSV'} variant="outline" loading={exporting === 'csv'} onPress={() => handleExport('csv')} style={styles.smallButton} /></View> : null}
       </View>
-      <View style={styles.detailToggle}><Pressable onPress={() => setTab('table')} accessibilityRole="button" accessibilityState={{ selected: tab === 'table' }} style={[styles.toggle, tab === 'table' && { backgroundColor: colors.input }]}><AppText variant="tiny" color={colors.deepTeal}>Detalhada</AppText></Pressable><Pressable onPress={() => setTab('grid')} accessibilityRole="button" accessibilityState={{ selected: tab === 'grid' }} style={[styles.toggle, tab === 'grid' && { backgroundColor: colors.input }]}><AppText variant="tiny" color={colors.deepTeal}>Compacta</AppText></Pressable></View>
-
       {mode === 'month' ? <ActionButton title={retroOpen ? 'Fechar lançamento retroativo' : 'Adicionar batida esquecida'} variant="outline" onPress={() => { setRetroOpen((value) => !value); setNotice(''); }} /> : null}
-      {retroOpen && mode === 'month' ? <SurfaceCard style={{ gap: 12 }}><AppText variant="subtitle">Registrar horário que ficou faltando</AppText><AppText variant="small" color={colors.muted}>Informe uma data deste mês e uma justificativa. O app sugere a próxima batida permitida e bloqueia horários fora de ordem, futuros ou acima do limite.</AppText><TextField label="Data (AAAA-MM-DD)" value={retroDate} onChangeText={setRetroDate} autoCapitalize="none" placeholder="2026-11-03" maxLength={10} /><TextField label="Horário (HH:mm)" value={retroTime} onChangeText={setRetroTime} keyboardType="numbers-and-punctuation" placeholder="Ex.: 08:00" maxLength={5} /><TextField label="Justificativa" value={retroReason} onChangeText={setRetroReason} multiline placeholder="Ex.: esquecimento ao registrar a entrada" style={{ minHeight: 72, textAlignVertical: 'top' }} /><View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}><MaterialCommunityIcons name="information-outline" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Próxima batida: {getNextPunch(periodEntries.filter((entry) => entry.data === retroDate)) ? LABELS[getNextPunch(periodEntries.filter((entry) => entry.data === retroDate))!] : 'dia completo'}</AppText></View><ActionButton title="Salvar batida esquecida" onPress={saveRetroactive} loading={saving} disabled={!retroTime || !retroReason.trim()} /></SurfaceCard> : null}
+      {retroOpen && mode === 'month' ? <SurfaceCard style={{ gap: 12 }}><AppText variant="subtitle">Adicionar ao espelho</AppText><View style={styles.retroOptions}>{([['entry', 'Batida'], ['rest', 'Folga'], ['absence', 'Falta'], ['medical_leave', 'Atestado']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setRetroKind(value); setNotice(''); }} accessibilityRole="radio" accessibilityState={{ selected: retroKind === value }} style={[styles.retroOption, retroKind === value && { backgroundColor: colors.deepTeal }]}><AppText variant="small" color={retroKind === value ? '#FFFFFF' : colors.deepTeal}>{label}</AppText></Pressable>)}</View><AppText variant="small" color={colors.muted}>{retroKind === 'entry' ? 'Informe uma data deste mês e uma justificativa. O app sugere a próxima batida permitida e bloqueia horários fora de ordem, futuros ou acima do limite.' : 'Informe uma data deste mês. O dia precisa estar sem batidas e não pode ser futuro.'}</AppText><TextField label="Data (AAAA-MM-DD)" value={retroDate} onChangeText={setRetroDate} autoCapitalize="none" placeholder="2026-11-03" maxLength={10} />{retroKind === 'entry' ? <><TextField label="Horário (HH:mm)" value={retroTime} onChangeText={setRetroTime} keyboardType="numbers-and-punctuation" placeholder="Ex.: 08:00" maxLength={5} /><TextField label="Justificativa" value={retroReason} onChangeText={setRetroReason} multiline placeholder="Ex.: esquecimento ao registrar a entrada" style={{ minHeight: 72, textAlignVertical: 'top' }} /><View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}><MaterialCommunityIcons name="information-outline" size={18} color={colors.deepTeal} /><AppText variant="small" color={colors.deepTeal}>Próxima batida: {getNextPunch(periodEntries.filter((entry) => entry.data === retroDate)) ? LABELS[getNextPunch(periodEntries.filter((entry) => entry.data === retroDate))!] : 'dia completo'}</AppText></View></> : null}<ActionButton title={retroKind === 'entry' ? 'Salvar batida esquecida' : `Salvar ${STATUS_LABELS[retroKind].toLowerCase()}`} onPress={saveRetroactive} loading={saving} disabled={retroKind === 'entry' && (!retroTime || !retroReason.trim())} /></SurfaceCard> : null}
       {reportLoading ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}><ActivityIndicator color={colors.deepTeal} /><AppText variant="small" color={colors.muted}>Carregando batidas de {periodTitle}…</AppText></View> : null}
       {syncNotice && !authUnavailable ? <AppText variant="small" color={colors.coral}>{syncNotice}</AppText> : null}
       {visibleLoadError ? <SurfaceCard tone="soft" style={{ gap: 10 }}><AppText variant="body" color={colors.error}>{visibleLoadError}</AppText>{!authUnavailable ? <ActionButton title="Tentar novamente" variant="outline" onPress={() => { setLoading(true); setLoadError(''); setRetryCount((value) => value + 1); }} /> : null}{visibleLoadError.toLowerCase().includes('sessão') ? <ActionButton title="Voltar ao login" onPress={() => router.replace('/login')} /> : null}</SurfaceCard> : null}
@@ -303,16 +328,17 @@ const styles = StyleSheet.create({
   metric: { flex: 1, backgroundColor: '#24B3A20D', borderRadius: 16, padding: 12, gap: 3 },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
   toggleGroup: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: '#0B6A630D' },
-  detailToggle: { alignSelf: 'flex-start', flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: '#0B6A6308' },
   toggle: { borderRadius: 11, paddingVertical: 8, paddingHorizontal: 12 },
   smallButton: { minHeight: 40, borderRadius: 13, paddingHorizontal: 13, paddingVertical: 7 },
   dayCard: { padding: 14, gap: 10 },
   dayHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dayBadge: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  tableRow: { flexDirection: 'row', gap: 4 },
-  tableCell: { flex: 1, minWidth: 0, gap: 3 },
   compactList: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   compactCell: { width: '46%', borderRadius: 12, backgroundColor: '#24B3A208', padding: 9, gap: 2 },
+  retroOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  retroOption: { borderRadius: 12, borderWidth: 1, borderColor: '#0B6A6330', paddingHorizontal: 12, paddingVertical: 8 },
+  statusActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  statusButton: { minHeight: 38, flexGrow: 1, paddingHorizontal: 10, paddingVertical: 7 },
   emptySelection: { textAlign: 'center', paddingVertical: 12 },
   dayFooter: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#DFEAE6', paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   iconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#24B3A21A' },
