@@ -34,6 +34,7 @@ export default function AvataresScreen() {
   const unlockedCount = AVATARS.filter((avatar) => isUnlocked(avatar, progress)).length;
   const useAvatar = async () => { if (!preview) return; await setSelectedAvatar(preview.id); setSelectedId(preview.id); setPreview(null); };
   return <ScreenShell contentStyle={styles.page}>
+    <ActionButton title="Voltar" variant="ghost" onPress={() => router.back()} icon={<MaterialCommunityIcons name="arrow-left" size={18} color={colors.deepTeal} />} style={styles.backButton} />
     <PageHeading eyebrow="Sua coleção" title="Meus avatares" subtitle={`${unlockedCount}/69 desbloqueados`} right={<AccountMenuButton />} />
     <View style={[styles.tabs, { borderColor: colors.border }]}>{filters.map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.value }} style={[styles.tab, { backgroundColor: filter === item.value ? `${colors.teal}20` : 'transparent' }]}><AppText variant="tiny" color={filter === item.value ? colors.deepTeal : colors.muted}>{item.label}</AppText></Pressable>)}</View>
     <View style={styles.grid}>{visible.map((avatar) => { const unlocked = isUnlocked(avatar, progress); const chosen = selectedId === avatar.id; return <Pressable key={avatar.id} disabled={!unlocked} onPress={() => setPreview(avatar)} accessibilityRole="button" accessibilityLabel={unlocked ? `Usar ${avatar.nome}` : `${avatar.nome}, bloqueado`} style={[styles.tile, { borderColor: rarityColor[avatar.raridade], backgroundColor: colors.card }]}>
@@ -46,6 +47,7 @@ export default function AvataresScreen() {
 
 const styles = StyleSheet.create({
   page: { gap: 14, paddingTop: 18 },
+  backButton: { alignSelf: 'flex-start', minHeight: 34, paddingHorizontal: 0 },
   tabs: { flexDirection: 'row', borderWidth: 1, borderRadius: 13, padding: 3 },
   tab: { flex: 1, alignItems: 'center', borderRadius: 9, paddingVertical: 9 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

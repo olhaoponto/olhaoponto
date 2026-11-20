@@ -5,6 +5,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AccountMenuButton } from '@/components/AccountMenuButton';
+import { UserAvatar } from '@/components/UserAvatar';
 import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, StatusPill, SurfaceCard, TextField, useAppColors } from '@/components/ui';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { updateProfile } from '@/services/auth-service';
@@ -248,6 +249,7 @@ export default function ConfiguracoesScreen() {
       <SurfaceCard>
         <AppText variant="subtitle">Meus avatares</AppText>
         <AppText variant="small" color={colors.muted}>Escolha uma imagem para aparecer no seu perfil, ranking e equipe.</AppText>
+        <Pressable onPress={() => router.push('/avatares')} accessibilityRole="button" accessibilityLabel="Abrir coleção de avatares" style={styles.avatarLink}><UserAvatar size={64} /></Pressable>
         <ActionButton title="Abrir coleção de avatares" variant="outline" onPress={() => router.push('/avatares')} />
       </SurfaceCard>
 
@@ -345,4 +347,5 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', minHeight: 50, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DFEAE6' },
   modalCard: { width: '100%', maxWidth: 480, alignSelf: 'center', gap: 13 },
   modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  avatarLink: { alignSelf: 'flex-start' },
 });

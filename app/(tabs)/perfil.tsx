@@ -96,7 +96,7 @@ export default function PerfilScreen() {
       <TabNavigationCard active={null} />
       <PageHeading eyebrow="Sua conta" title="Perfil" subtitle="Seus dados pessoais e segurança da conta." right={<AccountMenuButton />} />
       <SurfaceCard style={styles.identityCard}>
-        <UserAvatar size={58} />
+        <Pressable onPress={() => router.push('/avatares')} accessibilityRole="button" accessibilityLabel="Abrir coleção de avatares"><UserAvatar size={58} /></Pressable>
         <View style={{ flex: 1, gap: 4 }}><AppText variant="subtitle">{profile.nome}</AppText><AppText variant="small" color={colors.muted}>{profile.email}</AppText></View>
         <StatusPill tone={profile.role === 'admin' ? 'yellow' : 'teal'}>{roleLabel.toUpperCase()}</StatusPill>
       </SurfaceCard>
