@@ -3,6 +3,7 @@ import type { TimeEntry } from '@/types/app';
 import { supabase } from './supabase';
 import { getAuthenticatedSession } from './auth-session';
 import { getJourneyImage, PECAS_POR_QUEBRA_CABECA, PUNCH_ORIGINS, type JourneyPieceOrigin } from '@/utils/journey-game';
+import { useAppStore } from '@/store/app-store';
 
 export type JourneyPiece = {
   id: string;
@@ -56,7 +57,7 @@ export async function loadJourney(): Promise<JourneyState | null> {
   return local || { level: localLevel(userId), pieces: [] };
 }
 
-async function awardPiece(origin: JourneyPieceOrigin, data: string, batidaId: string | null = null): Promise<JourneyState | null> {
+async function awardPiece(origin: JourneyPieceOrigin, data: string, batidaId: string | null = null, notify = true): Promise<JourneyState | null> {
   const userId = await uid();
   if (!userId || !data) return null;
   const current = (await loadJourney()) || { level: localLevel(userId), pieces: [] };
@@ -67,6 +68,9 @@ async function awardPiece(origin: JourneyPieceOrigin, data: string, batidaId: st
   const piece: JourneyPiece = { id: `local-piece-${origin}-${data}-${userId}`, usuario_id: userId, nivel: current.level.nivel, indice: index, origem: origin, data, batida_id: batidaId, encaixada: false, encaixada_em: null };
   const next = { ...current, pieces: [...current.pieces, piece] };
   await writeLocal(userId, next);
+  const { recordNewPiece } = await import('./avatar-service');
+  await recordNewPiece();
+  if (notify) useAppStore.getState().bumpJourney();
   try {
     await supabase.from('jornada_niveis').upsert({ usuario_id: userId, nivel: next.level.nivel, imagem_id: next.level.imagem_id, pecas_total: next.pieces.filter((item) => item.nivel === next.level.nivel).length }, { onConflict: 'usuario_id,nivel' });
     const remote = await supabase.from('jornada_pecas').upsert({ usuario_id: userId, nivel: piece.nivel, indice: piece.indice, origem: piece.origem, data: piece.data, batida_id: piece.batida_id, encaixada: false }, { onConflict: 'usuario_id,data,origem' }).select('id,usuario_id,nivel,indice,origem,data,batida_id,encaixada,encaixada_em').single();
@@ -85,7 +89,7 @@ export async function awardPieceForEntry(entry: TimeEntry): Promise<JourneyState
 }
 
 export async function awardBonusPiece(data: string): Promise<JourneyState | null> {
-  return awardPiece('bonus', data);
+  return awardPiece('bonus', data, null, false);
 }
 
 export async function placeJourneyPiece(pieceId: string): Promise<JourneyState | null> {
@@ -104,7 +108,13 @@ export async function placeJourneyPiece(pieceId: string): Promise<JourneyState |
   }
   const next = { level, pieces };
   await writeLocal(userId, next);
-  try { await supabase.from('jornada_pecas').update({ encaixada: true, encaixada_em: placed.encaixada_em }).eq('id', pieceId).eq('usuario_id', userId); } catch { /* estado local permanece */ }
+  if (level.concluido_em && !current.level.concluido_em) useAppStore.getState().bumpJourney();
+  try {
+    await supabase.from('jornada_pecas').update({ encaixada: true, encaixada_em: placed.encaixada_em }).eq('id', pieceId).eq('usuario_id', userId);
+    if (level.concluido_em && !current.level.concluido_em) {
+      await supabase.from('jornada_niveis').upsert({ usuario_id: userId, nivel: level.nivel, imagem_id: level.imagem_id, pecas_total: level.pecas_total, concluido_em: level.concluido_em }, { onConflict: 'usuario_id,nivel' });
+    }
+  } catch { /* estado local permanece */ }
   return next;
 }
 

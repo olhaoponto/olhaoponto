@@ -20,6 +20,7 @@ import { supabase } from '@/services/supabase';
 import { useAppStore } from '@/store/app-store';
 import { SchemeColors } from '@/constants/theme';
 import GlobalAlertOverlay from '@/components/GlobalAlertOverlay';
+import { AvatarUnlockModal } from '@/components/AvatarUnlockModal';
 import { getAuthRouteRedirect, isRouteProtected } from '@/utils/auth-route';
 import { checkSessionControl, recordUserPresence } from '@/services/session-control-service';
 
@@ -162,8 +163,10 @@ function AppStack() {
         <Stack.Screen name="bank-hours" />
         <Stack.Screen name="agenda" />
         <Stack.Screen name="configuracoes" />
+        <Stack.Screen name="avatares" />
       </Stack>
       <GlobalAlertOverlay />
+      <AvatarUnlockModal />
       <StatusBar style="auto" />
     </>
   );

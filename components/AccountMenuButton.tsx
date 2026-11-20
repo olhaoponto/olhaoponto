@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActionButton, AppText, SurfaceCard, initials, useAppColors } from '@/components/ui';
+import { ActionButton, AppText, SurfaceCard, useAppColors } from '@/components/ui';
+import { UserAvatar } from '@/components/UserAvatar';
 import { syncPendingEntries } from '@/services/time-entry-service';
 import { logout } from '@/services/auth-service';
 import { useAppStore } from '@/store/app-store';
@@ -43,9 +44,9 @@ export function AccountMenuButton() {
         onPress={() => { setError(''); setVisible(true); }}
         accessibilityRole="button"
         accessibilityLabel="Abrir menu Perfil, Configurações e Sair do Sistema"
-        style={[styles.avatar, { backgroundColor: `${colors.teal}25` }]}
+        style={styles.avatar}
       >
-        <AppText variant="subtitle" color={colors.deepTeal}>{initials(profile?.nome)}</AppText>
+        <UserAvatar size={48} />
       </Pressable>
       <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
         <View style={styles.backdrop}>

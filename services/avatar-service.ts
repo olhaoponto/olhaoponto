@@ -1,0 +1,77 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Avatar, AvatarProgress } from '@/utils/avatar-catalog';
+import { AVATARS, isUnlocked } from '@/utils/avatar-catalog';
+import { getAuthenticatedSession } from '@/services/auth-session';
+import { loadJourney } from '@/services/journey-service';
+import { supabase } from '@/services/supabase';
+import { avatarStorageKeys, nextPieceCount } from '@/utils/avatar-storage';
+
+const selectedKey = (userId: string) => avatarStorageKeys(userId).selected;
+const seenKey = (userId: string) => avatarStorageKeys(userId).seen;
+const piecesKey = (userId: string) => avatarStorageKeys(userId).pieces;
+const stepsKey = (userId: string) => avatarStorageKeys(userId).steps;
+
+async function userId() { return (await getAuthenticatedSession()).session?.user.id ?? null; }
+async function readNumber(key: string) {
+  const value = Number(await AsyncStorage.getItem(key));
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+async function readIds(key: string) {
+  try {
+    const value = JSON.parse((await AsyncStorage.getItem(key)) || '[]');
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  } catch { return []; }
+}
+
+export async function getSelectedAvatarId(): Promise<string | null> {
+  const uid = await userId();
+  return uid ? AsyncStorage.getItem(selectedKey(uid)) : null;
+}
+
+export async function setSelectedAvatar(id: string | null): Promise<void> {
+  const uid = await userId();
+  if (!uid) return;
+  if (id) await AsyncStorage.setItem(selectedKey(uid), id);
+  else await AsyncStorage.removeItem(selectedKey(uid));
+}
+
+export async function markAvatarsSeen(ids: readonly string[]): Promise<void> {
+  const uid = await userId();
+  if (!uid || !ids.length) return;
+  const seen = new Set(await readIds(seenKey(uid)));
+  ids.forEach((id) => seen.add(id));
+  await AsyncStorage.setItem(seenKey(uid), JSON.stringify([...seen]));
+}
+
+export async function recordNewPiece(): Promise<number> {
+  const uid = await userId();
+  if (!uid) return 0;
+  const next = nextPieceCount(await readNumber(piecesKey(uid)));
+  await AsyncStorage.setItem(piecesKey(uid), String(next));
+  return next;
+}
+
+export async function getProgress(): Promise<AvatarProgress> {
+  const uid = await userId();
+  if (!uid) return { pecas: 0, ciclos: 0, puzzles: 0 };
+  const [counter, journey, steps, levels] = await Promise.all([
+    readNumber(piecesKey(uid)),
+    loadJourney(),
+    readNumber(stepsKey(uid)),
+    supabase.from('jornada_niveis').select('concluido_em').eq('usuario_id', uid).not('concluido_em', 'is', null).limit(100),
+  ]);
+  const journeyPieces = journey?.pieces.length ?? 0;
+  const completedLevels = levels.error ? (journey?.level.concluido_em ? 1 : 0) : (levels.data?.length ?? 0);
+  return { pecas: Math.max(counter, journeyPieces), ciclos: steps, puzzles: completedLevels };
+}
+
+export async function getUnseenUnlockedAvatars(progress: AvatarProgress): Promise<Avatar[]> {
+  const uid = await userId();
+  if (!uid) return [];
+  const seen = new Set(await readIds(seenKey(uid)));
+  return AVATARS.filter((avatar) => isUnlocked(avatar, progress) && !seen.has(avatar.id));
+}
+
+export async function getUnlockedAvatars(progress: AvatarProgress): Promise<Avatar[]> {
+  return AVATARS.filter((avatar) => isUnlocked(avatar, progress));
+}

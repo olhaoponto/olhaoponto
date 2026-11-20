@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Appearance, Linking, Modal, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ const WORK_ALERT_OPTIONS = [
 
 export default function ConfiguracoesScreen() {
   const colors = useAppColors();
+  const router = useRouter();
   const profile = useAppStore((state) => state.profile);
   const setProfile = useAppStore((state) => state.setProfile);
   const { setColorScheme } = useThemeContext();
@@ -241,6 +243,12 @@ export default function ConfiguracoesScreen() {
         <PreferenceSwitch label="Biometria ao abrir" value={biometricEnabled} onChange={toggleBiometrics} />
         <AppText variant="small" color={colors.muted}>Tema</AppText>
         <View style={styles.choices}>{(['system', 'light', 'dark'] as const).map((theme) => <Pressable key={theme} onPress={() => chooseTheme(theme)} accessibilityRole="button" accessibilityState={{ selected: selectedTheme === theme }} style={[styles.choice, { borderColor: selectedTheme === theme ? colors.deepTeal : colors.border, backgroundColor: selectedTheme === theme ? `${colors.teal}20` : colors.input }]}><AppText variant="small" color={selectedTheme === theme ? colors.deepTeal : colors.foreground}>{theme === 'system' ? 'Sistema' : theme === 'light' ? 'Claro' : 'Escuro'}</AppText></Pressable>)}</View>
+      </SurfaceCard>
+
+      <SurfaceCard>
+        <AppText variant="subtitle">Meus avatares</AppText>
+        <AppText variant="small" color={colors.muted}>Escolha uma imagem para aparecer no seu perfil, ranking e equipe.</AppText>
+        <ActionButton title="Abrir coleção de avatares" variant="outline" onPress={() => router.push('/avatares')} />
       </SurfaceCard>
 
       <SurfaceCard>

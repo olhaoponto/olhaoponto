@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText, SurfaceCard, useAppColors } from '@/components/ui';
+import { UserAvatar } from '@/components/UserAvatar';
 import { loadRanking, type RankingPeriod, type RankingResult, type RankingRow } from '@/services/ranking-service';
 import { getPodiumColumns, getRankingRowsFourToTen, getUserOutsideTopTen } from '@/utils/ranking-podium';
 
@@ -13,7 +14,7 @@ function PodiumColumn({ row, colors }: { row: RankingRow; colors: ReturnType<typ
   const podiumColor = row.posicao === 1 ? '#D2A83E' : row.posicao === 2 ? colors.muted : '#B9784E';
   return <View style={[styles.podiumColumn, isFirst ? styles.firstColumn : styles.sideColumn]}>
     <AppText style={styles.medal}>{medal}</AppText>
-    <AppText variant="small" color={row.eh_voce ? colors.deepTeal : colors.foreground} style={styles.podiumName} numberOfLines={1}>{row.nome}</AppText>
+    {row.eh_voce ? <UserAvatar size={30} /> : null}<AppText variant="small" color={row.eh_voce ? colors.deepTeal : colors.foreground} style={styles.podiumName} numberOfLines={1}>{row.nome}</AppText>
     <AppText variant="tiny" color={colors.muted}>{pointsLabel(row.pontos)}</AppText>
     <View style={[styles.podiumBlock, { backgroundColor: `${podiumColor}35`, borderColor: `${podiumColor}80`, height: isFirst ? 100 : row.posicao === 2 ? 72 : 56 }]}><AppText variant="subtitle" color={colors.deepTeal} style={styles.position}>{row.posicao}º</AppText></View>
   </View>;
@@ -22,7 +23,7 @@ function PodiumColumn({ row, colors }: { row: RankingRow; colors: ReturnType<typ
 function RankingLine({ row, colors }: { row: RankingRow; colors: ReturnType<typeof useAppColors> }) {
   return <View style={[styles.rankingLine, { borderBottomColor: colors.border, backgroundColor: row.eh_voce ? `${colors.teal}18` : 'transparent' }]}>
     <AppText variant="small" color={colors.muted} style={styles.positionLabel}>{row.posicao}º</AppText>
-    <AppText variant="small" color={colors.foreground} style={styles.lineName} numberOfLines={1}>{row.nome}</AppText>
+    {row.eh_voce ? <UserAvatar size={24} /> : null}<AppText variant="small" color={colors.foreground} style={styles.lineName} numberOfLines={1}>{row.nome}</AppText>
     {row.eh_voce ? <AppText variant="tiny" color={colors.deepTeal} style={styles.youLabel}>Você</AppText> : null}
     <AppText variant="small" color={colors.deepTeal} style={styles.points}>{pointsLabel(row.pontos)}</AppText>
   </View>;

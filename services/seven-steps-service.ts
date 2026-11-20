@@ -3,6 +3,7 @@ import type { AlertPreferences, DayStatusRecord, TimeEntry } from '@/types/app';
 import { getAuthenticatedSession } from '@/services/auth-session';
 import { awardBonusPiece } from '@/services/journey-service';
 import { computeSevenSteps, type SevenStepsResult } from '@/utils/seven-steps';
+import { useAppStore } from '@/store/app-store';
 
 const storageKey = (userId: string) => `olhaoponto:${userId}:sete-passos`;
 
@@ -41,5 +42,6 @@ export async function loadSevenSteps(input: {
 
   const nextStored = { lastRewardedEndDate: computed.lastResolvedDate, totalCycles: stored.totalCycles + 1 };
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(nextStored)).catch(() => undefined);
+  useAppStore.getState().bumpJourney();
   return { ...computed, rewardDue: false, rewardGranted: true, totalCycles: nextStored.totalCycles };
 }
