@@ -79,7 +79,7 @@ export default function SevenStepsScreen() {
     width: percent((58 / SCENE_W) * 100),
     aspectRatio: 1,
     marginLeft: percent(-(58 / SCENE_W) * 50),
-    marginTop: percent(-(58 / SCENE_H) * 100),
+    marginTop: percent(-(58 / SCENE_W) * 100),
     transform: [{ translateY: jump.interpolate({ inputRange: [0, 1], outputRange: [0, -42] }) }],
   };
   const ringStyle = {
@@ -88,7 +88,7 @@ export default function SevenStepsScreen() {
     width: percent((62 / SCENE_W) * 100),
     aspectRatio: 1,
     marginLeft: percent(-(62 / SCENE_W) * 50),
-    marginTop: percent(-(62 / SCENE_H) * 50),
+    marginTop: percent(-(62 / SCENE_W) * 50),
     opacity: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.9] }),
     transform: [{ scale: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] }) }],
   };
