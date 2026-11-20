@@ -26,11 +26,11 @@ export function MirrorCalendar({ month, countByDate, statusDates, selectedDate, 
   return (
     <View style={styles.container} accessibilityLabel={`Calendário de ${MONTHS[monthNumber - 1]} de ${year}`}>
       <View style={styles.weekHeader}>
-        {WEEKDAYS.map((weekday, index) => <AppText key={`${weekday}-${index}`} variant="tiny" color={colors.muted} style={styles.weekday}>{weekday}</AppText>)}
+        {WEEKDAYS.map((weekday, index) => <View key={`${weekday}-${index}`} style={styles.headerCell}><AppText variant="tiny" color={colors.muted} style={styles.weekday}>{weekday}</AppText></View>)}
       </View>
       <View style={styles.grid}>
         {cells.map((day, index) => {
-          if (!day) return <View key={`empty-${index}`} style={styles.cell} />;
+          if (!day) return <View key={`empty-${index}`} style={styles.cell}><View style={styles.cellInner} /></View>;
           const date = dateFromDay(month, day);
           const count = countByDate.get(date) ?? 0;
           const hasStatus = statusDates.has(date);
@@ -43,10 +43,12 @@ export function MirrorCalendar({ month, countByDate, statusDates, selectedDate, 
               onPress={() => onSelect(date)}
               accessibilityRole="button"
               accessibilityLabel={`${day} de ${MONTHS[monthNumber - 1]}, ${count} ${count === 1 ? 'batida' : 'batidas'}${hasStatus && count === 0 ? ', folga, atestado ou falta' : ''}`}
-              style={[styles.cell, styles.dayCell, selected && { backgroundColor: colors.deepTeal }, today && styles.today]}
+              style={styles.cell}
             >
-              <AppText variant="small" color={selected ? '#FFFFFF' : colors.foreground} style={styles.dayNumber}>{day}</AppText>
-              {dotColor ? <View style={[styles.dot, { backgroundColor: dotColor }]} /> : null}
+              <View style={[styles.cellInner, styles.dayCell, selected && { backgroundColor: colors.deepTeal }, today && styles.today]}>
+                <AppText variant="small" color={selected ? '#FFFFFF' : colors.foreground} style={styles.dayNumber}>{day}</AppText>
+                {dotColor ? <View style={[styles.dot, { backgroundColor: dotColor }]} /> : null}
+              </View>
             </Pressable>
           );
         })}
@@ -64,10 +66,12 @@ export function MirrorCalendar({ month, countByDate, statusDates, selectedDate, 
 
 const styles = StyleSheet.create({
   container: { gap: 10 },
-  weekHeader: { flexDirection: 'row', gap: 4 },
-  weekday: { flex: 1, minWidth: 40, textAlign: 'center', fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  cell: { width: '13.38%', minWidth: 40, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  weekHeader: { flexDirection: 'row' },
+  headerCell: { width: '14.2857%', padding: 2, alignItems: 'center' },
+  weekday: { width: '100%', textAlign: 'center', fontWeight: '700' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: '14.2857%', aspectRatio: 1, padding: 2 },
+  cellInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   dayCell: { borderRadius: 13, position: 'relative' },
   today: { borderWidth: 2, borderColor: '#0B6A63' },
   dayNumber: { lineHeight: 20 },
