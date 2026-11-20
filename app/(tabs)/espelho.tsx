@@ -15,6 +15,7 @@ import { calculateDailyTotals, calculatePeriodTotals, formatMinutesHHMM, getBahi
 import { addCivilDays, getWeekDateRange } from '@/utils/day-status';
 import { getActiveWorkSchedule } from '@/utils/work-schedules';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
+import { MirrorCalendar } from '@/components/MirrorCalendar';
 
 const ZONE = 'America/Bahia';
 const TYPES: TimeEntry['tipo'][] = ['entrada', 'saida_almoco', 'volta_almoco', 'saida'];
@@ -39,6 +40,8 @@ export default function EspelhoScreen() {
   const upsertEntry = useAppStore((state) => state.upsertEntry);
   const removeEntry = useAppStore((state) => state.removeEntry);
   const [month, setMonth] = useState(() => formatInTimeZone(new Date(), ZONE, 'yyyy-MM'));
+  const todayDate = formatInTimeZone(new Date(), ZONE, 'yyyy-MM-dd');
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => todayDate.slice(0, 7) === formatInTimeZone(new Date(), ZONE, 'yyyy-MM') ? todayDate : null);
   const [weekAnchor, setWeekAnchor] = useState(() => getBahiaDate(new Date()));
   const [mode, setMode] = useState<MirrorMode>('month');
   const [loading, setLoading] = useState(true);
@@ -131,6 +134,8 @@ export default function EspelhoScreen() {
     return Array.from({ length: countDays }, (_, index) => `${month}-${String(index + 1).padStart(2, '0')}`);
   }, [mode, month, periodRange.endDate, periodRange.startDate]);
   const statusByDate = useMemo(() => new Map(dayStatuses.map((item) => [item.data, item])), [dayStatuses]);
+  const countByDate = useMemo(() => new Map(dates.map((date) => [date, periodEntries.filter((entry) => entry.data === date).length])), [dates, periodEntries]);
+  const statusDates = useMemo(() => new Set(dayStatuses.filter((item) => item.status !== 'working').map((item) => item.data)), [dayStatuses]);
   const periodTitle = mode === 'month' ? monthLabel(month) : weekLabel(periodRange.startDate, periodRange.endDate);
 
   const startEdit = (entry: TimeEntry) => { setSelected(entry); setEditTime(timeLabel(entry.registrado_em)); setReason(entry.justificativa || ''); setNotice(''); };
@@ -140,6 +145,7 @@ export default function EspelhoScreen() {
     if (mode === 'month') {
       const next = formatInTimeZone(amount < 0 ? subMonths(new Date(`${month}-15T12:00:00Z`), 1) : addMonths(new Date(`${month}-15T12:00:00Z`), 1), ZONE, 'yyyy-MM');
       const today = formatInTimeZone(new Date(), ZONE, 'yyyy-MM-dd');
+      setSelectedDate(null);
       setRetroDate(today.startsWith(next) ? today : `${next}-01`);
       setMonth(next);
     } else setWeekAnchor(addCivilDays(weekAnchor, amount * 7));
@@ -216,6 +222,29 @@ export default function EspelhoScreen() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível gerar o arquivo.'); }
     finally { setExporting(''); }
   };
+  const renderDayCard = (date: string) => {
+    const rows = periodEntries.filter((entry) => entry.data === date);
+    const daily = totalByDay.get(date);
+    const status = statusByDate.get(date);
+    const personalStatus = status?.status && status.status !== 'working' ? status.status : null;
+    const standout = (daily?.workedMinutes ?? 0) >= 570;
+    const find = (type: TimeEntry['tipo']) => rows.find((entry) => entry.tipo === type);
+    return (
+      <SurfaceCard key={date} style={[styles.dayCard, standout && { borderColor: colors.coral }]}>
+        <View style={styles.dayHeading}>
+          <View style={[styles.dayBadge, { backgroundColor: `${standout ? colors.coral : colors.teal}20` }]}><AppText variant="tiny" color={standout ? colors.error : colors.deepTeal}>{String(Number(date.slice(-2))).padStart(2, '0')}</AppText></View>
+          <View style={{ flex: 1, gap: 2 }}><AppText variant="subtitle" style={{ textTransform: 'capitalize' }}>{dayLabel(date)}</AppText><AppText variant="tiny" color={colors.muted}>{fullDateLabel(date)} · {rows.length ? rows.some((entry) => entry.editado) ? 'Contém batida editada' : rows.some((entry) => entry.horario_informado_manual) ? 'Contém horário manual' : 'Batidas registradas' : personalStatus ? STATUS_LABELS[personalStatus] : 'Sem registro'}</AppText></View>
+          {personalStatus ? <StatusPill tone={personalStatus === 'absence' ? 'yellow' : personalStatus === 'medical_leave' ? 'coral' : 'teal'}>{STATUS_LABELS[personalStatus]}</StatusPill> : daily ? <StatusPill tone={standout ? 'danger' : 'teal'}>{daily.workedHHMM} trabalhadas</StatusPill> : null}
+        </View>
+        {tab === 'table' ? <View style={styles.tableRow}>{TYPES.map((type) => {
+          const entry = find(type);
+          return <View key={type} style={styles.tableCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small" style={{ fontWeight: '600' }}>{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>;
+        })}</View> : <View style={styles.compactList}>{TYPES.map((type) => { const entry = find(type); return <View key={type} style={styles.compactCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small">{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>; })}</View>}
+        {rows.filter((entry) => entry.justificativa).map((entry) => <AppText key={`note-${entry.id}`} variant="tiny" color={colors.muted}>{LABELS[entry.tipo]} · {entry.justificativa}</AppText>)}
+        <View style={styles.dayFooter}><View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>{daily ? <AppText variant="tiny" color={colors.muted}>Extras: {daily.overtimeHHMM}</AppText> : personalStatus ? <AppText variant="tiny" color={colors.muted}>{STATUS_LABELS[personalStatus]}</AppText> : <AppText variant="tiny" color={colors.muted}>—</AppText>}{rows.some((entry) => entry.horario_informado_manual) ? <StatusPill tone="yellow">MANUAL</StatusPill> : null}</View>{mode === 'month' ? <View style={{ flexDirection: 'row', gap: 6 }}>{rows.map((entry) => <Pressable key={entry.id} onPress={() => startEdit(entry)} accessibilityRole="button" accessibilityLabel={`Editar ${LABELS[entry.tipo]} ${timeLabel(entry.registrado_em)}`} style={styles.iconButton}><MaterialCommunityIcons name="pencil-outline" size={16} color={colors.deepTeal} /></Pressable>)}</View> : null}</View>
+      </SurfaceCard>
+    );
+  };
 
   return (
     <ScreenShell contentStyle={styles.page}>
@@ -250,29 +279,10 @@ export default function EspelhoScreen() {
       {error ? <AppText variant="small" color={colors.error}>{error}</AppText> : null}
       {notice ? <AppText variant="small" color={colors.deepTeal}>{notice}</AppText> : null}
       {!reportLoading && !visibleLoadError ? <View style={{ gap: 10 }}>
-        {dates.map((date) => {
-          const rows = periodEntries.filter((entry) => entry.data === date);
-          const daily = totalByDay.get(date);
-          const status = statusByDate.get(date);
-          const personalStatus = status?.status && status.status !== 'working' ? status.status : null;
-          const standout = (daily?.workedMinutes ?? 0) >= 570;
-          const find = (type: TimeEntry['tipo']) => rows.find((entry) => entry.tipo === type);
-          return (
-            <SurfaceCard key={date} style={[styles.dayCard, standout && { borderColor: colors.coral }]}>
-              <View style={styles.dayHeading}>
-                <View style={[styles.dayBadge, { backgroundColor: `${standout ? colors.coral : colors.teal}20` }]}><AppText variant="tiny" color={standout ? colors.error : colors.deepTeal}>{String(Number(date.slice(-2))).padStart(2, '0')}</AppText></View>
-                <View style={{ flex: 1, gap: 2 }}><AppText variant="subtitle" style={{ textTransform: 'capitalize' }}>{dayLabel(date)}</AppText><AppText variant="tiny" color={colors.muted}>{fullDateLabel(date)} · {rows.length ? rows.some((entry) => entry.editado) ? 'Contém batida editada' : rows.some((entry) => entry.horario_informado_manual) ? 'Contém horário manual' : 'Batidas registradas' : personalStatus ? STATUS_LABELS[personalStatus] : 'Sem registro'}</AppText></View>
-                {personalStatus ? <StatusPill tone={personalStatus === 'absence' ? 'yellow' : personalStatus === 'medical_leave' ? 'coral' : 'teal'}>{STATUS_LABELS[personalStatus]}</StatusPill> : daily ? <StatusPill tone={standout ? 'danger' : 'teal'}>{daily.workedHHMM} trabalhadas</StatusPill> : null}
-              </View>
-              {tab === 'table' ? <View style={styles.tableRow}>{TYPES.map((type) => {
-                const entry = find(type);
-                return <View key={type} style={styles.tableCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small" style={{ fontWeight: '600' }}>{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>;
-              })}</View> : <View style={styles.compactList}>{TYPES.map((type) => { const entry = find(type); return <View key={type} style={styles.compactCell}><AppText variant="tiny" color={colors.muted}>{LABELS[type]}</AppText><AppText variant="small">{entry ? timeLabel(entry.registrado_em) : '—'}</AppText></View>; })}</View>}
-              {rows.filter((entry) => entry.justificativa).map((entry) => <AppText key={`note-${entry.id}`} variant="tiny" color={colors.muted}>{LABELS[entry.tipo]} · {entry.justificativa}</AppText>)}
-              <View style={styles.dayFooter}><View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>{daily ? <AppText variant="tiny" color={colors.muted}>Extras: {daily.overtimeHHMM}</AppText> : personalStatus ? <AppText variant="tiny" color={colors.muted}>{STATUS_LABELS[personalStatus]}</AppText> : <AppText variant="tiny" color={colors.muted}>—</AppText>}{rows.some((entry) => entry.horario_informado_manual) ? <StatusPill tone="yellow">MANUAL</StatusPill> : null}</View>{mode === 'month' ? <View style={{ flexDirection: 'row', gap: 6 }}>{rows.map((entry) => <Pressable key={entry.id} onPress={() => startEdit(entry)} accessibilityRole="button" accessibilityLabel={`Editar ${LABELS[entry.tipo]} ${timeLabel(entry.registrado_em)}`} style={styles.iconButton}><MaterialCommunityIcons name="pencil-outline" size={16} color={colors.deepTeal} /></Pressable>)}</View> : null}</View>
-            </SurfaceCard>
-          );
-        })}
+        {mode === 'month' ? <>
+          <MirrorCalendar month={month} countByDate={countByDate} statusDates={statusDates} selectedDate={selectedDate} todayDate={todayDate} onSelect={setSelectedDate} />
+          {selectedDate ? renderDayCard(selectedDate) : <AppText variant="small" color={colors.muted} style={styles.emptySelection}>Toque em um dia para ver as batidas</AppText>}
+        </> : dates.map((date) => renderDayCard(date))}
       </View> : null}
       <SurfaceCard tone="soft"><AppText variant="small" color={colors.muted}>Este espelho é um controle pessoal e não substitui o documento oficial do empregador. Edições exigem justificativa; para preservar a sequência, exclua batidas da última para a primeira.</AppText></SurfaceCard>
 
@@ -303,6 +313,7 @@ const styles = StyleSheet.create({
   tableCell: { flex: 1, minWidth: 0, gap: 3 },
   compactList: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   compactCell: { width: '46%', borderRadius: 12, backgroundColor: '#24B3A208', padding: 9, gap: 2 },
+  emptySelection: { textAlign: 'center', paddingVertical: 12 },
   dayFooter: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#DFEAE6', paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   iconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#24B3A21A' },
   modalBackdrop: { flex: 1, backgroundColor: '#081A1880', justifyContent: 'center', padding: 18 },
