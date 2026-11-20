@@ -85,7 +85,7 @@ export function AccountMenuButton() {
             </View>
             <View style={styles.avatarPicker}>
               <UserAvatar size={64} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.avatarStrip}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ alignSelf: 'stretch', width: '100%', maxWidth: '100%', flexGrow: 0 }} contentContainerStyle={styles.avatarStrip}>
                 {AVATARS.map((avatar) => {
                   const unlocked = isUnlocked(avatar, progress);
                   const chosen = selectedAvatarId === avatar.id;
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: '#1024218A' },
   card: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: 12 },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
-  avatarPicker: { alignItems: 'center', gap: 9 },
+  avatarPicker: { alignItems: 'center', alignSelf: 'stretch', minWidth: 0, gap: 9 },
   avatarStrip: { alignItems: 'center', gap: 8, paddingHorizontal: 2, paddingVertical: 3 },
   avatarChoice: { width: 58, height: 58, borderWidth: 2, borderRadius: 17, padding: 2 },
   avatarImageWrap: { width: '100%', height: '100%', borderRadius: 13, overflow: 'hidden', position: 'relative' },
