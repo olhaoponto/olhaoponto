@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { calculateLunchReturnTimes, getLunchReturnWarningMinutes } from '@/utils/lunch-return';
 import { HomeCommunications } from '@/components/HomeCommunications';
 import { checkForAppUpdate, type AppUpdate } from '@/services/update-service';
+import { ClockProgressBar } from '@/components/ClockProgressBar';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
@@ -312,7 +313,7 @@ Enviado pelo Olha o Ponto.` }); }
             <AppText variant="tiny" color={colors.muted} style={{ letterSpacing: 1.4, textTransform: 'uppercase' }}>Seu contador hoje</AppText>
             <AppText variant="hero" style={[styles.landscapeClock, { color: alertColor }]} accessibilityLabel={`Tempo trabalhado ${elapsed(workedSeconds)}`}>{elapsed(workedSeconds)}</AppText>
             <View style={styles.landscapeDetails}><StatusPill tone={ended ? 'teal' : lunchInProgress ? 'yellow' : shiftComplete ? 'danger' : 'teal'}>{ended ? 'FINALIZADO' : lunchInProgress ? 'PAUSADO · ALMOÇO' : shiftComplete ? 'JORNADA PREVISTA CONCLUÍDA' : 'AO VIVO'}</StatusPill><AppText variant="subtitle">{formatMinutesHHMM(workedMinutes)} trabalhadas</AppText></View>
-            <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: alertColor }]} /></View>
+            <ClockProgressBar progress={progress} color={alertColor} height={12} />
             <AppText variant="small" color={colors.muted}>{ended && timeFor('saida') ? `Saída registrada às ${localTime(timeFor('saida')!.registrado_em)}` : `Jornada ${activeSchedule.start_time}–${activeSchedule.end_time} · almoço ${activeSchedule.lunch_minutes} min`}</AppText>
           </SurfaceCard>
         </View>
@@ -338,11 +339,12 @@ Enviado pelo Olha o Ponto.` }); }
       {notificationStatus && (!notificationStatus.granted || !notificationStatus.exactAlarms) ? <SurfaceCard tone="soft" style={{ gap: 8 }}><AppText variant="small" color={colors.foreground}>{!notificationStatus.granted ? 'Ative as notificações para receber avisos quando o app estiver fechado.' : 'Notificações estão ativas, mas o Android pode entregar os alarmes com atraso enquanto Alarmes e lembretes não estiver liberado.'}</AppText>{Platform.OS !== 'web' ? <Pressable onPress={() => { void Linking.openSettings().catch(() => undefined); }} accessibilityRole="button"><AppText variant="small" color={colors.deepTeal}>Abrir configurações do aplicativo</AppText></Pressable> : null}</SurfaceCard> : null}
 
       {occurrence ? <DayOccurrenceCard occurrence={occurrence} onUndo={() => void undoOccurrence()} /> : shouldShowOutcome ? <DayOutcomeCard status={todayStatus?.status ?? null} weekendPrompt={weekendNeedsChoice} busy={savingDayStatus} dateLabel={dateLabel} onChoose={(status) => void handleChooseDayStatus(status)} onManage={() => setDayStatusModal(true)} /> : <>
+        <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
         <SurfaceCard style={[styles.timerCard, { borderColor: `${alertColor}65` }]}>
-          <View style={styles.timerHeader}><View style={{ gap: 4, flex: 1 }}><AppText variant="small" color={colors.muted}>Seu contador de hoje</AppText><AppText variant="subtitle">{lunchInProgress ? 'Pausa para o almoço' : ended ? 'Jornada encerrada' : 'Jornada em andamento'}</AppText></View><StatusPill tone={ended ? 'teal' : workedMinutes >= 570 ? 'danger' : workedMinutes >= expectedWorkMinutes ? 'yellow' : 'teal'}>{lunchInProgress ? 'PAUSADO' : ended ? 'FINALIZADO' : 'AO VIVO'}</StatusPill></View>
+          <View style={styles.timerHeader}><View style={{ gap: 4, flex: 1, minWidth: 0 }}><AppText variant="small" color={colors.muted}>Seu contador de hoje</AppText><AppText variant="subtitle" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{lunchInProgress ? 'Pausa para o almoço' : ended ? 'Jornada encerrada' : 'Jornada em andamento'}</AppText></View><View style={{ flexShrink: 0 }}><StatusPill tone={ended ? 'teal' : workedMinutes >= 570 ? 'danger' : workedMinutes >= expectedWorkMinutes ? 'yellow' : 'teal'}>{lunchInProgress ? 'PAUSADO' : ended ? 'FINALIZADO' : 'AO VIVO'}</StatusPill></View></View>
           <AppText variant="hero" style={[styles.clock, { color: alertColor }]} accessibilityLabel={`Tempo trabalhado ${elapsed(workedSeconds)}`}>{elapsed(workedSeconds)}</AppText>
           <View style={styles.metricRow}><View style={{ flex: 1, gap: 3 }}><AppText variant="small" color={colors.muted}>Você já trabalhou</AppText><AppText variant="subtitle">{formatMinutesHHMM(workedMinutes)} hoje</AppText></View><View style={[styles.metricDivider, { backgroundColor: colors.border }]} /><View style={{ flex: 1, gap: 3 }}><AppText variant="small" color={colors.muted}>Faltam para o limite</AppText><AppText variant="subtitle" color={remainingMinutes <= 30 ? colors.error : colors.deepTeal}>{formatMinutesHHMM(remainingMinutes)}</AppText></View></View>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: alertColor }]} /></View>
+          <ClockProgressBar progress={progress} color={alertColor} height={12} />
           <View style={styles.etaRow}><MaterialCommunityIcons name="flag-checkered" size={18} color={colors.deepTeal} /><AppText variant="small" style={{ flex: 1 }}>{ended ? 'Saída registrada' : 'Horário-limite de saída projetado'}</AppText><AppText variant="subtitle" color={colors.deepTeal}>{ended && timeFor('saida') ? localTime(timeFor('saida')!.registrado_em) : projectedLabel}</AppText></View>
           {workedMinutes >= expectedWorkMinutes && workedMinutes < 570 ? <View style={[styles.alertBanner, { backgroundColor: workedMinutes >= 540 ? `${colors.coral}20` : `${colors.warning}2B` }]}><MaterialCommunityIcons name={workedMinutes >= 540 ? 'alert-circle-outline' : 'check-circle-outline'} size={21} color={workedMinutes >= 540 ? colors.error : colors.deepTeal} /><AppText variant="small" style={{ flex: 1, fontWeight: '600' }}>{workedMinutes >= 540 ? 'A jornada prevista foi concluída. Planeje sua saída.' : `Jornada prevista completa (${formatMinutesHHMM(expectedWorkMinutes)}). A partir daqui é hora extra.`}</AppText></View> : null}
           {shiftComplete ? <View style={[styles.alertBanner, { backgroundColor: `${colors.coral}20` }]}><MaterialCommunityIcons name="calendar-check-outline" size={21} color={colors.error} /><AppText variant="small" style={{ flex: 1, fontWeight: '700' }}>Sua jornada programada terminou às {activeSchedule.end_time}. Registre a saída no relógio da empresa e no aplicativo.</AppText></View> : null}
@@ -368,6 +370,7 @@ Enviado pelo Olha o Ponto.` }); }
         </SurfaceCard>
 
         <JourneyProgressCard onOpen={() => router.push('/jornada')} />
+        <SevenStepsCard civilDate={today} entries={sevenStepsEntries} statuses={sevenStepsStatuses} preferences={profile?.preferencias_alerta} />
 
         {lunchInProgress ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Bom almoço!</AppText><AppText variant="small" color={colors.muted}>{lunchReturnLabel ? `O intervalo de ${lunchMinutes} min termina às ${lunchReturnLabel}. O aviso será enviado ${lunchReturnWarningMinutes} min antes.` : `O contador está pausado durante o intervalo de ${lunchMinutes} minutos.`}</AppText></View></SurfaceCard> : null}
         {SHOW_LUNCH_SHARE_CARD ? <SurfaceCard style={{ gap: 10 }}>
@@ -377,9 +380,7 @@ Enviado pelo Olha o Ponto.` }); }
           <ActionButton title="Compartilhar previsão a partir de agora" variant="outline" onPress={() => void shareLunch(false)} loading={sharingLunch} icon={<MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.deepTeal} />} />
           <AppText variant="tiny" color={colors.muted}>Sem horário fixo: após bater a saída, o retorno é calculado pela hora real registrada mais {lunchMinutes} min de intervalo.</AppText>
         </SurfaceCard> : null}
-        <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       </>}
-      <SevenStepsCard civilDate={today} entries={sevenStepsEntries} statuses={sevenStepsStatuses} preferences={profile?.preferencias_alerta} />
       {shouldShowOutcome && error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
       {dayStatusNotice ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{dayStatusNotice}</AppText> : null}
       <HomeCommunications lunchMinutes={lunchMinutes} lunchStarted={lunchStarted} ended={ended} />
@@ -423,8 +424,6 @@ const styles = StyleSheet.create({
   clock: { fontVariant: ['tabular-nums'], letterSpacing: -1.3, textAlign: 'center', marginVertical: 2 },
   metricRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   metricDivider: { width: 1, height: 42 },
-  progressTrack: { height: 10, borderRadius: 999, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 999 },
   etaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 2 },
   alertBanner: { borderRadius: 15, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 10 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
