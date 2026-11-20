@@ -15,6 +15,7 @@ import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 import { loadDayStatuses, saveDayStatus, syncPendingDayStatuses } from '@/services/day-status-service';
 import { getCivilWeekday, getWeekDateRange } from '@/utils/day-status';
 import { JourneyProgressCard } from '@/components/WeeklyMissionCard';
+import { SevenStepsCard } from '@/components/SevenStepsCard';
 import { DayOccurrenceCard, DayOutcomeCard } from '@/components/DayOutcomeCard';
 import { deleteDayOccurrence, loadDayOccurrence, saveDayOccurrence } from '@/services/day-occurrence-service';
 import type { DayOccurrence, OccurrenceReason } from '@/types/app';
@@ -38,6 +39,7 @@ function elapsed(seconds: number) {
 }
 function friendlyDate(value: Date) { return new Intl.DateTimeFormat('pt-BR', { timeZone: ZONE, weekday: 'long', day: 'numeric', month: 'long' }).format(value); }
 function localTime(value: string) { return formatInTimeZone(new Date(value), ZONE, 'HH:mm'); }
+function shiftCivilDate(civilDate: string, amount: number) { const [year, month, day] = civilDate.split('-').map(Number); return new Date(Date.UTC(year, month - 1, day + amount, 12)).toISOString().slice(0, 10); }
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useAppColors();
@@ -147,13 +149,14 @@ export default function HomeScreen() {
     const months = [...new Set([weekRange.startDate.slice(0, 7), weekRange.endDate.slice(0, 7)])];
     const [entryResults, statusResult] = await Promise.all([
       Promise.all(months.map((month) => loadEntriesByMonth(`${month}-01`))),
-      loadDayStatuses(weekRange.startDate, weekRange.endDate),
+      loadDayStatuses(shiftCivilDate(today, -6), today),
     ]);
     const byId = new Map<string, TimeEntry>();
     for (const result of entryResults) for (const entry of result.data ?? []) byId.set(entry.id, entry);
+    mergeEntries([...byId.values()]);
     setWeekEntries([...byId.values()].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
     if (statusResult.data) setDayStatuses(statusResult.data);
-  }, [session?.user.id, weekRange.startDate, weekRange.endDate]);
+  }, [session?.user.id, today, weekRange.startDate, weekRange.endDate, mergeEntries]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -362,6 +365,7 @@ Enviado pelo Olha o Ponto.` }); }
         </SurfaceCard> : null}
         <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Controle pessoal de acompanhamento — não substitui o espelho oficial do empregador.</AppText>
       </>}
+      <SevenStepsCard civilDate={today} entries={storeEntries} statuses={dayStatuses} preferences={profile?.preferencias_alerta} />
       {shouldShowOutcome && error ? <AppText variant="small" color={colors.error} accessibilityRole="alert">{error}</AppText> : null}
       {dayStatusNotice ? <AppText variant="small" color={colors.deepTeal} accessibilityRole="alert">{dayStatusNotice}</AppText> : null}
       <HomeCommunications lunchMinutes={lunchMinutes} lunchStarted={lunchStarted} ended={ended} />

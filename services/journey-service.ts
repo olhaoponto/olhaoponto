@@ -56,16 +56,15 @@ export async function loadJourney(): Promise<JourneyState | null> {
   return local || { level: localLevel(userId), pieces: [] };
 }
 
-export async function awardPieceForEntry(entry: TimeEntry): Promise<JourneyState | null> {
+async function awardPiece(origin: JourneyPieceOrigin, data: string, batidaId: string | null = null): Promise<JourneyState | null> {
   const userId = await uid();
-  if (!userId || !entry.id || !entry.data) return null;
-  const origin = PUNCH_ORIGINS[entry.tipo];
+  if (!userId || !data) return null;
   const current = (await loadJourney()) || { level: localLevel(userId), pieces: [] };
-  if (current.pieces.some((piece) => piece.data === entry.data && piece.origem === origin)) return current;
+  if (current.pieces.some((piece) => piece.data === data && piece.origem === origin)) return current;
   const used = new Set(current.pieces.filter((piece) => piece.nivel === current.level.nivel).map((piece) => piece.indice));
   const index = Array.from({ length: PECAS_POR_QUEBRA_CABECA }, (_, item) => item).find((item) => !used.has(item));
   if (index === undefined) return current;
-  const piece: JourneyPiece = { id: `local-piece-${entry.id}`, usuario_id: userId, nivel: current.level.nivel, indice: index, origem: origin, data: entry.data, batida_id: entry.id, encaixada: false, encaixada_em: null };
+  const piece: JourneyPiece = { id: `local-piece-${origin}-${data}-${userId}`, usuario_id: userId, nivel: current.level.nivel, indice: index, origem: origin, data, batida_id: batidaId, encaixada: false, encaixada_em: null };
   const next = { ...current, pieces: [...current.pieces, piece] };
   await writeLocal(userId, next);
   try {
@@ -78,6 +77,15 @@ export async function awardPieceForEntry(entry: TimeEntry): Promise<JourneyState
     }
   } catch { /* mantém a peça local para sincronização posterior */ }
   return next;
+}
+
+export async function awardPieceForEntry(entry: TimeEntry): Promise<JourneyState | null> {
+  if (!entry.id || !entry.data) return null;
+  return awardPiece(PUNCH_ORIGINS[entry.tipo], entry.data, entry.id);
+}
+
+export async function awardBonusPiece(data: string): Promise<JourneyState | null> {
+  return awardPiece('bonus', data);
 }
 
 export async function placeJourneyPiece(pieceId: string): Promise<JourneyState | null> {
