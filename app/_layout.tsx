@@ -20,7 +20,6 @@ import { supabase } from '@/services/supabase';
 import { useAppStore } from '@/store/app-store';
 import { SchemeColors } from '@/constants/theme';
 import GlobalAlertOverlay from '@/components/GlobalAlertOverlay';
-import { AvatarUnlockModal } from '@/components/AvatarUnlockModal';
 import { getAuthRouteRedirect, isRouteProtected } from '@/utils/auth-route';
 import { checkSessionControl, recordUserPresence } from '@/services/session-control-service';
 
@@ -168,7 +167,6 @@ function AppStack() {
         <Stack.Screen name="conquistas" />
       </Stack>
       <GlobalAlertOverlay />
-      <AvatarUnlockModal />
       <StatusBar style="auto" />
     </>
   );

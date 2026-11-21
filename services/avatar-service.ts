@@ -5,11 +5,13 @@ import { getAuthenticatedSession } from '@/services/auth-session';
 import { loadJourney } from '@/services/journey-service';
 import { supabase } from '@/services/supabase';
 import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
+import { getAvatarAnnouncement } from '@/utils/avatar-unlock-state';
 
 const selectedKey = (userId: string) => avatarStorageKeys(userId).selected;
 const seenKey = (userId: string) => avatarStorageKeys(userId).seen;
 const piecesKey = (userId: string) => avatarStorageKeys(userId).pieces;
 const stepsKey = (userId: string) => avatarStorageKeys(userId).steps;
+const baselineKey = (userId: string) => `olhaponto:${userId}:avatares-baseline`;
 
 async function userId() { return (await getAuthenticatedSession()).session?.user.id ?? null; }
 async function readNumber(key: string) {
@@ -70,6 +72,19 @@ export async function getUnseenUnlockedAvatars(progress: AvatarProgress): Promis
   if (!uid) return [];
   const seen = new Set(await readIds(seenKey(uid)));
   return AVATARS.filter((avatar) => isUnlocked(avatar, progress) && !seen.has(avatar.id));
+}
+
+export async function prepareAvatarAnnouncements(progress: AvatarProgress): Promise<Avatar[]> {
+  const uid = await userId();
+  if (!uid) return [];
+  const [baseline, seen] = await Promise.all([AsyncStorage.getItem(baselineKey(uid)), readIds(seenKey(uid))]);
+  const unlocked = AVATARS.filter((avatar) => isUnlocked(avatar, progress));
+  const decision = getAvatarAnnouncement({ baselineDone: baseline === '1', unlockedIds: unlocked.map((avatar) => avatar.id), seenIds: seen });
+  const baselineSeen = new Set([...seen, ...decision.baselineIds]);
+  if (baseline !== '1') await AsyncStorage.setItem(baselineKey(uid), '1');
+  if (baselineSeen.size !== seen.length) await AsyncStorage.setItem(seenKey(uid), JSON.stringify([...baselineSeen]));
+  const announce = new Set(decision.announceIds);
+  return unlocked.filter((avatar) => announce.has(avatar.id));
 }
 
 export async function getUnlockedAvatars(progress: AvatarProgress): Promise<Avatar[]> {

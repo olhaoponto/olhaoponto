@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActionButton, AppText, SurfaceCard, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
-import { getProgress, getUnseenUnlockedAvatars, markAvatarsSeen, setSelectedAvatar } from '@/services/avatar-service';
+import { getProgress, markAvatarsSeen, prepareAvatarAnnouncements, setSelectedAvatar } from '@/services/avatar-service';
 import type { Avatar } from '@/utils/avatar-catalog';
 
 const rarityLabel = { comum: 'Comum', raro: 'Raro', epico: 'Épico', lendario: 'Lendário' } as const;
@@ -18,12 +18,16 @@ export function AvatarUnlockModal() {
   const [queue, setQueue] = useState<Avatar[]>([]);
   const [visible, setVisible] = useState(false);
   const scale = useRef(new Animated.Value(0.86)).current;
+  const evaluating = useRef(false);
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id || evaluating.current) return;
     let active = true;
-    void getProgress().then((progress) => getUnseenUnlockedAvatars(progress)).then((avatars) => {
-      if (active && avatars.length) { setQueue(avatars); setVisible(true); }
-    });
+    evaluating.current = true;
+    void getProgress().then((progress) => prepareAvatarAnnouncements(progress)).then(async (avatars) => {
+      if (!active || !avatars.length) return;
+      await markAvatarsSeen(avatars.map((avatar) => avatar.id));
+      if (active) { setQueue(avatars); setVisible(true); }
+    }).finally(() => { evaluating.current = false; });
     return () => { active = false; };
   }, [profile?.id, journeyVersion]);
   useEffect(() => {
@@ -33,8 +37,7 @@ export function AvatarUnlockModal() {
   }, [scale, visible]);
   const bulk = queue.length > 3;
   const current = bulk ? [...queue].sort((a, b) => ({ comum: 0, raro: 1, epico: 2, lendario: 3 }[b.raridade] - ({ comum: 0, raro: 1, epico: 2, lendario: 3 }[a.raridade])))[0] : queue[0];
-  const close = async (ids: string[]) => {
-    await markAvatarsSeen(ids);
+  const close = () => {
     setQueue((items) => bulk ? [] : items.slice(1));
     setVisible(!bulk && queue.length > 1);
   };
@@ -42,22 +45,22 @@ export function AvatarUnlockModal() {
     if (!current) return;
     await setSelectedAvatar(current.id);
     useAppStore.getState().bumpJourney();
-    await close(bulk ? queue.map((item) => item.id) : [current.id]);
+    close();
   };
   const seeCollection = async () => {
-    await close(queue.map((item) => item.id));
+    close();
     router.push('/avatares');
   };
   if (!current) return null;
-  return <Modal visible={visible} transparent animationType="fade" onRequestClose={() => void close(bulk ? queue.map((item) => item.id) : [current.id])}>
-    <View style={styles.backdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => void close(bulk ? queue.map((item) => item.id) : [current.id])} accessibilityRole="button" accessibilityLabel="Fechar desbloqueio de avatar" /><Animated.View style={{ transform: [{ scale }] }}><SurfaceCard style={styles.card}>
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+    <View style={styles.backdrop}><Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel="Fechar desbloqueio de avatar" /><Animated.View style={{ transform: [{ scale }] }}><SurfaceCard style={styles.card}>
       <MaterialCommunityIcons name="party-popper" size={28} color={colors.coral} />
       <AppText variant="subtitle" style={{ textAlign: 'center' }}>{bulk ? `Você desbloqueou ${queue.length} avatares!` : 'Parabéns! Você desbloqueou um avatar'}</AppText>
       <Image source={current.source} style={styles.image} />
       <AppText variant="title" style={{ textAlign: 'center' }}>{current.nome}</AppText>
       <AppText variant="small" color={rarityColor[current.raridade]} style={styles.rarity}>{rarityLabel[current.raridade]}</AppText>
       {bulk ? <ActionButton title="Ver coleção" onPress={() => void seeCollection()} /> : <ActionButton title="Usar agora" onPress={() => void useNow()} />}
-      {!bulk ? <ActionButton title="Depois" variant="outline" onPress={() => void close([current.id])} /> : null}
+      {!bulk ? <ActionButton title="Depois" variant="outline" onPress={close} /> : null}
     </SurfaceCard></Animated.View></View>
   </Modal>;
 }

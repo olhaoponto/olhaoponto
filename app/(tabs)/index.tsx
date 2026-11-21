@@ -29,6 +29,7 @@ import { HomeCommunications } from '@/components/HomeCommunications';
 import { checkForAppUpdate, type AppUpdate } from '@/services/update-service';
 import { ClockProgressBar } from '@/components/ClockProgressBar';
 import { StreakBadge } from '@/components/StreakBadge';
+import { AvatarUnlockModal } from '@/components/AvatarUnlockModal';
 import { evaluateAchievements, type UnlockedAchievement } from '@/services/achievements-service';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
@@ -330,6 +331,7 @@ Enviado pelo Olha o Ponto.` }); }
           </SurfaceCard>
           <StreakBadge />
           {latestAchievement ? <Pressable onPress={() => router.push('/conquistas' as never)} accessibilityRole="button" accessibilityLabel={`Última conquista: ${latestAchievement.titulo}`}><SurfaceCard tone="soft" style={styles.achievementShortcut}><AppText variant="tiny" color={colors.deepTeal}>Última conquista</AppText><AppText variant="small">{latestAchievement.icone} {latestAchievement.titulo} · ver medalhas</AppText></SurfaceCard></Pressable> : null}
+          <AvatarUnlockModal />
         </View>
       </ScreenShell>
     );
@@ -365,6 +367,7 @@ Enviado pelo Olha o Ponto.` }); }
         </SurfaceCard>
         <StreakBadge />
         {latestAchievement ? <Pressable onPress={() => router.push('/conquistas' as never)} accessibilityRole="button" accessibilityLabel={`Última conquista: ${latestAchievement.titulo}`}><SurfaceCard tone="soft" style={styles.achievementShortcut}><AppText variant="tiny" color={colors.deepTeal}>Última conquista</AppText><AppText variant="small">{latestAchievement.icone} {latestAchievement.titulo} · ver medalhas</AppText></SurfaceCard></Pressable> : null}
+        <AvatarUnlockModal />
 
           {profile?.preferencias_alerta?.alerta_pausa_almoco === true && workedMinutes >= lunchReminderMinutes && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou {formatMinutesHHMM(lunchReminderMinutes)}. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
         <SurfaceCard>
