@@ -85,6 +85,7 @@ export function AccountMenuButton() {
               </Pressable>
             </View>
             <StreakBadge compact />
+            <ActionButton title="Conquistas" variant="outline" onPress={() => { close(); router.push('/conquistas' as never); }} icon={<MaterialCommunityIcons name="medal-outline" size={19} color={colors.deepTeal} />} />
             <View style={styles.avatarPicker}>
               <UserAvatar size={64} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ alignSelf: 'stretch', width: '100%', maxWidth: '100%', flexGrow: 0 }} contentContainerStyle={styles.avatarStrip}>

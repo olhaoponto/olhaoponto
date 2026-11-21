@@ -29,6 +29,7 @@ import { HomeCommunications } from '@/components/HomeCommunications';
 import { checkForAppUpdate, type AppUpdate } from '@/services/update-service';
 import { ClockProgressBar } from '@/components/ClockProgressBar';
 import { StreakBadge } from '@/components/StreakBadge';
+import { evaluateAchievements, type UnlockedAchievement } from '@/services/achievements-service';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
@@ -75,6 +76,8 @@ export default function HomeScreen() {
   const [occurrenceTime, setOccurrenceTime] = useState('');
   const [savingOccurrence, setSavingOccurrence] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AppUpdate | null>(null);
+  const [latestAchievement, setLatestAchievement] = useState<UnlockedAchievement | null>(null);
+  const [newAchievement, setNewAchievement] = useState<UnlockedAchievement | null>(null);
   const { width, height } = useWindowDimensions();
   const rotationEnabled = profile?.preferencias_alerta?.rotacao_contador !== false;
   const today = getBahiaDate(now);
@@ -135,6 +138,13 @@ export default function HomeScreen() {
     void AsyncStorage.setItem(`olhaponto:${session.user.id}:update-dismissed-version`, availableUpdate.version).catch(() => undefined);
     setAvailableUpdate(null);
   };
+  const refreshAchievements = useCallback(async () => {
+    if (!session?.user.id) return;
+    const result = await evaluateAchievements(session.user.id);
+    setLatestAchievement(result.unlocked.at(-1) ?? null);
+    if (result.newlyUnlocked.length) setNewAchievement(result.newlyUnlocked.at(-1) ?? null);
+  }, [session?.user.id]);
+  useEffect(() => { void refreshAchievements(); }, [refreshAchievements]);
 
   const refreshDay = useCallback(async () => {
     if (!session?.user.id) return;
@@ -206,6 +216,7 @@ export default function HomeScreen() {
     const result = await insertTimeEntry({ tipo: nextPunch, registrado_em: stamp, horario_informado_manual: manual });
     setLoading(false);
     if (result.error || !result.data) { setError(result.error || 'Não foi possível salvar a batida.'); return; }
+    void refreshAchievements();
     const updated = [...todayEntries.filter((entry) => entry.id !== result.data!.id), result.data].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em));
     mergeEntries(updated);
     setWeekEntries((current) => [...current.filter((entry) => entry.data !== today || entry.id !== result.data!.id), result.data!].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
@@ -318,6 +329,7 @@ Enviado pelo Olha o Ponto.` }); }
             <AppText variant="small" color={colors.muted}>{ended && timeFor('saida') ? `Saída registrada às ${localTime(timeFor('saida')!.registrado_em)}` : `Jornada ${activeSchedule.start_time}–${activeSchedule.end_time} · almoço ${activeSchedule.lunch_minutes} min`}</AppText>
           </SurfaceCard>
           <StreakBadge />
+          {latestAchievement ? <Pressable onPress={() => router.push('/conquistas' as never)} accessibilityRole="button" accessibilityLabel={`Última conquista: ${latestAchievement.titulo}`}><SurfaceCard tone="soft" style={styles.achievementShortcut}><AppText variant="tiny" color={colors.deepTeal}>Última conquista</AppText><AppText variant="small">{latestAchievement.icone} {latestAchievement.titulo} · ver medalhas</AppText></SurfaceCard></Pressable> : null}
         </View>
       </ScreenShell>
     );
@@ -352,6 +364,7 @@ Enviado pelo Olha o Ponto.` }); }
           {shiftComplete ? <View style={[styles.alertBanner, { backgroundColor: `${colors.coral}20` }]}><MaterialCommunityIcons name="calendar-check-outline" size={21} color={colors.error} /><AppText variant="small" style={{ flex: 1, fontWeight: '700' }}>Sua jornada programada terminou às {activeSchedule.end_time}. Registre a saída no relógio da empresa e no aplicativo.</AppText></View> : null}
         </SurfaceCard>
         <StreakBadge />
+        {latestAchievement ? <Pressable onPress={() => router.push('/conquistas' as never)} accessibilityRole="button" accessibilityLabel={`Última conquista: ${latestAchievement.titulo}`}><SurfaceCard tone="soft" style={styles.achievementShortcut}><AppText variant="tiny" color={colors.deepTeal}>Última conquista</AppText><AppText variant="small">{latestAchievement.icone} {latestAchievement.titulo} · ver medalhas</AppText></SurfaceCard></Pressable> : null}
 
           {profile?.preferencias_alerta?.alerta_pausa_almoco === true && workedMinutes >= lunchReminderMinutes && workedMinutes < 480 && !lunchStarted && !ended ? <SurfaceCard tone="soft" style={styles.lunchCard}><MaterialCommunityIcons name="food-outline" size={22} color={colors.deepTeal} /><View style={{ flex: 1, gap: 3 }}><AppText variant="subtitle">Lembrete de pausa</AppText><AppText variant="small" color={colors.muted}>Você já trabalhou {formatMinutesHHMM(lunchReminderMinutes)}. Se for fazer o intervalo, registre a saída no relógio da empresa e no app.</AppText></View></SurfaceCard> : null}
         <SurfaceCard>
@@ -390,6 +403,7 @@ Enviado pelo Olha o Ponto.` }); }
       {/* Compartilhamento da instalação fica oculto temporariamente; o componente permanece preservado para reativação futura. */}
       {/* <AppDownloadShareCard /> */}
       <ConfettiBurst visible={celebrated} />
+      {newAchievement ? <Pressable onPress={() => setNewAchievement(null)} accessibilityRole="button" accessibilityLabel="Fechar aviso de nova conquista"><SurfaceCard style={styles.achievementToast}><AppText variant="tiny" color={colors.deepTeal}>Nova conquista!</AppText><AppText variant="subtitle">{newAchievement.icone} {newAchievement.titulo}</AppText><AppText variant="tiny" color={colors.muted}>Toque para fechar</AppText></SurfaceCard></Pressable> : null}
       <Modal visible={dayStatusModal} transparent animationType="fade" onRequestClose={() => setDayStatusModal(false)}>
         <View style={styles.accountMenuBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDayStatusModal(false)} accessibilityRole="button" accessibilityLabel="Fechar situação do dia" />
@@ -435,4 +449,6 @@ const styles = StyleSheet.create({
   manualToggle: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, padding: 4 },
   lunchCard: { flexDirection: 'row', alignItems: 'center' },
   celebration: { borderRadius: 16, padding: 14, gap: 3, alignItems: 'center' },
+  achievementShortcut: { padding: 12, gap: 2 },
+  achievementToast: { position: 'absolute', left: 20, right: 20, bottom: 24, zIndex: 10, gap: 3, borderColor: '#F2C648', borderWidth: 2 },
 });

@@ -16,6 +16,7 @@ import { addCivilDays, getWeekDateRange } from '@/utils/day-status';
 import { getActiveWorkSchedule } from '@/utils/work-schedules';
 import type { DayStatus, DayStatusRecord, TimeEntry } from '@/types/app';
 import { MirrorCalendar } from '@/components/MirrorCalendar';
+import { recordMissionEvent } from '@/services/mission-progress-service';
 
 const ZONE = 'America/Bahia';
 const TYPES: TimeEntry['tipo'][] = ['entrada', 'saida_almoco', 'volta_almoco', 'saida'];
@@ -114,6 +115,7 @@ export default function EspelhoScreen() {
   }, [mode, month, periodRange.endDate, periodRange.startDate, retryCount, sessionInitialized, mergeEntries, userId]);
 
   useFocusEffect(useCallback(() => {
+    if (userId) void recordMissionEvent(userId, getBahiaDate(new Date()), 'review_mirror');
     if (!focusInitialized.current) {
       focusInitialized.current = true;
       return undefined;

@@ -165,6 +165,7 @@ function AppStack() {
         <Stack.Screen name="configuracoes" />
         <Stack.Screen name="avatares" />
         <Stack.Screen name="sete-passos" />
+        <Stack.Screen name="conquistas" />
       </Stack>
       <GlobalAlertOverlay />
       <AvatarUnlockModal />
