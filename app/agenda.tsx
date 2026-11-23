@@ -9,13 +9,14 @@ import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, 
 import { loadAgendaMeetings, saveAgendaMeetings } from '@/services/agenda-service';
 import { loadCalendarPreferences, saveCalendarPreferences, type CalendarPreferences } from '@/services/calendar-preferences';
 import { createCalendarEvent, deleteCalendarEvent, getCalendarPermissionState, listCalendarEvents, listDeviceCalendars, requestCalendarAccess, updateCalendarEvent, type DeviceCalendar, type DeviceCalendarEvent } from '@/services/calendar-service';
-import { loadAllEntries, loadEntriesByDate } from '@/services/time-entry-service';
+import { loadEntriesByDateRange } from '@/services/time-entry-service';
 import { prepareLocalNotifications, scheduleMeetingNotifications } from '@/services/notification-service';
 import { useAppStore } from '@/store/app-store';
 import type { AgendaMeeting, TimeEntry } from '@/types/app';
 import { parseAgendaDateTime, parseAgendaReminderMinutes } from '@/utils/agenda';
 import { estimateTypicalEntryTime, projectWorkedRangeAt } from '@/utils/calendar-risk';
 import { getWorkScheduleForDate } from '@/utils/work-schedules';
+import { AGENDA_HISTORY_WINDOW_DAYS } from '@/utils/local-history-cache';
 
 const ZONE_FALLBACK = 'America/Bahia';
 const MINUTE_MS = 60_000;
@@ -62,6 +63,14 @@ function parseDateTimeInZone(dateText: string, timeText: string, timeZone: strin
   } catch { return null; }
 }
 function uniqueNativeKey(calendarId: string, eventId: string): string { return `${calendarId}::${eventId}`; }
+function shiftCivilDate(civilDate: string, amount: number): string {
+  const [year, month, day] = civilDate.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + amount, 12)).toISOString().slice(0, 10);
+}
+function agendaHistoryRange(timeZone: string): { start: string; end: string } {
+  const end = formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd');
+  return { start: shiftCivilDate(end, -(AGENDA_HISTORY_WINDOW_DAYS - 1)), end };
+}
 function formatMinutes(value: number): string {
   const safe = Math.max(0, Math.floor(value));
   return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
@@ -161,7 +170,8 @@ export default function AgendaScreen() {
       }, 0);
       return () => { active = false; clearTimeout(deferred); };
     }
-    void Promise.all([loadAgendaMeetings(userId), loadCalendarPreferences(userId), Notifications.getPermissionsAsync(), loadAllEntries()])
+    const historyRange = agendaHistoryRange(zone);
+    void Promise.all([loadAgendaMeetings(userId), loadCalendarPreferences(userId), Notifications.getPermissionsAsync(), loadEntriesByDateRange(historyRange.start, historyRange.end)])
       .then(async ([items, preferences, notificationPermission, entryResult]) => {
         if (!active) return;
         setMeetings(items);
@@ -201,7 +211,7 @@ export default function AgendaScreen() {
       .catch(() => { if (active) setError('Não foi possível carregar a Agenda neste aparelho.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [userId, profileId, soundEnabled, vibrationEnabled]);
+  }, [userId, profileId, soundEnabled, vibrationEnabled, zone]);
 
   const displayMeetings = useMemo<DisplayMeeting[]>(() => {
     const local: DisplayMeeting[] = meetings.map((meeting) => ({
@@ -241,8 +251,7 @@ export default function AgendaScreen() {
   }, [deviceCalendars]);
 
   const assessRisk = useCallback(async (date: string, endsAt: Date, expectedEntry?: string): Promise<RiskStatus | null> => {
-    const dateResult = await loadEntriesByDate(date);
-    const sameDay = dateResult.data ?? history.filter((entry) => entry.data === date);
+    const sameDay = history.filter((entry) => entry.data === date);
     const allEntries = history;
     const entryRecorded = sameDay.some((entry) => entry.tipo === 'entrada');
     const estimate = entryRecorded ? null : estimateTypicalEntryTime(allEntries, date, zone);
@@ -367,7 +376,8 @@ export default function AgendaScreen() {
       const calendars = await listDeviceCalendars();
       setDeviceCalendars(calendars);
       await refreshEvents(prefs.selectedCalendarIds, meetings, prefs.meetingReminderMinutes);
-      const result = await loadAllEntries();
+      const historyRange = agendaHistoryRange(zone);
+      const result = await loadEntriesByDateRange(historyRange.start, historyRange.end);
       if (result.data) setHistory(result.data);
       setNotice('Agenda atualizada a partir dos calendários selecionados no aparelho.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar a Agenda.'); }

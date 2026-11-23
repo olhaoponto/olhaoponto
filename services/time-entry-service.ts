@@ -248,7 +248,7 @@ export async function savePendingEntry(input: TimeEntryInput): Promise<ServiceRe
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
-export async function loadAllEntries(): Promise<ServiceResult<TimeEntry[]>> {
+export async function loadEntriesForCompleteHistory(): Promise<ServiceResult<TimeEntry[]>> {
   try {
     const uid = await currentUserId();
     const [cached, pending] = await Promise.all([readCache(uid), readPending(uid)]);

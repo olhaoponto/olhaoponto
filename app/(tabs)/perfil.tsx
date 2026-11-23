@@ -7,7 +7,7 @@ import { ActionButton, AppText, KeyboardModalContent, PageHeading, ScreenShell, 
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { changePassword, deleteAccount, updateEmail, updateProfile } from '@/services/auth-service';
 import { exportJson } from '@/services/export-service';
-import { loadAllEntries } from '@/services/time-entry-service';
+import { loadEntriesForCompleteHistory } from '@/services/time-entry-service';
 import { useAppStore } from '@/store/app-store';
 import { UserAvatar } from '@/components/UserAvatar';
 
@@ -57,7 +57,7 @@ export default function PerfilScreen() {
   const exportAll = async () => {
     if (!profile) return;
     setExporting(true); setError(''); setMessage('');
-    const result = await loadAllEntries();
+    const result = await loadEntriesForCompleteHistory();
     if (!result.data) { setError(result.error || 'Não foi possível buscar seus dados.'); setExporting(false); return; }
     try { await exportJson(profile, result.data, 'todos'); setMessage(result.error ? 'Dados salvos neste aparelho exportados; a conexão não permitiu atualizar o histórico.' : 'Arquivo JSON com todos os seus registros pronto para compartilhar.'); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível exportar seus dados.'); }

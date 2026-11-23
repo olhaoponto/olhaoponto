@@ -20,7 +20,7 @@ vi.mock('@/services/auth-session', () => ({
   SESSION_REQUIRED_MESSAGE: 'Sua sessão não está ativa.',
 }));
 vi.mock('@/services/time-entry-service', () => ({
-  loadAllEntries: vi.fn(async () => ({ data: entriesRef.current, error: null })),
+  loadEntriesForCompleteHistory: vi.fn(async () => ({ data: entriesRef.current, error: null })),
   loadEntriesByDateRange: vi.fn(async () => ({ data: entriesRef.current, error: null })),
 }));
 vi.mock('@/services/day-status-service', () => ({

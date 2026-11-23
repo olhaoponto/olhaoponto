@@ -5,7 +5,7 @@ import { ActionButton, AppText, ScreenShell } from '@/components/ui';
 import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
 import { RankingPodium } from '@/components/RankingPodium';
 import { useAppStore } from '@/store/app-store';
-import { loadAllEntries } from '@/services/time-entry-service';
+import { loadEntriesForCompleteHistory } from '@/services/time-entry-service';
 import { loadDayStatuses } from '@/services/day-status-service';
 import { getBahiaDate } from '@/utils/work-time';
 import { getWeekDateRange } from '@/utils/day-status';
@@ -24,7 +24,7 @@ export default function JourneyScreen() {
   useEffect(() => {
     let active = true;
     if (!session?.user.id) { setLoading(false); return () => { active = false; }; }
-    void Promise.all([loadAllEntries(), loadDayStatuses(weekRange.startDate, weekRange.endDate)]).then(([entryResult, statusResult]) => {
+    void Promise.all([loadEntriesForCompleteHistory(), loadDayStatuses(weekRange.startDate, weekRange.endDate)]).then(([entryResult, statusResult]) => {
       if (!active) return;
       setEntries(entryResult.data ?? []);
       setStatuses(statusResult.data ?? []);

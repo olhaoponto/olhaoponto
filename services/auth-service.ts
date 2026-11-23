@@ -173,4 +173,14 @@ export async function listProfiles(): Promise<AuthResult<Profile[]>> {
 async function clearLocalUserData(userId: string): Promise<void> {
   const { removable } = partitionUserDataKeys(await AsyncStorage.getAllKeys(), userId);
   if (removable.length) await AsyncStorage.multiRemove(removable);
+  const [{ invalidateTimeEntryCache }, { invalidateDayStatusCache }, { invalidateRecentHistory }, { invalidateAvatarCache }] = await Promise.all([
+    import('./time-entry-service'),
+    import('./day-status-service'),
+    import('./recent-history-cache'),
+    import('./avatar-service'),
+  ]);
+  invalidateTimeEntryCache();
+  invalidateDayStatusCache();
+  invalidateRecentHistory();
+  invalidateAvatarCache();
 }

@@ -6,9 +6,23 @@ import { loadJourney } from '@/services/journey-service';
 import { supabase } from '@/services/supabase';
 import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
 import { getAvatarAnnouncement } from '@/utils/avatar-unlock-state';
-import { getProgressCache, invalidateProgressCache, setProgressCache } from '@/utils/progress-cache';
+import { clearProgressCache, getProgressCache, invalidateProgressCache, setProgressCache } from '@/utils/progress-cache';
 
 export { invalidateProgressCache };
+
+export function invalidateAvatarCache(uid?: string): void {
+  if (uid) {
+    selectedCache.delete(uid);
+    selectedLoads.delete(uid);
+    progressLoads.delete(uid);
+    invalidateProgressCache(uid);
+    return;
+  }
+  selectedCache.clear();
+  selectedLoads.clear();
+  progressLoads.clear();
+  clearProgressCache();
+}
 
 const selectedKey = (userId: string) => avatarStorageKeys(userId).selected;
 const seenKey = (userId: string) => avatarStorageKeys(userId).seen;

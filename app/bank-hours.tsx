@@ -7,7 +7,7 @@ import { ActionButton, AppText, PageHeading, ScreenShell, SurfaceCard, TextField
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { useAppStore } from '@/store/app-store';
 import { addBalanceAdjustment, loadBalanceAdjustments } from '@/services/bank-hours-service';
-import { loadAllEntries } from '@/services/time-entry-service';
+import { loadEntriesForCompleteHistory } from '@/services/time-entry-service';
 import { calculateBankBalance } from '@/utils/bank-hours';
 import { formatMinutesHHMM } from '@/utils/work-time';
 import { getActiveWorkSchedule } from '@/utils/work-schedules';
@@ -32,7 +32,7 @@ export default function BankHoursScreen() {
   const profile = useAppStore((state) => state.profile);
   const session = useAppStore((state) => state.session);
   const sessionInitialized = useAppStore((state) => state.sessionInitialized);
-  const [entries, setEntries] = useState<Awaited<ReturnType<typeof loadAllEntries>>['data']>(null);
+  const [entries, setEntries] = useState<Awaited<ReturnType<typeof loadEntriesForCompleteHistory>>['data']>(null);
   const [adjustments, setAdjustments] = useState<BalanceAdjustment[]>([]);
   const [occurrences, setOccurrences] = useState<DayOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +55,7 @@ export default function BankHoursScreen() {
     setError('');
     try {
       const [entriesResult, adjustmentResult, occurrenceResult] = await withTimeout(
-        Promise.all([loadAllEntries(), loadBalanceAdjustments(), loadDayOccurrences()]),
+        Promise.all([loadEntriesForCompleteHistory(), loadBalanceAdjustments(), loadDayOccurrences()]),
         'A consulta demorou mais que o esperado. Confira a conexão e tente novamente.',
       );
       if (requestId !== requestVersion.current) return;
