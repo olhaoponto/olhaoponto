@@ -151,7 +151,7 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
       edges={["top", "bottom", "left", "right"]}
       contentStyle={[styles.page, { backgroundColor: "#E4F5F2" }]}
     >
-      <View style={Platform.OS === "web" ? styles.webViewport : undefined}>
+      <View style={Platform.OS === "web" ? styles.webViewport : styles.nativeViewport}>
         <Animated.View
           style={[
             styles.animatedContent,
@@ -344,6 +344,7 @@ export function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
 const styles = StyleSheet.create({
   page: { paddingHorizontal: 0, paddingVertical: 0 },
   animatedContent: { flex: 1 },
+  nativeViewport: { flex: 1 },
   webViewport: {
     flex: 1,
     justifyContent: "center",
