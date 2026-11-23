@@ -65,6 +65,7 @@ export default function EspelhoScreen() {
   const [retroReason, setRetroReason] = useState('');
   const [dayStatuses, setDayStatuses] = useState<DayStatusRecord[]>([]);
   const focusInitialized = useRef(false);
+  const lastLoaded = useRef<{ key: string; at: number } | null>(null);
 
   const userId = session?.user.id;
   const authUnavailable = sessionInitialized && !userId;
@@ -96,6 +97,7 @@ export default function EspelhoScreen() {
         if (!alive) return;
         if (result.data) mergeEntries(result.data);
         if (statusResult.data) setDayStatuses(statusResult.data);
+        lastLoaded.current = { key: `${userId}:${mode}:${periodRange.startDate}:${periodRange.endDate}`, at: Date.now() };
         const hasCurrentPeriodEntries = useAppStore.getState().entries.some((entry) => entry.data >= periodRange.startDate && entry.data <= periodRange.endDate);
         if (result.error && (result.data?.length || hasCurrentPeriodEntries)) {
           setSyncNotice('Sem conexão com o Supabase. Exibindo os registros salvos neste aparelho; tente sincronizar novamente.');
@@ -120,9 +122,11 @@ export default function EspelhoScreen() {
       focusInitialized.current = true;
       return undefined;
     }
+    const key = `${userId}:${mode}:${periodRange.startDate}:${periodRange.endDate}`;
+    if (lastLoaded.current?.key === key && Date.now() - lastLoaded.current.at < 60_000) return undefined;
     setRetryCount((value) => value + 1);
     return undefined;
-  }, []));
+  }, [mode, periodRange.endDate, periodRange.startDate, userId]));
 
   const periodEntries = useMemo(() => entries.filter((entry) => entry.data >= periodRange.startDate && entry.data <= periodRange.endDate), [entries, periodRange.endDate, periodRange.startDate]);
   const hasPeriodEntries = periodEntries.length > 0;
@@ -130,14 +134,19 @@ export default function EspelhoScreen() {
   const workSchedule = useMemo(() => getActiveWorkSchedule(profile?.preferencias_alerta, profile?.almoco_minutos ?? 60), [profile?.almoco_minutos, profile?.preferencias_alerta]);
   const dailyTotals = useMemo(() => calculateDailyTotals(periodEntries, new Date(), workSchedule), [periodEntries, workSchedule]);
   const totals = useMemo(() => calculatePeriodTotals(periodEntries, new Date(), workSchedule), [periodEntries, workSchedule]);
-  const totalByDay = new Map(dailyTotals.map((item) => [item.date, item]));
+  const totalByDay = useMemo(() => new Map(dailyTotals.map((item) => [item.date, item])), [dailyTotals]);
+  const entriesByDate = useMemo(() => {
+    const indexed = new Map<string, TimeEntry[]>();
+    for (const entry of periodEntries) indexed.set(entry.data, [...(indexed.get(entry.data) ?? []), entry]);
+    return indexed;
+  }, [periodEntries]);
   const dates = useMemo(() => {
     if (mode === 'week') return Array.from({ length: 7 }, (_, index) => addCivilDays(periodRange.startDate, index));
     const countDays = Number(periodRange.endDate.slice(-2));
     return Array.from({ length: countDays }, (_, index) => `${month}-${String(index + 1).padStart(2, '0')}`);
   }, [mode, month, periodRange.endDate, periodRange.startDate]);
   const statusByDate = useMemo(() => new Map(dayStatuses.map((item) => [item.data, item])), [dayStatuses]);
-  const countByDate = useMemo(() => new Map(dates.map((date) => [date, periodEntries.filter((entry) => entry.data === date).length])), [dates, periodEntries]);
+  const countByDate = useMemo(() => new Map(dates.map((date) => [date, entriesByDate.get(date)?.length ?? 0])), [dates, entriesByDate]);
   const statusDates = useMemo(() => new Set(dayStatuses.filter((item) => item.status !== 'working').map((item) => item.data)), [dayStatuses]);
   const periodTitle = mode === 'month' ? monthLabel(month) : weekLabel(periodRange.startDate, periodRange.endDate);
 
@@ -254,7 +263,7 @@ export default function EspelhoScreen() {
     finally { setExporting(''); }
   };
   const renderDayCard = (date: string) => {
-    const rows = periodEntries.filter((entry) => entry.data === date);
+    const rows = entriesByDate.get(date) ?? [];
     const daily = totalByDay.get(date);
     const status = statusByDate.get(date);
     const personalStatus = status?.status && status.status !== 'working' ? status.status : null;

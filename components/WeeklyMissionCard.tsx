@@ -92,7 +92,7 @@ function PuzzleBoard({ state, colors, onPlace }: { state: JourneyState; colors: 
   </View>;
 }
 
-export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMissionSummary; onOpenMirror: () => void }) {
+export const WeeklyMissionCard = memo(function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMissionSummary; onOpenMirror: () => void }) {
   const colors = useAppColors(); const insets = useSafeAreaInsets(); const journeyVersion = useAppStore((state) => state.journeyVersion); const pieceNotice = useAppStore((state) => state.pieceNotice); const clearPieceNotice = useAppStore((state) => state.clearPieceNotice); const [state, setState] = useState<JourneyState | null>(null); const [mapVisible, setMapVisible] = useState(false); const mapRef = useRef<ScrollView>(null);
   useEffect(() => { void Promise.resolve().then(async () => setState(await loadJourney())); }, [journeyVersion]); useEffect(() => { if (!pieceNotice) return undefined; const timer = setTimeout(clearPieceNotice, 2800); return () => clearTimeout(timer); }, [pieceNotice, clearPieceNotice]);
   const currentPieces = state?.pieces.filter((piece) => piece.nivel === state.level.nivel) ?? []; const earned = currentPieces.length; const nextIndex = Math.min(PECAS_POR_QUEBRA_CABECA - 1, earned); const fullPath = useMemo(() => mapPath(MAP_NODES), []); const traveledPath = useMemo(() => mapPath(MAP_NODES.slice(0, Math.max(2, nextIndex + 1))), [nextIndex]); const level = state?.level.nivel ?? 1; const completed = Boolean(state?.level.concluido_em);
@@ -109,7 +109,7 @@ export function WeeklyMissionCard({ summary, onOpenMirror }: { summary: WeeklyMi
     <ActionButton title="Abrir espelho" variant="secondary" onPress={onOpenMirror} icon={<MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.deepTeal} />} />
     <Modal visible={mapVisible} transparent animationType="slide" onRequestClose={() => setMapVisible(false)}><View style={styles.fullMapBackdrop}><View style={[styles.fullMapCard, { backgroundColor: colors.card, paddingBottom: Math.max(18, insets.bottom) }]}><View style={styles.modalTitle}><AppText variant="subtitle">Seu caminho · Nível {level}</AppText><Pressable onPress={() => setMapVisible(false)}><MaterialCommunityIcons name="close" size={24} color={colors.muted} /></Pressable></View><ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}><View style={styles.mapCanvas}><MapBackground level={level} colors={colors} /><Svg width={MAP_WIDTH} height={MAP_HEIGHT} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} style={StyleSheet.absoluteFill}><Path d={fullPath} fill="none" stroke={`${colors.muted}B0`} strokeWidth={7} strokeDasharray="3 12" /><Path d={traveledPath} fill="none" stroke={colors.teal} strokeWidth={9} /></Svg>{MAP_NODES.map((node) => <View key={node.index} style={[styles.mapNode, { left: node.x - NODE_SIZE / 2, top: node.y - NODE_SIZE / 2 }]}><View style={[styles.node, { width: NODE_SIZE, height: NODE_SIZE, borderRadius: 40, backgroundColor: node.index < earned ? colors.teal : `${colors.card}E8`, borderColor: node.index < earned ? colors.teal : colors.muted }]}><AppText variant="tiny" color={node.index < earned ? '#FFFFFF' : colors.muted}>{node.index + 1}</AppText></View></View>)}</View></ScrollView></View></View></Modal>
   </SurfaceCard>;
-}
+});
 
 export const JourneyProgressCard = memo(function JourneyProgressCard({ onOpen }: { onOpen: () => void }) {
   const colors = useAppColors();

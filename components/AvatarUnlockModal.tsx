@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import type { Avatar } from '@/utils/avatar-catalog';
 const rarityLabel = { comum: 'Comum', raro: 'Raro', epico: 'Épico', lendario: 'Lendário' } as const;
 const rarityColor = { comum: '#9CA3AF', raro: '#3B82F6', epico: '#8B5CF6', lendario: '#D4A72C' } as const;
 
-export function AvatarUnlockModal() {
+export const AvatarUnlockModal = memo(function AvatarUnlockModal() {
   const colors = useAppColors();
   const router = useRouter();
   const profile = useAppStore((state) => state.profile);
@@ -63,7 +63,7 @@ export function AvatarUnlockModal() {
       {!bulk ? <ActionButton title="Depois" variant="outline" onPress={close} /> : null}
     </SurfaceCard></Animated.View></View>
   </Modal>;
-}
+});
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'center', padding: 18, backgroundColor: '#081A1880' },

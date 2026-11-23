@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { InteractionManager, Keyboard, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
@@ -243,8 +243,7 @@ export default function AgendaScreen() {
   const assessRisk = useCallback(async (date: string, endsAt: Date, expectedEntry?: string): Promise<RiskStatus | null> => {
     const dateResult = await loadEntriesByDate(date);
     const sameDay = dateResult.data ?? history.filter((entry) => entry.data === date);
-    const historyResult = await loadAllEntries();
-    const allEntries = historyResult.data ?? history;
+    const allEntries = history;
     const entryRecorded = sameDay.some((entry) => entry.tipo === 'entrada');
     const estimate = entryRecorded ? null : estimateTypicalEntryTime(allEntries, date, zone);
     const startClock = entryRecorded ? undefined : expectedEntry || estimate?.time;
@@ -274,9 +273,9 @@ export default function AgendaScreen() {
     let active = true;
     const candidates = displayMeetings.filter((meeting) => meeting.endsAt && new Date(meeting.endsAt).getTime() > Date.now());
     if (!candidates.length) return;
-    void loadAllEntries().then((result) => {
-      const allEntries = result.data ?? history;
-      return Promise.all(candidates.map(async (meeting) => {
+    const allEntries = history;
+    const calculate = async () => {
+      const pairs = await Promise.all(candidates.map(async (meeting) => {
         const date = formatInTimeZone(new Date(meeting.startsAt), zone, 'yyyy-MM-dd');
         const dayEntries = allEntries.filter((entry) => entry.data === date);
         const hasStart = dayEntries.some((entry) => entry.tipo === 'entrada');
@@ -295,11 +294,11 @@ export default function AgendaScreen() {
             : `Pode levar a ${formatMinutes(projection.minimumMinutes)}–${formatMinutes(projection.maximumMinutes)} se o almoço não ocorrer antes do fim.`,
         } as RiskStatus] as const;
       }));
-    }).then((pairs) => {
       if (!active) return;
       const byId = new Map(pairs);
       setRiskMap(Object.fromEntries(byId));
-    }).catch(() => undefined);
+    };
+    InteractionManager.runAfterInteractions(() => { void calculate().catch(() => undefined); });
     return () => { active = false; };
   }, [displayMeetings, history, profile?.preferencias_alerta, profile?.almoco_minutos, zone]);
 

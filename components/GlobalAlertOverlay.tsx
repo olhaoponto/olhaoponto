@@ -65,6 +65,7 @@ export default function GlobalAlertOverlay() {
   const pulse = useSharedValue(0);
   const lastKey = useRef('');
   const previousCharge = useRef<string | undefined>(undefined);
+  const occurrenceLoading = useRef(false);
   const today = getBahiaDate(now);
   const todayEntries = useMemo(() => entries.filter((entry) => entry.data === today), [entries, today]);
   const completed = todayEntries.some((entry) => entry.tipo === 'saida');
@@ -93,8 +94,8 @@ export default function GlobalAlertOverlay() {
   const pulseStyle = useAnimatedStyle(() => ({ opacity: urgent ? 0.04 + pulse.value * 0.05 : 0.05, transform: [{ scale: urgent ? 0.99 + pulse.value * 0.02 : 1 }] }));
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    const listener = AppState.addEventListener('change', () => setNow(new Date()));
+    const timer = setInterval(() => { if (AppState.currentState === 'active') setNow(new Date()); }, 1000);
+    const listener = AppState.addEventListener('change', (state) => { if (state === 'active') setNow(new Date()); });
     return () => { clearInterval(timer); listener.remove(); };
   }, []);
 
@@ -109,10 +110,16 @@ export default function GlobalAlertOverlay() {
 
   useEffect(() => {
     let active = true;
-    const refreshOccurrence = () => { if (session?.user.id) void loadDayOccurrence(today).then((result) => { if (active) setOccurrence(result.data); }); else setOccurrence(null); };
+    const refreshOccurrence = () => {
+      if (!session?.user.id) { setOccurrence(null); return; }
+      if (AppState.currentState !== 'active' || occurrenceLoading.current) return;
+      occurrenceLoading.current = true;
+      void loadDayOccurrence(today).then((result) => { if (active) setOccurrence(result.data); }).finally(() => { occurrenceLoading.current = false; });
+    };
     refreshOccurrence();
-    const timer = setInterval(refreshOccurrence, 30_000);
-    return () => { active = false; clearInterval(timer); };
+    const timer = setInterval(refreshOccurrence, 60_000);
+    const listener = AppState.addEventListener('change', (state) => { if (state === 'active') refreshOccurrence(); });
+    return () => { active = false; clearInterval(timer); listener.remove(); };
   }, [session?.user.id, today, todayEntries.length]);
 
   useEffect(() => {

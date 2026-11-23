@@ -21,12 +21,14 @@ vi.mock('@/services/auth-session', () => ({
 }));
 vi.mock('@/services/time-entry-service', () => ({
   loadAllEntries: vi.fn(async () => ({ data: entriesRef.current, error: null })),
+  loadEntriesByDateRange: vi.fn(async () => ({ data: entriesRef.current, error: null })),
 }));
 vi.mock('@/services/day-status-service', () => ({
   loadDayStatuses: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 import { evaluateAchievements } from '@/services/achievements-service';
+import { invalidateRecentHistory } from '@/services/recent-history-cache';
 import { seedAchievementUnlocks } from '@/utils/achievement-announcement';
 import { getBahiaDate } from '@/utils/work-time';
 
@@ -75,10 +77,11 @@ describe('seedAchievementUnlocks', () => {
 });
 
 describe('evaluateAchievements', () => {
-  beforeEach(() => {
-    store.data.clear();
-    entriesRef.current = [];
-  });
+beforeEach(() => {
+  store.data.clear();
+  entriesRef.current = [];
+  invalidateRecentHistory();
+});
 
   it('grava em silêncio a primeira avaliação do usuário', async () => {
     entriesRef.current = punches(1);
@@ -102,6 +105,7 @@ describe('evaluateAchievements', () => {
     entriesRef.current = punches(1);
     await evaluateAchievements('user-1');
     entriesRef.current = punches(4);
+    invalidateRecentHistory('user-1');
     const result = await evaluateAchievements('user-1');
     expect(result.newlyUnlocked.map((item) => item.id)).toEqual(['dia_completo']);
     expect(result.unlocked.map((item) => item.id)).toEqual(['primeiro_ponto', 'dia_completo']);

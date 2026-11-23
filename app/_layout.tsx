@@ -101,7 +101,7 @@ function AppStack() {
       checking = false;
     };
     void verify();
-    const timer = setInterval(() => { void verify(); }, 30_000);
+    const timer = setInterval(() => { void verify(); }, 60_000);
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') void verify(); });
     return () => { alive = false; clearInterval(timer); listener.remove(); };
   }, [session?.user.id, session?.access_token, router]);

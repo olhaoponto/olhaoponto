@@ -44,7 +44,7 @@ export async function loadDayStatuses(startDate: string, endDate: string): Promi
     const key = cacheKey(uid);
     const cached = await readCache(key);
     const localRange = cached.filter((row) => row.data >= startDate && row.data <= endDate);
-    const response = await (supabase as any).from('day_statuses').select('user_id,data,status,atualizado_em').eq('user_id', uid).gte('data', startDate).lte('data', endDate).order('data').limit(31);
+    const response = await (supabase as any).from('day_statuses').select('user_id,data,status,atualizado_em').eq('user_id', uid).gte('data', startDate).lte('data', endDate).order('data').limit(120);
     if (response.error) return { data: localRange, error: friendly(response.error) };
     const merged = new Map<string, DayStatusRecord>();
     for (const row of (response.data ?? []) as DayStatusRecord[]) merged.set(row.data, row);

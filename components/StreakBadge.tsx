@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText, useAppColors } from '@/components/ui';
@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/app-store';
 import { loadStreak, markStreakMilestones, type StreakResult } from '@/services/streak-service';
 import { getBahiaDate } from '@/utils/work-time';
 
-export function StreakBadge({ compact = false }: { compact?: boolean }) {
+export const StreakBadge = memo(function StreakBadge({ compact = false }: { compact?: boolean }) {
   const colors = useAppColors();
   const profileId = useAppStore((state) => state.profile?.id);
   const [streak, setStreak] = useState<StreakResult | null>(null);
@@ -51,7 +51,7 @@ export function StreakBadge({ compact = false }: { compact?: boolean }) {
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 15, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#EF796714', width: '100%' },

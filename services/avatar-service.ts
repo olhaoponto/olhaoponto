@@ -13,6 +13,11 @@ const piecesKey = (userId: string) => avatarStorageKeys(userId).pieces;
 const stepsKey = (userId: string) => avatarStorageKeys(userId).steps;
 const baselineKey = (userId: string) => `olhaponto:${userId}:avatares-baseline`;
 
+const selectedCache = new Map<string, string | null>();
+const selectedLoads = new Map<string, Promise<string | null>>();
+const progressCache = new Map<string, AvatarProgress>();
+const progressLoads = new Map<string, Promise<AvatarProgress>>();
+
 async function userId() { return (await getAuthenticatedSession()).session?.user.id ?? null; }
 async function readNumber(key: string) {
   const value = Number(await AsyncStorage.getItem(key));
@@ -27,7 +32,24 @@ async function readIds(key: string) {
 
 export async function getSelectedAvatarId(): Promise<string | null> {
   const uid = await userId();
-  return uid ? AsyncStorage.getItem(selectedKey(uid)) : null;
+  if (!uid) return null;
+  if (selectedCache.has(uid)) return selectedCache.get(uid) ?? null;
+  const current = selectedLoads.get(uid);
+  if (current) return current;
+  const load = AsyncStorage.getItem(selectedKey(uid)).then((id) => {
+    selectedCache.set(uid, id);
+    selectedLoads.delete(uid);
+    return id;
+  }).catch((error) => {
+    selectedLoads.delete(uid);
+    throw error;
+  });
+  selectedLoads.set(uid, load);
+  return load;
+}
+
+export function getCachedSelectedAvatarId(uid: string | null | undefined): string | null {
+  return uid && selectedCache.has(uid) ? selectedCache.get(uid) ?? null : null;
 }
 
 export async function setSelectedAvatar(id: string | null): Promise<void> {
@@ -35,6 +57,7 @@ export async function setSelectedAvatar(id: string | null): Promise<void> {
   if (!uid) return;
   if (id) await AsyncStorage.setItem(selectedKey(uid), id);
   else await AsyncStorage.removeItem(selectedKey(uid));
+  selectedCache.set(uid, id);
 }
 
 export async function markAvatarsSeen(ids: readonly string[]): Promise<void> {
@@ -50,21 +73,33 @@ export async function recordNewPiece(): Promise<number> {
   if (!uid) return 0;
   const next = nextPieceCount(await readNumber(piecesKey(uid)));
   await AsyncStorage.setItem(piecesKey(uid), String(next));
+  progressCache.delete(uid);
   return next;
 }
 
 export async function getProgress(): Promise<AvatarProgress> {
   const uid = await userId();
   if (!uid) return { pecas: 0, ciclos: 0, puzzles: 0 };
-  const [counter, journey, steps, levels] = await Promise.all([
-    readNumber(piecesKey(uid)),
-    loadJourney(),
-    AsyncStorage.getItem(stepsKey(uid)).then(parseCycles),
+  const cached = progressCache.get(uid);
+  if (cached) return cached;
+  const current = progressLoads.get(uid);
+  if (current) return current;
+  const load = Promise.all([
+    readNumber(piecesKey(uid)), loadJourney(), AsyncStorage.getItem(stepsKey(uid)).then(parseCycles),
     supabase.from('jornada_niveis').select('concluido_em').eq('usuario_id', uid).not('concluido_em', 'is', null).limit(100),
-  ]);
-  const journeyPieces = journey?.pieces.length ?? 0;
-  const completedLevels = levels.error ? (journey?.level.concluido_em ? 1 : 0) : (levels.data?.length ?? 0);
-  return { pecas: Math.max(counter, journeyPieces), ciclos: steps, puzzles: completedLevels };
+  ]).then(([counter, journey, steps, levels]) => {
+    const journeyPieces = journey?.pieces.length ?? 0;
+    const completedLevels = levels.error ? (journey?.level.concluido_em ? 1 : 0) : (levels.data?.length ?? 0);
+    const progress = { pecas: Math.max(counter, journeyPieces), ciclos: steps, puzzles: completedLevels };
+    progressCache.set(uid, progress);
+    progressLoads.delete(uid);
+    return progress;
+  }).catch((error) => {
+    progressLoads.delete(uid);
+    throw error;
+  });
+  progressLoads.set(uid, load);
+  return load;
 }
 
 export async function getUnseenUnlockedAvatars(progress: AvatarProgress): Promise<Avatar[]> {

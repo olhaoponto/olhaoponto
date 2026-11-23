@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Linking, Modal, Platform, Pressable, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppState, InteractionManager, Linking, Modal, Platform, Pressable, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Network from 'expo-network';
 import * as Haptics from 'expo-haptics';
@@ -23,7 +23,7 @@ import { getExpectedWorkMinutesForDate, getWorkScheduleForDate, getScheduleEndAt
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { TabNavigationCard } from '@/components/TabNavigationCard';
 import { AccountMenuButton } from '@/components/AccountMenuButton';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { calculateLunchReturnTimes, getLunchReturnWarningMinutes } from '@/utils/lunch-return';
 import { HomeCommunications } from '@/components/HomeCommunications';
 import { checkForAppUpdate, type AppUpdate } from '@/services/update-service';
@@ -31,6 +31,8 @@ import { ClockProgressBar } from '@/components/ClockProgressBar';
 import { StreakBadge } from '@/components/StreakBadge';
 import { AvatarUnlockModal } from '@/components/AvatarUnlockModal';
 import { evaluateAchievements, type UnlockedAchievement } from '@/services/achievements-service';
+import { invalidateRecentHistory } from '@/services/recent-history-cache';
+import { recordHomeRender } from '@/utils/perf-metrics';
 // import { AppDownloadShareCard } from '@/components/AppDownloadShareCard';
 
 const ZONE = 'America/Bahia';
@@ -52,6 +54,7 @@ function friendlyDate(value: Date) { return new Intl.DateTimeFormat('pt-BR', { t
 function localTime(value: string) { return formatInTimeZone(new Date(value), ZONE, 'HH:mm'); }
 function shiftCivilDate(civilDate: string, amount: number) { const [year, month, day] = civilDate.split('-').map(Number); return new Date(Date.UTC(year, month - 1, day + amount, 12)).toISOString().slice(0, 10); }
 export default function HomeScreen() {
+  recordHomeRender();
   const router = useRouter();
   const colors = useAppColors();
   const profile = useAppStore((state) => state.profile);
@@ -147,12 +150,16 @@ export default function HomeScreen() {
     setAvailableUpdate(null);
   };
   const achievementsInFlight = useRef(false);
+  const achievementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAchievementAt = useRef(0);
   const refreshAchievements = useCallback(async () => {
     const userId = session?.user.id;
     if (!userId || achievementsInFlight.current) return;
+    if (Date.now() - lastAchievementAt.current < 5 * 60_000) return;
     achievementsInFlight.current = true;
     try {
       const result = await evaluateAchievements(userId);
+      lastAchievementAt.current = Date.now();
       setLatestAchievement(result.unlocked.at(-1) ?? null);
       const announce = result.newlyUnlocked.filter((item) => !announcedAchievementKeys.has(`${userId}:${item.id}`));
       if (!announce.length) return;
@@ -162,7 +169,16 @@ export default function HomeScreen() {
       achievementsInFlight.current = false;
     }
   }, [session?.user.id]);
-  useEffect(() => { void refreshAchievements(); }, [refreshAchievements]);
+  const scheduleAchievements = useCallback((debounced = false) => {
+    if (achievementTimer.current) clearTimeout(achievementTimer.current);
+    achievementTimer.current = setTimeout(() => {
+      InteractionManager.runAfterInteractions(() => { void refreshAchievements(); });
+    }, debounced ? 800 : 0);
+  }, [refreshAchievements]);
+  useEffect(() => {
+    scheduleAchievements();
+    return () => { if (achievementTimer.current) clearTimeout(achievementTimer.current); };
+  }, [scheduleAchievements]);
   useEffect(() => {
     if (!newAchievement) return undefined;
     const timer = setTimeout(() => setNewAchievement(null), ACHIEVEMENT_TOAST_MS);
@@ -207,9 +223,15 @@ export default function HomeScreen() {
     if (sevenStepsStatusResult.data) setSevenStepsStatuses(sevenStepsStatusResult.data);
   }, [session?.user.id, today, weekRange.startDate, weekRange.endDate, mergeEntries]);
 
+  useFocusEffect(useCallback(() => {
+    let active = AppState.currentState === 'active';
+    const timer = setInterval(() => { if (active && AppState.currentState === 'active') setNow(new Date()); }, 1000);
+    const listener = AppState.addEventListener('change', (state) => { active = state === 'active'; if (active) setNow(new Date()); });
+    return () => { clearInterval(timer); listener.remove(); };
+  }, [refreshDay, refreshWeek]));
+
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    const listener = AppState.addEventListener('change', (state) => { if (state === 'active') { setNow(new Date()); void syncPendingEntries(); void refreshDay(); void syncPendingDayStatuses().finally(() => refreshWeek()); } });
+    const listener = AppState.addEventListener('change', (state) => { if (state === 'active') { void syncPendingEntries(); void refreshDay(); void syncPendingDayStatuses().finally(() => refreshWeek()); } });
     const networkListener = Network.addNetworkStateListener((state) => {
       if (state.isConnected && state.isInternetReachable !== false) {
         void syncPendingEntries().finally(() => refreshDay());
@@ -218,7 +240,7 @@ export default function HomeScreen() {
     });
     void prepareLocalNotifications().then(setNotificationStatus).catch(() => setNotificationStatus({ granted: false, exactAlarms: false }));
     void Promise.resolve().then(refreshDay);
-    return () => { clearInterval(timer); listener.remove(); networkListener.remove(); };
+    return () => { listener.remove(); networkListener.remove(); };
   }, [refreshDay, refreshWeek]);
 
   useEffect(() => { void Promise.resolve().then(refreshWeek); }, [refreshWeek]);
@@ -239,7 +261,8 @@ export default function HomeScreen() {
     const result = await insertTimeEntry({ tipo: nextPunch, registrado_em: stamp, horario_informado_manual: manual });
     setLoading(false);
     if (result.error || !result.data) { setError(result.error || 'Não foi possível salvar a batida.'); return; }
-    void refreshAchievements();
+    scheduleAchievements(true);
+    if (session?.user.id) invalidateRecentHistory(session.user.id);
     const updated = [...todayEntries.filter((entry) => entry.id !== result.data!.id), result.data].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em));
     mergeEntries(updated);
     setWeekEntries((current) => [...current.filter((entry) => entry.data !== today || entry.id !== result.data!.id), result.data!].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));

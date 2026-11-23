@@ -3,14 +3,15 @@ import { Image, StyleSheet, View } from 'react-native';
 import { AppText, initials, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { getAvatar } from '@/utils/avatar-catalog';
-import { getSelectedAvatarId } from '@/services/avatar-service';
+import { getCachedSelectedAvatarId, getSelectedAvatarId } from '@/services/avatar-service';
 
 export function UserAvatar({ size = 42 }: { size?: number }) {
   const colors = useAppColors();
   const profile = useAppStore((state) => state.profile);
   const journeyVersion = useAppStore((state) => state.journeyVersion);
-  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [avatarId, setAvatarId] = useState<string | null>(() => getCachedSelectedAvatarId(profile?.id));
   useEffect(() => {
+    setAvatarId(getCachedSelectedAvatarId(profile?.id));
     let active = true;
     void getSelectedAvatarId().then((id) => { if (active) setAvatarId(id); });
     return () => { active = false; };

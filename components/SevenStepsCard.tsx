@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppText, SurfaceCard, useAppColors } from '@/components/ui';
 import type { AlertPreferences, DayStatusRecord, TimeEntry } from '@/types/app';
 import { loadSevenSteps, type SevenStepsState } from '@/services/seven-steps-service';
 
-export function SevenStepsCard({ civilDate, entries, statuses, preferences }: {
+export const SevenStepsCard = memo(function SevenStepsCard({ civilDate, entries, statuses, preferences }: {
   civilDate: string;
   entries: readonly TimeEntry[];
   statuses: readonly (Pick<DayStatusRecord, 'data'> & { status: string })[];
@@ -57,7 +57,7 @@ export function SevenStepsCard({ civilDate, entries, statuses, preferences }: {
       </SurfaceCard>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: { gap: 10, paddingVertical: 14 },

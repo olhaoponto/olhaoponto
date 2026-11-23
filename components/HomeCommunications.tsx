@@ -27,6 +27,7 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
   const profile = useAppStore((state) => state.profile);
   const userId = session?.user.id;
   const focused = useRef(false);
+  const refreshing = useRef(false);
   const [broadcasts, setBroadcasts] = useState<BroadcastMessage[]>([]);
   const [invites, setInvites] = useState<LunchInviteSummary[]>([]);
   const [pointReminders, setPointReminders] = useState<PointReminderSummary[]>([]);
@@ -46,12 +47,16 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
   const hiddenStorageKey = userId ? `olhaponto:${userId}:hidden-communications` : null;
 
   const refresh = useCallback(async () => {
-    if (!userId) { setBroadcasts([]); setInvites([]); setPointReminders([]); return; }
-    const result = await loadHomeCommunications(userId);
-    if (!focused.current || !result.data) return;
-    setBroadcasts(result.data.broadcasts);
-    setInvites(result.data.invites);
-    setPointReminders(result.data.pointReminders);
+    if (refreshing.current) return;
+    refreshing.current = true;
+    if (!userId) { setBroadcasts([]); setInvites([]); setPointReminders([]); refreshing.current = false; return; }
+    try {
+      const result = await loadHomeCommunications(userId);
+      if (!focused.current || !result.data) return;
+      setBroadcasts(result.data.broadcasts);
+      setInvites(result.data.invites);
+      setPointReminders(result.data.pointReminders);
+    } finally { refreshing.current = false; }
   }, [userId]);
 
   useFocusEffect(useCallback(() => {
@@ -62,7 +67,7 @@ export function HomeCommunications({ lunchMinutes, lunchStarted, ended }: {
       }).catch(() => { if (focused.current) setHiddenCommunicationIds(new Set()); });
     } else setHiddenCommunicationIds(new Set());
     void refresh();
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 30_000);
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 60_000);
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') void refresh(); });
     return () => { focused.current = false; clearInterval(timer); listener.remove(); };
   }, [hiddenStorageKey, refresh]));
