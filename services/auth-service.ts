@@ -6,6 +6,7 @@ import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-sessio
 import { supabase } from './supabase';
 import * as Notifications from 'expo-notifications';
 import { captureSessionControlBaseline } from './session-control-service';
+import { partitionUserDataKeys } from '@/utils/local-storage-keys';
 
 export interface AuthResult<T = void> { data: T | null; error: string | null; }
 
@@ -169,7 +170,6 @@ export async function listProfiles(): Promise<AuthResult<Profile[]>> {
 }
 
 async function clearLocalUserData(userId: string): Promise<void> {
-  const keys = await AsyncStorage.getAllKeys();
-  const userKeys = keys.filter((key) => key.startsWith(`olhaponto:${userId}:`));
-  if (userKeys.length) await AsyncStorage.multiRemove(userKeys);
+  const { removable } = partitionUserDataKeys(await AsyncStorage.getAllKeys(), userId);
+  if (removable.length) await AsyncStorage.multiRemove(removable);
 }

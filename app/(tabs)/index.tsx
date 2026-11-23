@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Modal, Platform, Pressable, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Network from 'expo-network';
@@ -35,6 +35,13 @@ import { evaluateAchievements, type UnlockedAchievement } from '@/services/achie
 
 const ZONE = 'America/Bahia';
 const SHOW_LUNCH_SHARE_CARD = false;
+/** O aviso de conquista fecha sozinho em 6 s. */
+const ACHIEVEMENT_TOAST_MS = 6_000;
+/**
+ * Conquistas já exibidas nesta execução do app. Fica fora do React para que o aviso
+ * apareça uma vez só por conquista, mesmo trocando de aba ou voltando para a tela Hoje.
+ */
+const announcedAchievementKeys = new Set<string>();
 const labels: Record<PunchType, string> = { entrada: 'Entrada', saida_almoco: 'Saída para almoço', volta_almoco: 'Volta do almoço', saida: 'Saída' };
 const order: PunchType[] = ['entrada', 'saida_almoco', 'volta_almoco', 'saida'];
 function elapsed(seconds: number) {
@@ -139,13 +146,28 @@ export default function HomeScreen() {
     void AsyncStorage.setItem(`olhaponto:${session.user.id}:update-dismissed-version`, availableUpdate.version).catch(() => undefined);
     setAvailableUpdate(null);
   };
+  const achievementsInFlight = useRef(false);
   const refreshAchievements = useCallback(async () => {
-    if (!session?.user.id) return;
-    const result = await evaluateAchievements(session.user.id);
-    setLatestAchievement(result.unlocked.at(-1) ?? null);
-    if (result.newlyUnlocked.length) setNewAchievement(result.newlyUnlocked.at(-1) ?? null);
+    const userId = session?.user.id;
+    if (!userId || achievementsInFlight.current) return;
+    achievementsInFlight.current = true;
+    try {
+      const result = await evaluateAchievements(userId);
+      setLatestAchievement(result.unlocked.at(-1) ?? null);
+      const announce = result.newlyUnlocked.filter((item) => !announcedAchievementKeys.has(`${userId}:${item.id}`));
+      if (!announce.length) return;
+      announce.forEach((item) => announcedAchievementKeys.add(`${userId}:${item.id}`));
+      setNewAchievement(announce.at(-1) ?? null);
+    } finally {
+      achievementsInFlight.current = false;
+    }
   }, [session?.user.id]);
   useEffect(() => { void refreshAchievements(); }, [refreshAchievements]);
+  useEffect(() => {
+    if (!newAchievement) return undefined;
+    const timer = setTimeout(() => setNewAchievement(null), ACHIEVEMENT_TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [newAchievement]);
 
   const refreshDay = useCallback(async () => {
     if (!session?.user.id) return;
@@ -341,6 +363,18 @@ Enviado pelo Olha o Ponto.` }); }
     <ScreenShell contentStyle={styles.page}>
       <PageHeading eyebrow="Seu acompanhamento diário" title={`Olá, ${name}!`} subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} right={<AccountMenuButton />} />
 
+      {newAchievement ? (
+        <Pressable onPress={() => setNewAchievement(null)} accessibilityRole="button" accessibilityLabel="Fechar aviso de nova conquista">
+          <SurfaceCard tone="soft" style={styles.achievementToast}>
+            <MaterialCommunityIcons name="trophy-outline" size={20} color={colors.deepTeal} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText variant="tiny" color={colors.deepTeal}>Nova conquista!</AppText>
+              <AppText variant="small" style={{ fontWeight: '700' }}>{newAchievement.icone} {newAchievement.titulo}</AppText>
+              <AppText variant="tiny" color={colors.muted}>Toque para fechar</AppText>
+            </View>
+          </SurfaceCard>
+        </Pressable>
+      ) : null}
       <TabNavigationCard />
       {Platform.OS === 'android' && availableUpdate ? <SurfaceCard tone="soft" style={{ gap: 8 }}>
         <AppText variant="subtitle">Nova versão {availableUpdate.version} disponível</AppText>
@@ -406,7 +440,6 @@ Enviado pelo Olha o Ponto.` }); }
       {/* Compartilhamento da instalação fica oculto temporariamente; o componente permanece preservado para reativação futura. */}
       {/* <AppDownloadShareCard /> */}
       <ConfettiBurst visible={celebrated} />
-      {newAchievement ? <Pressable onPress={() => setNewAchievement(null)} accessibilityRole="button" accessibilityLabel="Fechar aviso de nova conquista"><SurfaceCard style={styles.achievementToast}><AppText variant="tiny" color={colors.deepTeal}>Nova conquista!</AppText><AppText variant="subtitle">{newAchievement.icone} {newAchievement.titulo}</AppText><AppText variant="tiny" color={colors.muted}>Toque para fechar</AppText></SurfaceCard></Pressable> : null}
       <Modal visible={dayStatusModal} transparent animationType="fade" onRequestClose={() => setDayStatusModal(false)}>
         <View style={styles.accountMenuBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDayStatusModal(false)} accessibilityRole="button" accessibilityLabel="Fechar situação do dia" />
@@ -453,5 +486,5 @@ const styles = StyleSheet.create({
   lunchCard: { flexDirection: 'row', alignItems: 'center' },
   celebration: { borderRadius: 16, padding: 14, gap: 3, alignItems: 'center' },
   achievementShortcut: { padding: 12, gap: 2 },
-  achievementToast: { position: 'absolute', left: 20, right: 20, bottom: 24, zIndex: 10, gap: 3, borderColor: '#F2C648', borderWidth: 2 },
+  achievementToast: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderColor: '#F2C648', borderWidth: 2 },
 });

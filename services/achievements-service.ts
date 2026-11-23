@@ -6,6 +6,7 @@ import { loadDayStatuses } from '@/services/day-status-service';
 import { computeStreak } from '@/utils/streak';
 import { getBahiaDate } from '@/utils/work-time';
 import { evaluateAchievementRules } from '@/utils/achievements';
+import { seedAchievementUnlocks } from '@/utils/achievement-announcement';
 
 export type Achievement = {
   id: string;
@@ -41,8 +42,12 @@ export { evaluateAchievementRules } from '@/utils/achievements';
 export type { AchievementRuleInput } from '@/utils/achievements';
 
 async function readUnlocked(uid: string): Promise<UnlockedAchievement[]> {
+  return parseUnlocked(await AsyncStorage.getItem(storageKey(uid)));
+}
+
+function parseUnlocked(raw: string | null): UnlockedAchievement[] {
   try {
-    const parsed: unknown = JSON.parse((await AsyncStorage.getItem(storageKey(uid))) || '[]');
+    const parsed: unknown = JSON.parse(raw || '[]');
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item): item is UnlockedAchievement => Boolean(item && typeof item === 'object' && typeof (item as UnlockedAchievement).id === 'string' && typeof (item as UnlockedAchievement).desbloqueadaEm === 'string'));
   } catch { return []; }
@@ -83,11 +88,11 @@ export async function evaluateAchievements(uid?: string): Promise<{ unlocked: Un
   const userId = uid ?? session.session?.user.id;
   if (!userId) return { unlocked: [], newlyUnlocked: [] };
   const today = getBahiaDate(new Date());
-  const [entriesResult, statuses, missionEvents, previous, stepsRaw] = await Promise.all([
+  const [entriesResult, statuses, missionEvents, stored, stepsRaw] = await Promise.all([
     loadAllEntries(),
     loadStatusHistory(today),
     loadMissionHistory(userId),
-    readUnlocked(userId),
+    AsyncStorage.getItem(storageKey(userId)),
     AsyncStorage.getItem(stepsKey(userId)),
   ]);
   const entries = entriesResult.data ?? [];
@@ -98,10 +103,11 @@ export async function evaluateAchievements(uid?: string): Promise<{ unlocked: Un
     totalCycles = typeof parsed?.totalCycles === 'number' && Number.isFinite(parsed.totalCycles) ? parsed.totalCycles : 0;
   } catch { /* progresso inválido vale zero */ }
   const ruleIds = evaluateAchievementRules({ today, entries, statuses, streak, missionEvents, totalCycles });
+  const previous = parseUnlocked(stored);
   const known = new Set(previous.map((item) => item.id));
   const now = new Date().toISOString();
-  const newlyUnlocked = ACHIEVEMENTS.filter((item) => ruleIds.includes(item.id) && !known.has(item.id)).map((item) => ({ ...item, desbloqueadaEm: now }));
-  const unlocked = [...previous, ...newlyUnlocked];
-  if (newlyUnlocked.length) await AsyncStorage.setItem(storageKey(userId), JSON.stringify(unlocked));
-  return { unlocked, newlyUnlocked };
+  const pending = ACHIEVEMENTS.filter((item) => ruleIds.includes(item.id) && !known.has(item.id)).map((item) => ({ ...item, desbloqueadaEm: now }));
+  const seed = seedAchievementUnlocks({ raw: stored, previous, pending });
+  if (seed.unlocked.length !== previous.length) await AsyncStorage.setItem(storageKey(userId), JSON.stringify(seed.unlocked));
+  return { unlocked: seed.unlocked, newlyUnlocked: seed.announce };
 }
