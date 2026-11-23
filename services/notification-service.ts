@@ -11,14 +11,16 @@ import { getBahiaDate } from '../utils/work-time';
 import { isDayOccurrenceActive } from './day-occurrence-service';
 import { loadStreak } from './streak-service';
 
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: notification.request.content.sound !== null,
-    shouldSetBadge: false,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification) => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: notification.request.content.sound !== null,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 export type AlertRouteLevel = '8h' | '9h' | '9h30' | '9h45' | '9h50' | '10h';
 
@@ -32,6 +34,7 @@ function levelForMinute(minute: number, limitMinutes: number): AlertRouteLevel {
 }
 
 export async function prepareLocalNotifications(): Promise<{ granted: boolean; exactAlarms: boolean }> {
+  if (Platform.OS === 'web') return { granted: false, exactAlarms: false };
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('work-alerts', {
       name: 'Alertas de jornada',
@@ -72,6 +75,7 @@ function makeTrigger(date: Date, channelId: string): Notifications.DateTriggerIn
 }
 
 export async function cancelDayNotifications(): Promise<void> {
+  if (Platform.OS === 'web') return;
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const workTypes = new Set(['shift-complete', 'lunch-start', 'lunch-return', 'work-alert', 'streak-risk']);
   const identifiers = scheduled
@@ -84,6 +88,7 @@ export async function scheduleMeetingNotifications(
   meetings: readonly AgendaMeeting[],
   options: { userId: string; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date },
 ): Promise<{ permissionGranted: boolean; scheduledCount: number }> {
+  if (Platform.OS === 'web') return { permissionGranted: false, scheduledCount: 0 };
   const { userId, soundEnabled = true, vibrationEnabled = true, now = new Date() } = options;
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const oldIdentifiers = scheduled
@@ -133,6 +138,7 @@ export async function scheduleDayNotifications(
   entries: readonly TimeEntry[],
   options: { userId?: string; limitMinutes?: number; lunchMinutes?: number; lunchReturnWarningMinutes?: number; lunchReturnEnabled?: boolean; lunchReminderMinutes?: number; alertPreferences?: AlertPreferences | null; workSchedule?: WorkSchedule; normalWorkMinutes?: number; timeZone?: string; enabled?: boolean; soundEnabled?: boolean; vibrationEnabled?: boolean; now?: Date; dayClosed?: boolean },
 ): Promise<void> {
+  if (Platform.OS === 'web') return;
   const { userId, limitMinutes = 600, lunchMinutes = 60, lunchReturnWarningMinutes = 5, lunchReturnEnabled = true, lunchReminderMinutes, alertPreferences, workSchedule, normalWorkMinutes = 480, timeZone = 'America/Bahia', enabled = true, soundEnabled = true, vibrationEnabled = true, now = new Date(), dayClosed = false } = options;
   const pauseReminderMinutes = getLunchReminderMinutes(lunchReminderMinutes ?? alertPreferences?.lunch_reminder_minutes);
   await cancelDayNotifications();

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -288,6 +289,9 @@ export function StatusPill({
 export function ClockMascot({ size = 64, worried = false }: { size?: number; worried?: boolean }) {
   const colors = useAppColors();
   const ink = colors.foreground;
+  if (Platform.OS === 'web') {
+    return <Image source={require('../assets/images/mascot/clock-base.png')} style={{ width: size, height: size }} resizeMode="contain" accessibilityRole="image" accessibilityLabel={worried ? 'Mascote relógio preocupado' : 'Mascote relógio'} />;
+  }
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100" accessibilityLabel={worried ? 'Mascote relógio preocupado' : 'Mascote relógio'}>
       <Circle cx="50" cy="50" r="38" fill={colors.cream} stroke={colors.deepTeal} strokeWidth="8" />

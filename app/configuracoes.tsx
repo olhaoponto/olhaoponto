@@ -26,6 +26,7 @@ const WORK_ALERT_OPTIONS = [
   { key: 'alerta_9h50', label: 'Lembrete de 9h50' },
   { key: 'alerta_9h55', label: 'Lembrete de 9h55' },
 ] as const;
+const ANDROID_APK_URL = 'https://github.com/olhaoponto/olhaoponto/releases/latest/download/olhaoponto.apk';
 
 export default function ConfiguracoesScreen() {
   const colors = useAppColors();
@@ -148,6 +149,7 @@ export default function ConfiguracoesScreen() {
   };
 
   const toggleBiometrics = async (value: boolean) => {
+    if (Platform.OS === 'web') { setError('A biometria está disponível somente no APK mobile.'); return; }
     if (value) {
       const [hardware, enrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
       if (!hardware || !enrolled) { setError('Cadastre uma biometria nas configurações do aparelho antes de ativar esta opção.'); return; }
@@ -257,6 +259,11 @@ export default function ConfiguracoesScreen() {
         <AppText variant="subtitle">Créditos dos avatares</AppText>
         <AppText variant="small" color={colors.muted}>DiceBear; estilos Open Peeps, Micah, Adventurer, Toon Head, Big Smile, Avataaars, Lorelei, Notionists, Bottts, Pixel Art e Fun Emoji (licenças CC0, CC BY 4.0 e uso livre).</AppText>
       </SurfaceCard>
+
+      {Platform.OS === 'web' ? <SurfaceCard>
+        <AppText variant="subtitle">Sobre</AppText>
+        <ActionButton title="Baixar aplicativo para Android" variant="outline" onPress={() => { void Linking.openURL(ANDROID_APK_URL).catch(() => undefined); }} />
+      </SurfaceCard> : null}
 
       <AppText variant="tiny" color={colors.muted} style={{ textAlign: 'center' }}>Olha o Ponto · versão 1.0.1</AppText>
 

@@ -5,6 +5,7 @@ import { useAppStore } from '../store/app-store';
 import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { captureSessionControlBaseline } from './session-control-service';
 import { partitionUserDataKeys } from '@/utils/local-storage-keys';
 
@@ -44,7 +45,7 @@ export async function login(email: string, password: string): Promise<AuthResult
 
 export async function logout(): Promise<AuthResult> {
   const { session } = await getAuthenticatedSession();
-  await Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
+  if (Platform.OS !== 'web') await Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   useAppStore.getState().setSession(null);
   useAppStore.getState().setProfile(null);
