@@ -40,6 +40,7 @@ describe('chaves preservadas no logout', () => {
     'achievements',
     'streak-best',
     'streak-milestones',
+    'lunch-game',
     'mission-events:2026-11-16',
     'mission-events:2026-11-23',
   ];
