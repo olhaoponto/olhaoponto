@@ -1,15 +1,12 @@
 import type { TimeEntry } from "./work-time";
 
 export type LunchGameStatus = "locked" | "open" | "closed";
-
 export type LunchGameState = {
   status: LunchGameStatus;
   closesAt: string | null;
   remainingMs: number;
 };
-
 export type LunchGameDifficulty = "easy" | "medium" | "hard";
-
 export type LunchGamePiece = {
   id: string;
   pairId: string;
@@ -19,90 +16,60 @@ export type LunchGamePiece = {
   row: number;
   column: number;
 };
+export type LunchGameBoardMetrics = {
+  columns: number;
+  rows: number;
+  width: number;
+  height: number;
+};
 
 const LUNCH_WINDOW_MS = 60 * 60 * 1000;
+export const LUNCH_GAME_WINDOW_MS = LUNCH_WINDOW_MS;
+export const LUNCH_GAME_BOARD_VERSION = 2;
+export const LUNCH_GAME_TILE_WIDTH = 62;
+export const LUNCH_GAME_TILE_HEIGHT = 70;
+
 const ICONS = [
-  "coffee-outline",
-  "food-apple-outline",
-  "fruit-cherries",
-  "pizza",
-  "cupcake",
-  "bottle-soda-outline",
-  "hamburger",
-  "silverware-fork-knife",
-  "food-drumstick-outline",
-  "ice-cream",
-  "noodles",
-  "leaf",
-  "carrot",
-  "cheese",
-  "rice",
-  "cookie-outline",
-  "fish",
-  "egg-outline",
-  "food-croissant",
-  "mushroom-outline",
-  "popcorn",
-  "water-outline",
-  "food-variant",
-  "candy-outline",
+  "🍜", "🍎", "🍒", "🍕", "🧁", "🍔", "🍣", "🥐", "🥕",
+  "🧀", "🍪", "🐟", "🥚", "🍄", "🍿", "🐢", "🦊", "🦉",
 ] as const;
-const COLORS = [
-  "#EF7967",
-  "#F2C648",
-  "#24B3A2",
-  "#6C63FF",
-  "#E85AAD",
-  "#4AA3DF",
-  "#F28E2B",
-  "#7EBD5A",
-];
+const COLORS = ["#C85B43", "#D49B35", "#3A8B77", "#5E7C9E", "#A45C79", "#557E63"] as const;
+type LayerShape = { rows: number; columns: number };
+const SHAPES: Record<LunchGameDifficulty, readonly LayerShape[]> = {
+  easy: [{ rows: 4, columns: 4 }, { rows: 2, columns: 4 }],
+  medium: [{ rows: 6, columns: 4 }, { rows: 4, columns: 2 }, { rows: 2, columns: 2 }],
+  hard: [{ rows: 6, columns: 5 }, { rows: 4, columns: 3 }, { rows: 2, columns: 3 }],
+};
 
 function timeOf(value: string): number {
   const time = Date.parse(value);
   return Number.isFinite(time) ? time : 0;
 }
-
 function civilDateOf(value: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bahia",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    timeZone: "America/Bahia", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(value);
 }
-
 function entryDate(entry: TimeEntry): string | null {
   if (entry.data) return entry.data;
   const timestamp = timeOf(entry.registrado_em);
   return timestamp ? civilDateOf(new Date(timestamp)) : null;
 }
 
-export function getLunchGameState(
-  entries: readonly TimeEntry[],
-  now: Date = new Date(),
-): LunchGameState {
+export function getLunchGameState(entries: readonly TimeEntry[], now: Date = new Date()): LunchGameState {
   const today = civilDateOf(now);
   const todayEntries = entries.filter((entry) => entryDate(entry) === today);
   const lunchOut = todayEntries
     .filter((entry) => entry.tipo === "saida_almoco")
     .sort((a, b) => timeOf(a.registrado_em) - timeOf(b.registrado_em))[0];
   if (!lunchOut) return { status: "locked", closesAt: null, remainingMs: 0 };
-
   const outAt = timeOf(lunchOut.registrado_em);
   const lunchReturn = todayEntries
-    .filter(
-      (entry) =>
-        entry.tipo === "volta_almoco" && timeOf(entry.registrado_em) >= outAt,
-    )
+    .filter((entry) => entry.tipo === "volta_almoco" && timeOf(entry.registrado_em) >= outAt)
     .sort((a, b) => timeOf(a.registrado_em) - timeOf(b.registrado_em))[0];
-  if (lunchReturn)
-    return {
-      status: "closed",
-      closesAt: new Date(outAt + LUNCH_WINDOW_MS).toISOString(),
-      remainingMs: 0,
-    };
-
+  if (lunchReturn) {
+    return { status: "closed", closesAt: new Date(outAt + LUNCH_WINDOW_MS).toISOString(), remainingMs: 0 };
+  }
   const closesAtMs = outAt + LUNCH_WINDOW_MS;
   const remainingMs = Math.max(0, closesAtMs - now.getTime());
   return {
@@ -122,102 +89,102 @@ function seededShuffle<T>(items: readonly T[], seed: number): T[] {
   }
   return result;
 }
-
 function pairCountFor(difficulty: LunchGameDifficulty): number {
   return difficulty === "easy" ? 12 : difficulty === "medium" ? 18 : 24;
 }
-
-export function generateLunchGameBoard(
-  difficulty: LunchGameDifficulty,
-  seed = 1,
-): LunchGamePiece[] {
-  const pairs = pairCountFor(difficulty);
-  const layers = difficulty === "easy" ? 3 : difficulty === "medium" ? 3 : 4;
-  const pairsPerLayer = Math.ceil(pairs / layers);
-  const columns = difficulty === "hard" ? 12 : difficulty === "medium" ? 9 : 8;
-  const shuffledIcons = seededShuffle(ICONS, seed);
-  const pieces: LunchGamePiece[] = [];
-  let pairIndex = 0;
-
-  for (let layer = 0; layer < layers && pairIndex < pairs; layer += 1) {
-    const layerPairs = Math.min(pairsPerLayer, pairs - pairIndex);
-    let remainingPairs = layerPairs;
-    let row = 0;
-    while (remainingPairs > 0 && pairIndex < pairs) {
-      const rowPairs = Math.min(remainingPairs, Math.floor(columns / 2));
-      for (
-        let localPair = 0;
-        localPair < rowPairs && pairIndex < pairs;
-        localPair += 1
-      ) {
-        const left = localPair;
-        const right = columns - localPair - 1;
-        // Os pares são colocados na ordem inversa da remoção: as bordas
-        // correspondem ao primeiro par disponível e os bloqueadores ficam no fim.
-        const pairId = `pair-${pairs - 1 - pairIndex}`;
-        const icon = shuffledIcons[pairIndex % shuffledIcons.length];
-        const color = COLORS[pairIndex % COLORS.length];
-        const offset = layer % 2 === 0 ? 0 : 0.5;
-        pieces.push({
-          id: `piece-${pairIndex}-a`,
-          pairId,
-          icon,
-          color,
-          layer,
-          row,
-          column: left + offset,
-        });
-        pieces.push({
-          id: `piece-${pairIndex}-b`,
-          pairId,
-          icon,
-          color,
-          layer,
-          row,
-          column: right + offset,
-        });
-        pairIndex += 1;
-      }
-      remainingPairs -= rowPairs;
-      row += 1;
-    }
-  }
-  return pieces;
+export function getLunchGamePairCount(difficulty: LunchGameDifficulty): number {
+  return pairCountFor(difficulty);
+}
+export function getLunchGameBoardMetrics(difficulty: LunchGameDifficulty): LunchGameBoardMetrics {
+  const shapes = SHAPES[difficulty];
+  const columns = Math.max(...shapes.map((shape) => shape.columns));
+  const rows = Math.max(...shapes.map((shape) => shape.rows));
+  return { columns, rows, width: columns * LUNCH_GAME_TILE_WIDTH, height: rows * LUNCH_GAME_TILE_HEIGHT };
 }
 
-export function isLunchGamePieceFree(
-  piece: LunchGamePiece,
-  remaining: readonly LunchGamePiece[],
-): boolean {
-  const sameOrAbove = remaining.filter(
-    (candidate) => candidate.id !== piece.id,
-  );
-  const covered = sameOrAbove.some(
-    (candidate) =>
-      candidate.layer > piece.layer &&
-      Math.abs(candidate.column - piece.column) < 1.1 &&
-      Math.abs(candidate.row - piece.row) < 1.1,
+function makeSlots(difficulty: LunchGameDifficulty): LunchGamePiece[] {
+  const shapes = SHAPES[difficulty];
+  const metrics = getLunchGameBoardMetrics(difficulty);
+  return shapes.flatMap((shape, layer) => {
+    const columnOffset = (metrics.columns - shape.columns) / 2;
+    const rowOffset = (metrics.rows - shape.rows) / 2;
+    return Array.from({ length: shape.rows * shape.columns }, (_, index) => {
+      const row = Math.floor(index / shape.columns);
+      const column = index % shape.columns;
+      return {
+        id: `piece-${layer}-${row}-${column}`,
+        pairId: "", icon: "", color: COLORS[layer % COLORS.length], layer,
+        row: row + rowOffset, column: column + columnOffset,
+      };
+    });
+  });
+}
+
+export function isLunchGamePieceFree(piece: LunchGamePiece, remaining: readonly LunchGamePiece[]): boolean {
+  const covered = remaining.some((candidate) =>
+    candidate.id !== piece.id && candidate.layer > piece.layer &&
+    Math.abs(candidate.column - piece.column) < 1 && Math.abs(candidate.row - piece.row) < 1,
   );
   if (covered) return false;
-  const leftBlocked = sameOrAbove.some(
-    (candidate) =>
-      candidate.layer === piece.layer &&
-      candidate.row === piece.row &&
-      Math.abs(candidate.column - piece.column) < 1.1 &&
-      candidate.column < piece.column,
+  const leftBlocked = remaining.some((candidate) =>
+    candidate.id !== piece.id && candidate.layer === piece.layer &&
+    Math.abs(candidate.row - piece.row) < 0.01 &&
+    Math.abs(candidate.column - piece.column) < 1.01 && candidate.column < piece.column,
   );
-  const rightBlocked = sameOrAbove.some(
-    (candidate) =>
-      candidate.layer === piece.layer &&
-      candidate.row === piece.row &&
-      Math.abs(candidate.column - piece.column) < 1.1 &&
-      candidate.column > piece.column,
+  const rightBlocked = remaining.some((candidate) =>
+    candidate.id !== piece.id && candidate.layer === piece.layer &&
+    Math.abs(candidate.row - piece.row) < 0.01 &&
+    Math.abs(candidate.column - piece.column) < 1.01 && candidate.column > piece.column,
   );
   return !leftBlocked || !rightBlocked;
 }
 
-export function getLunchGamePairCount(difficulty: LunchGameDifficulty): number {
-  return pairCountFor(difficulty);
+export function generateLunchGameBoard(difficulty: LunchGameDifficulty, seed = 1): LunchGamePiece[] {
+  const slots = makeSlots(difficulty);
+  const remaining = [...slots];
+  const assignments = new Map<string, { pairId: string; icon: string; color: string }>();
+  const shuffledIcons = seededShuffle(ICONS, seed + 97);
+  const memo = new Set<string>();
+  const findRemovalOrder = (current: readonly LunchGamePiece[]): LunchGamePiece[] | null => {
+    if (!current.length) return [];
+    const key = current.map((piece) => piece.id).sort().join("|");
+    if (memo.has(key)) return null;
+    const free = current
+      .filter((piece) => isLunchGamePieceFree(piece, current))
+      .sort((a, b) => a.layer - b.layer || a.row - b.row || a.column - b.column);
+    for (let firstIndex = 0; firstIndex < free.length - 1; firstIndex += 1) {
+      for (let secondIndex = firstIndex + 1; secondIndex < free.length; secondIndex += 1) {
+        const first = free[firstIndex];
+        const second = free[secondIndex];
+        const next = current.filter((piece) => piece.id !== first.id && piece.id !== second.id);
+        const rest = findRemovalOrder(next);
+        if (rest) return [first, second, ...rest];
+      }
+    }
+    memo.add(key);
+    return null;
+  };
+  const removalOrder = findRemovalOrder(remaining);
+  if (!removalOrder) throw new Error(`Não foi possível montar o tabuleiro ${difficulty}`);
+  for (let pairIndex = 0; pairIndex < removalOrder.length / 2; pairIndex += 1) {
+    const first = removalOrder[pairIndex * 2];
+    const second = removalOrder[pairIndex * 2 + 1];
+    const assignment = {
+      pairId: `pair-${pairIndex}`,
+      icon: shuffledIcons[pairIndex % shuffledIcons.length],
+      color: COLORS[pairIndex % COLORS.length],
+    };
+    assignments.set(first.id, assignment);
+    assignments.set(second.id, assignment);
+  }
+  return slots.map((slot) => ({
+    ...slot,
+    ...(assignments.get(slot.id) ?? { pairId: "", icon: shuffledIcons[0], color: COLORS[0] }),
+  }));
 }
 
-export const LUNCH_GAME_WINDOW_MS = LUNCH_WINDOW_MS;
+export function undoLunchGamePair(removedIds: readonly string[], pairIds: readonly string[]): string[] {
+  const removed = new Set(removedIds);
+  for (const id of pairIds) removed.delete(id);
+  return [...removed];
+}

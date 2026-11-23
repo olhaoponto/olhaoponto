@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   generateLunchGameBoard,
+  getLunchGameBoardMetrics,
   getLunchGamePairCount,
   getLunchGameState,
   isLunchGamePieceFree,
+  undoLunchGamePair,
 } from "../utils/lunch-game";
 import type { TimeEntry } from "../utils/work-time";
 
@@ -77,17 +79,57 @@ describe("tabuleiro resolvível", () => {
     }
   });
 
-  it("mantém uma jogada livre e pode ser consumido sem deixar peças bloqueadas", () => {
+  it("mantém uma jogada livre e pode ser consumido em várias seeds", () => {
     for (const difficulty of ["easy", "medium", "hard"] as const) {
-      let remaining = generateLunchGameBoard(difficulty, 7);
-      while (remaining.length) {
-        const free = remaining.filter((piece) =>
-          isLunchGamePieceFree(piece, remaining),
-        );
-        expect(free.length).toBeGreaterThan(0);
-        const pairId = free[0].pairId;
-        remaining = remaining.filter((piece) => piece.pairId !== pairId);
+      for (const seed of [1, 7, 42, 99, 20261123]) {
+        let remaining = generateLunchGameBoard(difficulty, seed);
+        while (remaining.length) {
+          const free = remaining.filter((piece) =>
+            isLunchGamePieceFree(piece, remaining),
+          );
+          expect(free.length).toBeGreaterThanOrEqual(2);
+          const pairId = free.find((piece) =>
+            free.some((other) => other.pairId === piece.pairId && other.id !== piece.id),
+          )?.pairId;
+          expect(pairId).toBeDefined();
+          remaining = remaining.filter((piece) => piece.pairId !== pairId);
+        }
       }
     }
+  });
+
+  it("usa as formas fixas sem sobreposição na mesma camada", () => {
+    const expected = {
+      easy: [16, 8],
+      medium: [24, 8, 4],
+      hard: [30, 12, 6],
+    } as const;
+    for (const difficulty of ["easy", "medium", "hard"] as const) {
+      const board = generateLunchGameBoard(difficulty, 42);
+      const metrics = getLunchGameBoardMetrics(difficulty);
+      expect(metrics.width).toBe(metrics.columns * 62);
+      expect(metrics.height).toBe(metrics.rows * 70);
+      for (const [layer, count] of expected[difficulty].entries()) {
+        const pieces = board.filter((piece) => piece.layer === layer);
+        expect(pieces).toHaveLength(count);
+        for (const piece of pieces) {
+          expect(
+            pieces.filter(
+              (other) =>
+                other.id !== piece.id &&
+                other.row === piece.row &&
+                Math.abs(other.column - piece.column) < 1,
+            ),
+          ).toHaveLength(0);
+        }
+      }
+    }
+  });
+
+  it("desfaz somente o último par removido", () => {
+    expect(undoLunchGamePair(["a", "b", "c", "d"], ["c", "d"])).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });
