@@ -202,13 +202,20 @@ export default function HomeScreen() {
     const months = [...new Set([weekRange.startDate.slice(0, 7), weekRange.endDate.slice(0, 7)])];
     const sevenStepsStart = shiftCivilDate(today, -20);
     const sevenStepsMonths = [...new Set([sevenStepsStart.slice(0, 7), today.slice(0, 7)])];
+    const applyWeekCached = (cached: TimeEntry[]) => {
+      if (!cached.length) return;
+      setWeekEntries((current) => [...new Map([...current, ...cached].map((entry) => [entry.id, entry])).values()].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
+    };
+    const applySevenStepsCached = (cached: TimeEntry[]) => {
+      setSevenStepsEntries((current) => [...new Map([...current, ...cached].filter((entry) => entry.data >= sevenStepsStart && entry.data <= today).map((entry) => [entry.id, entry])).values()].sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)));
+    };
     const [entryResults, statusResult] = await Promise.all([
-      Promise.all(months.map((month) => loadEntriesByMonth(`${month}-01`))),
-      loadDayStatuses(shiftCivilDate(today, -6), today),
+      Promise.all(months.map((month) => loadEntriesByMonth(`${month}-01`, { onCached: applyWeekCached }))),
+      loadDayStatuses(shiftCivilDate(today, -6), today, { onCached: (cached) => setDayStatuses(cached) }),
     ]);
     const [sevenStepsEntryResults, sevenStepsStatusResult] = await Promise.all([
-      Promise.all(sevenStepsMonths.map((month) => loadEntriesByMonth(`${month}-01`))),
-      loadDayStatuses(sevenStepsStart, today),
+      Promise.all(sevenStepsMonths.map((month) => loadEntriesByMonth(`${month}-01`, { onCached: applySevenStepsCached }))),
+      loadDayStatuses(sevenStepsStart, today, { onCached: (cached) => setSevenStepsStatuses(cached) }),
     ]);
     const byId = new Map<string, TimeEntry>();
     for (const result of entryResults) for (const entry of result.data ?? []) byId.set(entry.id, entry);

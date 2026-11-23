@@ -32,7 +32,7 @@ export default function ResumoScreen() {
   const [retryCount, setRetryCount] = useState(0);
   const userId = session?.user.id;
   const authUnavailable = sessionInitialized && !userId;
-  const reportLoading = !sessionInitialized || (!authUnavailable && loading);
+  const reportLoading = !sessionInitialized || (!authUnavailable && loading && !entries.some((entry) => entry.data.startsWith(month)));
   const visibleError = authUnavailable ? 'Sua sessão não está ativa. Entre novamente para consultar o resumo.' : error;
 
   useEffect(() => {
@@ -43,7 +43,9 @@ export default function ResumoScreen() {
       if (!active) return;
       setLoading(true); setError(''); setSyncNotice('');
       try {
-        const result = await loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`));
+        const result = await loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`), {
+          onCached: (cached) => { if (active) mergeEntries(cached); },
+        });
         if (!active) return;
         if (result.data) mergeEntries(result.data);
         if (result.error && result.data?.length) {

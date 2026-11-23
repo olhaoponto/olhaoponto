@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
-import { recordSupabaseRequest } from '@/utils/perf-metrics';
+import { recordSupabaseRequest, recordSupabaseResponse } from '@/utils/perf-metrics';
+import { fetchWithTimeout } from '@/utils/supabase-fetch';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,6 +11,7 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 const CHUNK_SIZE = 1500;
+const SUPABASE_REQUEST_TIMEOUT_MS = 10_000;
 async function writeSecureChunks(key: string, value: string): Promise<void> {
   const chunks = Array.from({ length: Math.max(1, Math.ceil(value.length / CHUNK_SIZE)) }, (_, index) => value.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE));
   if (chunks.length > 20) throw new Error('Sessão excede o limite de armazenamento seguro.');
@@ -80,7 +82,10 @@ export const supabase = createClient(
       fetch: (input, init) => {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
         recordSupabaseRequest(url);
-        return fetch(input, init);
+        const startedAt = Date.now();
+        return fetchWithTimeout(input, init, SUPABASE_REQUEST_TIMEOUT_MS)
+          .then((response) => { recordSupabaseResponse(url, Date.now() - startedAt); return response; })
+          ;
       },
     },
   },

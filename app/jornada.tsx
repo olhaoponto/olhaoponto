@@ -5,7 +5,7 @@ import { ActionButton, AppText, ScreenShell } from '@/components/ui';
 import { WeeklyMissionCard } from '@/components/WeeklyMissionCard';
 import { RankingPodium } from '@/components/RankingPodium';
 import { useAppStore } from '@/store/app-store';
-import { loadEntriesForCompleteHistory } from '@/services/time-entry-service';
+import { loadEntriesByDateRange } from '@/services/time-entry-service';
 import { loadDayStatuses } from '@/services/day-status-service';
 import { getBahiaDate } from '@/utils/work-time';
 import { getWeekDateRange } from '@/utils/day-status';
@@ -24,7 +24,16 @@ export default function JourneyScreen() {
   useEffect(() => {
     let active = true;
     if (!session?.user.id) { setLoading(false); return () => { active = false; }; }
-    void Promise.all([loadEntriesForCompleteHistory(), loadDayStatuses(weekRange.startDate, weekRange.endDate)]).then(([entryResult, statusResult]) => {
+    const options = {
+      onCached: (cached: TimeEntry[]) => { if (active) { setEntries(cached); setLoading(false); } },
+    };
+    const statusOptions = {
+      onCached: (cached: DayStatusRecord[]) => { if (active) { setStatuses(cached); setLoading(false); } },
+    };
+    void Promise.all([
+      loadEntriesByDateRange(weekRange.startDate, weekRange.endDate, options),
+      loadDayStatuses(weekRange.startDate, weekRange.endDate, statusOptions),
+    ]).then(([entryResult, statusResult]) => {
       if (!active) return;
       setEntries(entryResult.data ?? []);
       setStatuses(statusResult.data ?? []);
@@ -37,6 +46,8 @@ export default function JourneyScreen() {
     <ActionButton title="Voltar para Hoje" variant="ghost" onPress={() => router.back()} icon={<MaterialCommunityIcons name="arrow-left" size={19} color="#0B6A63" />} />
     <AppText variant="title">Sua jornada</AppText>
     <AppText variant="small" color="#607875">O mapa e o quebra-cabeça ficam aqui para a Home continuar rápida e focada no registro do ponto.</AppText>
-    {loading ? <AppText variant="small" color="#607875">Carregando seu caminho…</AppText> : <><WeeklyMissionCard summary={summary} onOpenMirror={() => router.push('/(tabs)/espelho')} /><RankingPodium /></>}
+    {loading ? <AppText variant="small" color="#607875">Atualizando dados da semana…</AppText> : null}
+    <WeeklyMissionCard summary={summary} onOpenMirror={() => router.push('/(tabs)/espelho')} />
+    <RankingPodium />
   </ScreenShell>;
 }

@@ -50,6 +50,7 @@ describe('authenticated session recovery', () => {
 
   it('restores the fresh login session if the auth client temporarily reports none', async () => {
     const cached = makeSession('login-access-token');
+    cached.expires_at = Math.floor(Date.now() / 1000) + 10;
     const restored = makeSession('restored-access-token');
     mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     mocks.getStoredSession.mockReturnValue(cached);
@@ -60,6 +61,33 @@ describe('authenticated session recovery', () => {
     expect(mocks.setSession).toHaveBeenCalledWith({ access_token: cached.access_token, refresh_token: cached.refresh_token });
     expect(result).toEqual({ session: restored, error: null });
     expect(mocks.setStoreSession).toHaveBeenCalledWith(restored);
+  });
+
+  it('returns a fresh store session without calling Supabase', async () => {
+    const cached = makeSession('cached-access-token');
+    mocks.getStoredSession.mockReturnValue(cached);
+
+    const result = await getAuthenticatedSession();
+
+    expect(result).toEqual({ session: cached, error: null });
+    expect(mocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates concurrent session lookups', async () => {
+    const session = makeSession('shared-access-token');
+    let resolveLookup!: (value: { data: { session: Session }; error: null }) => void;
+    mocks.getSession.mockReturnValue(new Promise((resolve) => { resolveLookup = resolve; }));
+    mocks.getStoredSession.mockReturnValue(null);
+
+    const first = getAuthenticatedSession();
+    const second = getAuthenticatedSession();
+    resolveLookup({ data: { session }, error: null });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { session, error: null },
+      { session, error: null },
+    ]);
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
   });
 
   it('returns a clear re-login instruction when neither source has a session', async () => {

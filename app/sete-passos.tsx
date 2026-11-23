@@ -33,27 +33,32 @@ export default function SevenStepsScreen() {
     let active = true;
     const start = shiftCivilDate(today, -20);
     const months = [...new Set([start.slice(0, 7), today.slice(0, 7)])];
-    void Promise.all([
-      Promise.all(months.map((month) => loadEntriesByMonth(`${month}-01`))),
-      loadDayStatuses(start, today),
-    ]).then(async ([entryResults, statuses]) => {
+    let cachedEntries: TimeEntry[] = [];
+    let cachedStatuses: DayStatusRecord[] = [];
+    const updateState = async () => {
       const entriesById = new Map<string, TimeEntry>();
-      for (const result of entryResults) for (const entry of result.data ?? []) {
+      for (const entry of cachedEntries) {
         if (entry.data >= start && entry.data <= today) entriesById.set(entry.id, entry);
       }
       const next = await loadSevenSteps({
         civilDate: today,
         entries: [...entriesById.values()],
-        statuses: (statuses.data ?? []) as (Pick<DayStatusRecord, 'data'> & { status: string })[],
+        statuses: cachedStatuses as (Pick<DayStatusRecord, 'data'> & { status: string })[],
         preferences: profile.preferencias_alerta,
       });
       if (active) {
         setState(next);
         setLoading(false);
       }
-    }).catch(() => { if (active) setLoading(false); });
+    };
+    void Promise.all([
+      Promise.all(months.map((month) => loadEntriesByMonth(`${month}-01`, {
+        onCached: (cached) => { cachedEntries = [...cachedEntries.filter((entry) => !cached.some((item) => item.id === entry.id)), ...cached]; void updateState(); },
+      }))).then((results) => { cachedEntries = results.flatMap((result) => result.data ?? []); return updateState(); }),
+      loadDayStatuses(start, today, { onCached: (cached) => { cachedStatuses = cached; void updateState(); } }).then((result) => { cachedStatuses = result.data ?? cachedStatuses; return updateState(); }),
+    ]).catch(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [profile, today, jump]);
+  }, [profile, today]);
 
   const step = Math.min(state?.step ?? 0, 7);
   const currentIndex = state?.completed ? 6 : Math.min(step, 6);
@@ -113,9 +118,8 @@ export default function SevenStepsScreen() {
       </SurfaceCard>
       <View onLayout={({ nativeEvent }) => setSceneW(nativeEvent.layout.width)} style={styles.sceneWrap} accessibilityLabel="Caminho do Sete Passos no rio">
         <SceneArt step={step} completed={!!state?.completed} />
-        {!loading && state && !state.completed && ringStyle ? <Animated.View style={[styles.currentRing, ringStyle]} /> : null}
-        {!loading && state && mascotStyle ? <Animated.View style={[styles.mascot, mascotStyle]}><Image source={MASCOT} resizeMode="contain" style={styles.mascotImage} accessibilityLabel="Mascote relógio sobre a pedra atual" /></Animated.View> : null}
-        {loading ? <View style={styles.loading}><AppText variant="small" color="#FFFFFF">Preparando seu caminho...</AppText></View> : null}
+        {!state?.completed && ringStyle ? <Animated.View style={[styles.currentRing, ringStyle]} /> : null}
+        {mascotStyle ? <Animated.View style={[styles.mascot, mascotStyle]}><Image source={MASCOT} resizeMode="contain" style={styles.mascotImage} accessibilityLabel="Mascote relógio sobre a pedra atual" /></Animated.View> : null}
       </View>
       {state?.completed ? <SurfaceCard tone="soft" style={styles.message}><AppText variant="subtitle" color={colors.deepTeal}>Parabéns, você chegou ao fim!</AppText><AppText variant="small" color={colors.muted}>Seu desafio foi concluído e uma peça bônus foi adicionada à jornada.</AppText></SurfaceCard> : <AppText variant="small" color={colors.muted} style={styles.gentle}>Cada dia resolvido conta um passo. Vá no seu ritmo.</AppText>}
     </ScreenShell>

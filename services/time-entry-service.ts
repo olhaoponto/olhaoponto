@@ -6,8 +6,11 @@ import { supabase } from './supabase';
 import { awardPieceForEntry } from './journey-service';
 import { useAppStore } from '@/store/app-store';
 import { pruneTimeEntries, rowsChanged } from '@/utils/local-history-cache';
+import { recordCacheFirst } from '@/utils/perf-metrics';
+import { serveCached } from '@/utils/cache-first';
 
 export interface ServiceResult<T> { data: T | null; error: string | null; }
+export interface CacheLoadOptions<T> { onCached?: (rows: T[]) => void; }
 export type TimeEntryInput = Pick<TimeEntry, 'tipo'> & Partial<Pick<TimeEntry, 'registrado_em' | 'horario_informado_manual' | 'editado' | 'justificativa'>> & { user_id?: never; data?: never };
 const friendly = (error: unknown) => {
   const message = error instanceof Error ? error.message : 'Não foi possível concluir a operação.';
@@ -79,12 +82,15 @@ async function currentUserId(): Promise<string> {
 }
 
 type Query = (userId: string) => PromiseLike<{ data: TimeEntry[] | null; error: { message: string } | null }>;
-async function cachedThenRemote(query: Query, matches: (entry: TimeEntry) => boolean): Promise<ServiceResult<TimeEntry[]>> {
+async function cachedThenRemote(query: Query, matches: (entry: TimeEntry) => boolean, options?: CacheLoadOptions<TimeEntry>): Promise<ServiceResult<TimeEntry[]>> {
   try {
     const uid = await currentUserId();
     const [allCached, allPending] = await withCacheLock(uid, () => Promise.all([readCache(uid), readPending(uid)]));
     const cached = allCached.filter(matches);
     const pending = allPending.filter(matches);
+    const cachedRows = [...cached];
+    for (const item of pending) if (!cachedRows.some((entry) => entry.id === item.id)) cachedRows.push(item);
+    if (options?.onCached) { recordCacheFirst(); serveCached(cachedRows.sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)), options.onCached); }
     const remote = await query(uid);
     if (remote.error) {
       const merged = [...cached];
@@ -103,15 +109,16 @@ async function cachedThenRemote(query: Query, matches: (entry: TimeEntry) => boo
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
-export const loadEntriesByDate = (date: string | Date) => {
+export const loadEntriesByDate = (date: string | Date, options?: CacheLoadOptions<TimeEntry>) => {
   const day = civilDate(date);
   return cachedThenRemote(
     (uid) => supabase.from('time_entries').select('*').eq('user_id', uid).eq('data', day).order('registrado_em'),
     (entry) => entry.data === day,
+    options,
   );
 };
 
-export const loadEntriesByMonth = (month: string | Date) => {
+export const loadEntriesByMonth = (month: string | Date, options?: CacheLoadOptions<TimeEntry>) => {
   const civil = civilDate(month);
   const start = `${civil.slice(0, 7)}-01`;
   const [year, mon] = civil.slice(0, 7).split('-').map(Number);
@@ -121,10 +128,11 @@ export const loadEntriesByMonth = (month: string | Date) => {
   return cachedThenRemote(
     (uid) => supabase.from('time_entries').select('*').eq('user_id', uid).gte('data', start).lte('data', end).order('registrado_em'),
     matches,
+    options,
   );
 };
 
-export const loadEntriesByDateRange = async (startDate: string | Date, endDate: string | Date): Promise<ServiceResult<TimeEntry[]>> => {
+export const loadEntriesByDateRange = async (startDate: string | Date, endDate: string | Date, options?: CacheLoadOptions<TimeEntry>): Promise<ServiceResult<TimeEntry[]>> => {
   const start = civilDate(startDate);
   const end = civilDate(endDate);
   if (start > end) return { data: null, error: 'O intervalo informado é inválido.' };
@@ -132,6 +140,7 @@ export const loadEntriesByDateRange = async (startDate: string | Date, endDate: 
   return cachedThenRemote(
     (uid) => supabase.from('time_entries').select('*').eq('user_id', uid).gte('data', start).lte('data', end).order('registrado_em'),
     matches,
+    options,
   );
 };
 

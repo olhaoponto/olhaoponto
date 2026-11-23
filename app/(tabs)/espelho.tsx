@@ -90,9 +90,9 @@ export default function EspelhoScreen() {
       try {
         const [result, statusResult] = await Promise.all([
           mode === 'month'
-            ? loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`))
-            : loadEntriesByDateRange(periodRange.startDate, periodRange.endDate),
-          loadDayStatuses(periodRange.startDate, periodRange.endDate),
+            ? loadEntriesByMonth(new Date(`${month}-15T12:00:00Z`), { onCached: (cached) => { if (alive) mergeEntries(cached); } })
+            : loadEntriesByDateRange(periodRange.startDate, periodRange.endDate, { onCached: (cached) => { if (alive) mergeEntries(cached); } }),
+          loadDayStatuses(periodRange.startDate, periodRange.endDate, { onCached: (cached) => { if (alive) setDayStatuses(cached); } }),
         ]);
         if (!alive) return;
         if (result.data) mergeEntries(result.data);
