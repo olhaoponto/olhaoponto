@@ -4,7 +4,9 @@ import {
   getLunchGameBoardMetrics,
   getLunchGamePairCount,
   getLunchGameState,
+  hasFreeLunchGameMove,
   isLunchGamePieceFree,
+  reshuffleLunchGameEmojis,
   undoLunchGamePair,
 } from "../utils/lunch-game";
 import type { TimeEntry } from "../utils/work-time";
@@ -64,6 +66,13 @@ describe("estado do Mahjong do almoço", () => {
 });
 
 describe("tabuleiro resolvível", () => {
+  function structure(board: ReturnType<typeof generateLunchGameBoard>): string {
+    return [...new Set(board.map((piece) => piece.pairId))]
+      .map((pairId) => `${pairId}:${board.filter((piece) => piece.pairId === pairId).map((piece) => piece.id).sort().join(",")}`)
+      .sort()
+      .join("|");
+  }
+
   it("gera dois exemplares de cada par nas três dificuldades", () => {
     for (const difficulty of ["easy", "medium", "hard"] as const) {
       const board = generateLunchGameBoard(difficulty, 42);
@@ -131,5 +140,38 @@ describe("tabuleiro resolvível", () => {
       "a",
       "b",
     ]);
+  });
+
+  it("espalha os pares de forma diferente para seeds diferentes", () => {
+    for (const difficulty of ["easy", "medium", "hard"] as const) {
+      const structures = [1, 7, 42, 99].map((seed) =>
+        structure(generateLunchGameBoard(difficulty, seed)),
+      );
+      expect(new Set(structures).size).toBeGreaterThan(1);
+    }
+  });
+
+  it("detecta quando não há par de peças livres com o mesmo emoji", () => {
+    const pieces = [
+      { id: "a", pairId: "a", icon: "🍎", color: "#000", layer: 0, row: 0, column: 0 },
+      { id: "b", pairId: "b", icon: "🍒", color: "#000", layer: 0, row: 0, column: 1 },
+    ];
+    expect(hasFreeLunchGameMove(pieces)).toBe(false);
+    expect(hasFreeLunchGameMove(pieces.map((piece) => ({ ...piece, icon: "🍎" })))).toBe(true);
+  });
+
+  it("reembaralha somente peças restantes e preserva a partida", () => {
+    const board = generateLunchGameBoard("medium", 42);
+    const removedIds = board.slice(0, 2).map((piece) => piece.id);
+    const reshuffled = reshuffleLunchGameEmojis(board, removedIds, 99);
+    expect(reshuffled.map((piece) => piece.id)).toEqual(board.map((piece) => piece.id));
+    expect(reshuffled.map((piece) => piece.pairId)).toEqual(board.map((piece) => piece.pairId));
+    expect(reshuffled.filter((piece) => removedIds.includes(piece.id))).toEqual(
+      board.filter((piece) => removedIds.includes(piece.id)),
+    );
+    const active = reshuffled.filter((piece) => !removedIds.includes(piece.id));
+    expect(hasFreeLunchGameMove(active)).toBe(true);
+    const free = active.filter((piece) => isLunchGamePieceFree(piece, active));
+    expect(free.some((piece) => free.some((other) => other.id !== piece.id && other.icon === piece.icon))).toBe(true);
   });
 });

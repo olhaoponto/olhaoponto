@@ -5,7 +5,6 @@ import {
   AccessibilityInfo,
   AppState,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -16,7 +15,6 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   FadeOut,
-  Layout,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -30,10 +28,12 @@ import {
   getLunchGameBoardMetrics,
   getLunchGamePairCount,
   getLunchGameState,
+  hasFreeLunchGameMove,
   isLunchGamePieceFree,
   LUNCH_GAME_BOARD_VERSION,
   LUNCH_GAME_TILE_HEIGHT,
   LUNCH_GAME_TILE_WIDTH,
+  reshuffleLunchGameEmojis,
   type LunchGameDifficulty,
   type LunchGamePiece,
 } from "@/utils/lunch-game";
@@ -80,19 +80,50 @@ function formatRemaining(milliseconds: number): string {
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function TimerPill({ closesAt, pairsLabel, onExpired }: { closesAt: string | null; pairsLabel: string; onExpired: () => void }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, (closesAt ? Date.parse(closesAt) : 0) - Date.now()));
+  const expired = useRef(false);
+  useEffect(() => {
+    expired.current = false;
+    const update = () => {
+      const next = Math.max(0, (closesAt ? Date.parse(closesAt) : 0) - Date.now());
+      setRemaining(next);
+      if (!next && !expired.current) {
+        expired.current = true;
+        onExpired();
+      }
+    };
+    if (!closesAt) return undefined;
+    update();
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") update();
+    }, 1000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") update();
+    });
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [closesAt, onExpired]);
+  return <View style={styles.timerPill}><AppText style={styles.timerLabel}>TEMPO DO ALMOÇO</AppText><AppText variant="subtitle" color="#FFF5D8">{formatRemaining(remaining)}</AppText><AppText variant="tiny" color="#BFE9D6" style={styles.pairsLabel}>{pairsLabel}</AppText></View>;
+}
+
 const AnimatedPiece = memo(function AnimatedPiece({
   piece,
   free,
   selected,
   reduceMotion,
   onPress,
+  pieceId,
   index,
 }: {
   piece: LunchGamePiece;
   free: boolean;
   selected: boolean;
   reduceMotion: boolean;
-  onPress: () => void;
+  onPress: (pieceId: string) => void;
+  pieceId: string;
   index: number;
 }) {
   const lift = useSharedValue(0);
@@ -114,11 +145,11 @@ const AnimatedPiece = memo(function AnimatedPiece({
     shadowOpacity: 0.18 + glow.value * 0.22,
     shadowRadius: 5 + glow.value * 8,
   }));
+  const handlePress = useCallback(() => onPress(pieceId), [onPress, pieceId]);
   return (
     <Animated.View
       entering={reduceMotion ? undefined : FadeInDown.delay(Math.min(420, index * 16)).duration(360)}
       exiting={reduceMotion ? undefined : FadeOut.duration(260)}
-      layout={reduceMotion ? undefined : Layout.springify()}
       style={[
         styles.tilePosition,
         {
@@ -131,7 +162,7 @@ const AnimatedPiece = memo(function AnimatedPiece({
       ]}
     >
       <Pressable
-        onPress={onPress}
+        onPress={handlePress}
         accessibilityRole="button"
         accessibilityState={{ disabled: !free, selected }}
         accessibilityLabel={`${selected ? "Peça selecionada" : "Peça"} ${piece.icon}`}
@@ -208,8 +239,7 @@ export default function LunchGameScreen() {
   const colors = useAppColors();
   const userId = useAppStore((state) => state.session?.user.id ?? null);
   const entries = useAppStore((state) => state.entries);
-  const { width } = useWindowDimensions();
-  const [now, setNow] = useState(() => new Date());
+  const { width, height } = useWindowDimensions();
   const [game, setGame] = useState<SavedGame | null>(null);
   const [undoStack, setUndoStack] = useState<SavedGame[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -220,15 +250,17 @@ export default function LunchGameScreen() {
   const [burst, setBurst] = useState(0);
   const [victory, setVictory] = useState(false);
   const [ended, setEnded] = useState(false);
+  const shuffleSeedRef = useRef(0);
   const shake = useSharedValue(0);
-  const today = todayKey(now);
-  const lunchState = useMemo(() => getLunchGameState(entries, now), [entries, now]);
+  const today = todayKey(new Date());
+  const lunchState = useMemo(() => getLunchGameState(entries), [entries]);
   const remaining = useMemo(() => new Set(game?.removedIds ?? []), [game?.removedIds]);
   const activePieces = useMemo(() => game?.pieces.filter((piece) => !remaining.has(piece.id)) ?? [], [game?.pieces, remaining]);
   const freeIds = useMemo(() => new Set(activePieces.filter((piece) => isLunchGamePieceFree(piece, activePieces)).map((piece) => piece.id)), [activePieces]);
   const selectedPiece = selectedId ? (game?.pieces.find((piece) => piece.id === selectedId) ?? null) : null;
-  const metrics = getLunchGameBoardMetrics(game?.difficulty ?? "medium");
-  const boardScale = Math.min(1, Math.max(0.5, (width - 28) / metrics.width));
+  const metrics = useMemo(() => getLunchGameBoardMetrics(game?.difficulty ?? "medium"), [game?.difficulty]);
+  const availableBoardHeight = Math.max(1, height - 410);
+  const boardScale = Math.min(1, (width - 28) / metrics.width, availableBoardHeight / metrics.height);
   const boardHeight = metrics.height * boardScale + 12;
   const persist = useCallback(async (next: SavedGame | null) => {
     if (userId && next) await AsyncStorage.setItem(gameKey(userId), JSON.stringify(next)).catch(() => undefined);
@@ -262,15 +294,7 @@ export default function LunchGameScreen() {
     return () => { active = false; subscription.remove(); };
   }, []);
   useEffect(() => {
-    if (lunchState.status !== "open" || ended) return undefined;
-    const update = () => { if (AppState.currentState === "active") setNow(new Date()); };
-    update();
-    const interval = setInterval(update, 1000);
-    const subscription = AppState.addEventListener("change", (state) => { if (state === "active") update(); });
-    return () => { clearInterval(interval); subscription.remove(); };
-  }, [ended, lunchState.status]);
-  useEffect(() => {
-    if (!loaded || ended || lunchState.status !== "closed") return undefined;
+    if (!loaded || (!ended && lunchState.status !== "closed")) return undefined;
     let active = true;
     let timeout: ReturnType<typeof setTimeout> | null = null;
     setEnded(true);
@@ -295,9 +319,16 @@ export default function LunchGameScreen() {
   }, [game, persist, today]);
   const shuffle = useCallback(() => {
     if (!game) return;
-    const next = makeGame(today, game.difficulty, game.bestScore, Date.now());
-    setGame(next); setUndoStack([]); setSelectedId(null); setVictory(false); setMessage("Peças embaralhadas."); void persist(next);
-  }, [game, persist, today]);
+    shuffleSeedRef.current += 1;
+    const next = { ...game, pieces: reshuffleLunchGameEmojis(game.pieces, game.removedIds, Date.now() + shuffleSeedRef.current) };
+    setGame(next); setSelectedId(null); setMessage("Peças embaralhadas."); void persist(next);
+  }, [game, persist]);
+  const autoShuffle = useCallback(() => {
+    if (!game) return;
+    shuffleSeedRef.current += 1;
+    const next = { ...game, pieces: reshuffleLunchGameEmojis(game.pieces, game.removedIds, Date.now() + shuffleSeedRef.current) };
+    setGame(next); setSelectedId(null); setMessage("Sem jogadas: embaralhei para você"); void persist(next);
+  }, [game, persist]);
   const undo = useCallback(() => {
     const previous = undoStack[undoStack.length - 1];
     if (!previous) return;
@@ -311,7 +342,7 @@ export default function LunchGameScreen() {
       return;
     }
     if (selectedPiece.id === piece.id) return;
-    if (selectedPiece.pairId === piece.pairId && freeIds.has(selectedPiece.id)) {
+    if (selectedPiece.icon === piece.icon && freeIds.has(selectedPiece.id)) {
       const removedIds = [...new Set([...game.removedIds, selectedPiece.id, piece.id])];
       const pairsFound = game.pairsFound + 1;
       const score = game.score + 100 + combo * 20;
@@ -325,10 +356,15 @@ export default function LunchGameScreen() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     }
   }, [animateWrong, combo, freeIds, game, persist, remaining, selectedPiece]);
+  const handlePiecePress = useCallback((pieceId: string) => {
+    const piece = game?.pieces.find((candidate) => candidate.id === pieceId);
+    if (piece) choosePiece(piece);
+  }, [choosePiece, game?.pieces]);
+  const handleTimerExpired = useCallback(() => setEnded(true), []);
   const boardStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }, { scale: boardScale }] }));
   const canPlay = lunchState.status === "open" && loaded && Boolean(game) && !ended;
-  const noMoves = canPlay && activePieces.length > 0 && freeIds.size === 0;
-  useEffect(() => { if (noMoves) shuffle(); }, [noMoves, shuffle]);
+  const noMoves = canPlay && activePieces.length > 0 && !hasFreeLunchGameMove(activePieces);
+  useEffect(() => { if (noMoves) autoShuffle(); }, [autoShuffle, noMoves]);
 
   if (lunchState.status === "locked" || !userId) {
     return <ScreenShell contentStyle={styles.centerPage}><SurfaceCard style={styles.lockCard}><AppText style={styles.lockEmoji}>🍱</AppText><AppText variant="title" style={styles.centerText}>Mahjong do almoço</AppText><AppText variant="body" color={colors.muted} style={styles.centerText}>Disponível depois de bater a saída do almoço.</AppText><Pressable onPress={() => router.replace("/(tabs)")} style={[styles.primaryButton, { backgroundColor: colors.deepTeal }]}><AppText variant="small" color="#FFFFFF" style={styles.buttonText}>Voltar para Hoje</AppText></Pressable></SurfaceCard></ScreenShell>;
@@ -343,25 +379,24 @@ export default function LunchGameScreen() {
           <Defs><LinearGradient id="lunch-felt" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#0C4B3B" /><Stop offset="0.55" stopColor="#103E35" /><Stop offset="1" stopColor="#082B2B" /></LinearGradient></Defs>
           <Rect width="400" height="900" fill="url(#lunch-felt)" />
         </Svg>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.scrollContent}>
           <View style={styles.header}>
             <View style={styles.headerCopy}><AppText variant="tiny" color="#BFE9D6" style={styles.eyebrow}>INTERVALO SOLO</AppText><AppText variant="title" color="#FFF5D8">Mahjong do almoço</AppText><AppText variant="small" color="#CDEBDD">Combine os pares antes do retorno.</AppText></View>
             <Pressable onPress={() => router.replace("/(tabs)")} accessibilityRole="button" accessibilityLabel="Fechar Mahjong" style={styles.closeButton}><AppText style={styles.closeText}>×</AppText></Pressable>
           </View>
-          <View style={styles.timerPill}><AppText style={styles.timerLabel}>TEMPO DO ALMOÇO</AppText><AppText variant="subtitle" color="#FFF5D8">{formatRemaining(lunchState.remainingMs)}</AppText><AppText variant="tiny" color="#BFE9D6" style={styles.pairsLabel}>{game?.pairsFound ?? 0}/{getLunchGamePairCount(game?.difficulty ?? "medium")} pares</AppText></View>
+          <TimerPill closesAt={lunchState.closesAt} pairsLabel={`${game?.pairsFound ?? 0}/${getLunchGamePairCount(game?.difficulty ?? "medium")} pares`} onExpired={handleTimerExpired} />
           <View style={styles.difficultyRow}>{DIFFICULTIES.map((item) => <Pressable key={item.key} onPress={() => chooseDifficulty(item.key)} accessibilityRole="button" accessibilityState={{ selected: game?.difficulty === item.key }} style={[styles.difficultyButton, game?.difficulty === item.key && styles.difficultySelected]}><AppText variant="tiny" color={game?.difficulty === item.key ? "#FFF5D8" : "#BFE9D6"}>{item.label} · {item.pieces}</AppText></Pressable>)}</View>
           <View style={styles.scoreRow}><View><AppText variant="tiny" color="#BFE9D6">PONTOS</AppText><AppText variant="subtitle" color="#FFF5D8">{game?.score ?? 0}</AppText></View><AppText style={styles.feltMark}>✦</AppText><View style={styles.scoreRight}><AppText variant="tiny" color="#BFE9D6">RECORDE</AppText><AppText variant="subtitle" color="#F2C648">{game?.bestScore ?? 0}</AppText></View></View>
           <View style={[styles.boardViewport, { width: Math.min(width - 28, metrics.width), height: boardHeight }]}>
             <Animated.View style={[styles.boardCanvas, { width: metrics.width, height: metrics.height }, boardStyle]}>
-              {activePieces.map((piece, index) => <AnimatedPiece key={piece.id} piece={piece} index={index} free={freeIds.has(piece.id)} selected={selectedId === piece.id} reduceMotion={reduceMotion} onPress={() => choosePiece(piece)} />)}
+              {activePieces.map((piece, index) => <AnimatedPiece key={piece.id} piece={piece} pieceId={piece.id} index={index} free={freeIds.has(piece.id)} selected={selectedId === piece.id} reduceMotion={reduceMotion} onPress={handlePiecePress} />)}
               <Burst trigger={burst} color="#D8B45A" /><VictoryConfetti visible={victory} />
             </Animated.View>
           </View>
           <View style={styles.feedback}><Animated.View entering={reduceMotion ? undefined : FadeInUp.duration(220)} key={message}><AppText variant="small" color={message === "Quase! Tente outro par." ? "#FFAE87" : "#FFF5D8"} style={styles.centerText}>{message || "Escolha uma peça livre para começar."}</AppText></Animated.View>{combo > 1 ? <Animated.Text entering={reduceMotion ? undefined : FadeInUp.duration(260)} style={styles.combo}>Combo x{combo}!</Animated.Text> : null}{victory ? <AppText variant="subtitle" color="#F2C648" style={styles.centerText}>Tabuleiro limpo! Você venceu.</AppText> : null}</View>
           <View style={styles.actionRow}><ActionButton label="Embaralhar" symbol="↝" badge="∞" onPress={shuffle} /><ActionButton label="Dica" symbol="?" badge="∞" onPress={() => { const hint = activePieces.find((piece) => freeIds.has(piece.id)); if (hint) { setSelectedId(hint.id); setMessage("Dica: esta peça está livre."); } }} /><ActionButton label="Desfazer" symbol="↶" badge={String(undoStack.length)} disabled={!undoStack.length} onPress={undo} /></View>
           <Pressable onPress={restart} style={styles.restartButton}><AppText variant="tiny" color="#BFE9D6">Reiniciar partida</AppText></Pressable>
-          <AppText variant="tiny" color="#BFE9D6" style={styles.ruleText}>Livre = sem peça por cima e com o lado esquerdo ou direito aberto.</AppText>
-        </ScrollView>
+        </View>
       </View>
     </ScreenShell>
   );
@@ -386,7 +421,7 @@ const styles = StyleSheet.create({
   scoreRight: { alignItems: "flex-end" },
   feltMark: { color: "#D8B45A", fontSize: 24 },
   boardViewport: { alignSelf: "center", alignItems: "center", justifyContent: "flex-start", overflow: "visible" },
-  boardCanvas: { position: "relative", alignSelf: "center" },
+  boardCanvas: { position: "relative", alignSelf: "center", transformOrigin: "center top" },
   tilePosition: { position: "absolute", width: LUNCH_GAME_TILE_WIDTH, height: LUNCH_GAME_TILE_HEIGHT, shadowOffset: { width: 0, height: 5 }, shadowRadius: 5, elevation: 6 },
   tileHitbox: { width: LUNCH_GAME_TILE_WIDTH + 7, height: LUNCH_GAME_TILE_HEIGHT + 7, position: "relative" },
   tileBack: { position: "absolute", left: 5, top: 6, width: LUNCH_GAME_TILE_WIDTH, height: LUNCH_GAME_TILE_HEIGHT, borderRadius: 10, backgroundColor: "#1B4B3C", borderRightWidth: 2, borderBottomWidth: 2, borderColor: "#0A2823" },
@@ -405,7 +440,6 @@ const styles = StyleSheet.create({
   actionBadge: { position: "absolute", right: -3, top: -5, minWidth: 25, height: 25, paddingHorizontal: 5, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#C85B43", borderWidth: 2, borderColor: "#F2C648" },
   actionBadgeText: { color: "#FFF5D8", fontSize: 12, fontWeight: "900" },
   restartButton: { alignSelf: "center", paddingHorizontal: 12, paddingVertical: 3 },
-  ruleText: { textAlign: "center", lineHeight: 17, paddingHorizontal: 8 },
   centerPage: { flex: 1, justifyContent: "center", padding: 22, backgroundColor: "#E4F5F2" },
   lockCard: { alignItems: "center", gap: 13, padding: 24 },
   lockEmoji: { fontSize: 48, lineHeight: 56 },

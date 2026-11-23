@@ -139,32 +139,50 @@ export function isLunchGamePieceFree(piece: LunchGamePiece, remaining: readonly 
   return !leftBlocked || !rightBlocked;
 }
 
-export function generateLunchGameBoard(difficulty: LunchGameDifficulty, seed = 1): LunchGamePiece[] {
-  const slots = makeSlots(difficulty);
-  const remaining = [...slots];
-  const assignments = new Map<string, { pairId: string; icon: string; color: string }>();
-  const shuffledIcons = seededShuffle(ICONS, seed + 97);
+export function hasFreeLunchGameMove(remaining: readonly LunchGamePiece[]): boolean {
+  const freeIcons = new Set<string>();
+  return remaining
+    .filter((piece) => isLunchGamePieceFree(piece, remaining))
+    .some((piece) => {
+      if (freeIcons.has(piece.icon)) return true;
+      freeIcons.add(piece.icon);
+      return false;
+    });
+}
+
+function findRemovalOrder(
+  pieces: readonly LunchGamePiece[],
+  seed: number,
+): LunchGamePiece[] | null {
   const memo = new Set<string>();
-  const findRemovalOrder = (current: readonly LunchGamePiece[]): LunchGamePiece[] | null => {
+  const search = (current: readonly LunchGamePiece[], depth: number): LunchGamePiece[] | null => {
     if (!current.length) return [];
     const key = current.map((piece) => piece.id).sort().join("|");
     if (memo.has(key)) return null;
-    const free = current
-      .filter((piece) => isLunchGamePieceFree(piece, current))
-      .sort((a, b) => a.layer - b.layer || a.row - b.row || a.column - b.column);
+    const free = seededShuffle(
+      current.filter((piece) => isLunchGamePieceFree(piece, current)),
+      seed + depth * 7919 + current.length * 131,
+    );
     for (let firstIndex = 0; firstIndex < free.length - 1; firstIndex += 1) {
       for (let secondIndex = firstIndex + 1; secondIndex < free.length; secondIndex += 1) {
         const first = free[firstIndex];
         const second = free[secondIndex];
         const next = current.filter((piece) => piece.id !== first.id && piece.id !== second.id);
-        const rest = findRemovalOrder(next);
+        const rest = search(next, depth + 1);
         if (rest) return [first, second, ...rest];
       }
     }
     memo.add(key);
     return null;
   };
-  const removalOrder = findRemovalOrder(remaining);
+  return search(pieces, 0);
+}
+
+export function generateLunchGameBoard(difficulty: LunchGameDifficulty, seed = 1): LunchGamePiece[] {
+  const slots = makeSlots(difficulty);
+  const assignments = new Map<string, { pairId: string; icon: string; color: string }>();
+  const shuffledIcons = seededShuffle(ICONS, seed + 97);
+  const removalOrder = findRemovalOrder(slots, seed);
   if (!removalOrder) throw new Error(`Não foi possível montar o tabuleiro ${difficulty}`);
   for (let pairIndex = 0; pairIndex < removalOrder.length / 2; pairIndex += 1) {
     const first = removalOrder[pairIndex * 2];
@@ -180,6 +198,29 @@ export function generateLunchGameBoard(difficulty: LunchGameDifficulty, seed = 1
   return slots.map((slot) => ({
     ...slot,
     ...(assignments.get(slot.id) ?? { pairId: "", icon: shuffledIcons[0], color: COLORS[0] }),
+  }));
+}
+
+export function reshuffleLunchGameEmojis(
+  pieces: readonly LunchGamePiece[],
+  removedIds: readonly string[],
+  seed = 1,
+): LunchGamePiece[] {
+  const removed = new Set(removedIds);
+  const active = pieces.filter((piece) => !removed.has(piece.id));
+  if (active.length < 2) return [...pieces];
+  const removalOrder = findRemovalOrder(active, seed);
+  if (!removalOrder) return [...pieces];
+  const shuffledIcons = seededShuffle(ICONS, seed + 193);
+  const icons = new Map<string, string>();
+  for (let index = 0; index < removalOrder.length; index += 2) {
+    const icon = shuffledIcons[(index / 2) % shuffledIcons.length];
+    icons.set(removalOrder[index].id, icon);
+    icons.set(removalOrder[index + 1].id, icon);
+  }
+  return pieces.map((piece) => ({
+    ...piece,
+    icon: icons.get(piece.id) ?? piece.icon,
   }));
 }
 
