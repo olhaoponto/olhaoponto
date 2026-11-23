@@ -5,6 +5,7 @@ import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-sessio
 import { supabase } from './supabase';
 import { awardPieceForEntry } from './journey-service';
 import { useAppStore } from '@/store/app-store';
+import { pruneTimeEntries, rowsChanged } from '@/utils/local-history-cache';
 
 export interface ServiceResult<T> { data: T | null; error: string | null; }
 export type TimeEntryInput = Pick<TimeEntry, 'tipo'> & Partial<Pick<TimeEntry, 'registrado_em' | 'horario_informado_manual' | 'editado' | 'justificativa'>> & { user_id?: never; data?: never };
@@ -16,8 +17,48 @@ const cacheKey = (id: string) => `olhaponto:${id}:time-entries`;
 const pendingKey = (id: string) => `olhaponto:${id}:pending-time-entries`;
 const zone = 'America/Bahia';
 const civilDate = (value: string | Date) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : formatInTimeZone(value, zone, 'yyyy-MM-dd');
-const readList = async (key: string): Promise<TimeEntry[]> => { try { return JSON.parse((await AsyncStorage.getItem(key)) || '[]') as TimeEntry[]; } catch { return []; } };
-const writeList = (key: string, rows: TimeEntry[]) => AsyncStorage.setItem(key, JSON.stringify(rows));
+const memoryCache = new Map<string, TimeEntry[]>();
+const cacheLocks = new Map<string, Promise<void>>();
+const today = () => civilDate(new Date());
+const withCacheLock = async <T>(uid: string, task: () => Promise<T>): Promise<T> => {
+  const previous = cacheLocks.get(uid) ?? Promise.resolve();
+  let resolve!: () => void;
+  const turn = new Promise<void>((done) => { resolve = done; });
+  cacheLocks.set(uid, turn);
+  await previous.catch(() => undefined);
+  try { return await task(); } finally { resolve(); if (cacheLocks.get(uid) === turn) cacheLocks.delete(uid); }
+};
+async function readList(key: string, uid: string, prune = false): Promise<TimeEntry[]> {
+  const cached = memoryCache.get(key);
+  if (cached) return cached;
+  let rows: TimeEntry[];
+  try { rows = JSON.parse((await AsyncStorage.getItem(key)) || '[]') as TimeEntry[]; } catch { rows = []; }
+  if (!Array.isArray(rows)) rows = [];
+  const normalized = prune ? pruneTimeEntries(rows, today()) : rows;
+  memoryCache.set(key, normalized);
+  if (prune && rowsChanged(rows, normalized)) await AsyncStorage.setItem(key, JSON.stringify(normalized));
+  return normalized;
+}
+async function writeList(key: string, uid: string, rows: TimeEntry[], prune = false): Promise<void> {
+  const normalized = prune ? pruneTimeEntries(rows, today()) : rows;
+  const previous = memoryCache.get(key);
+  if (previous && !rowsChanged(previous, normalized)) return;
+  if (!previous) {
+    const raw = await AsyncStorage.getItem(key).catch(() => null);
+    try { if (raw && !rowsChanged(JSON.parse(raw) as TimeEntry[], normalized)) { memoryCache.set(key, normalized); return; } } catch { /* regrava conteúdo inválido */ }
+  }
+  await AsyncStorage.setItem(key, JSON.stringify(normalized));
+  memoryCache.set(key, normalized);
+}
+async function readCache(uid: string) { return readList(cacheKey(uid), uid, true); }
+async function readPending(uid: string) { return readList(pendingKey(uid), uid); }
+async function writeCache(uid: string, rows: TimeEntry[]) { return writeList(cacheKey(uid), uid, rows, true); }
+async function writePending(uid: string, rows: TimeEntry[]) { return writeList(pendingKey(uid), uid, rows); }
+
+export function invalidateTimeEntryCache(uid?: string): void {
+  if (uid) { memoryCache.delete(cacheKey(uid)); memoryCache.delete(pendingKey(uid)); return; }
+  memoryCache.clear();
+}
 
 function uuidV4(): string {
   const cryptoApi = globalThis.crypto;
@@ -41,7 +82,7 @@ type Query = (userId: string) => PromiseLike<{ data: TimeEntry[] | null; error: 
 async function cachedThenRemote(query: Query, matches: (entry: TimeEntry) => boolean): Promise<ServiceResult<TimeEntry[]>> {
   try {
     const uid = await currentUserId();
-    const [allCached, allPending] = await Promise.all([readList(cacheKey(uid)), readList(pendingKey(uid))]);
+    const [allCached, allPending] = await withCacheLock(uid, () => Promise.all([readCache(uid), readPending(uid)]));
     const cached = allCached.filter(matches);
     const pending = allPending.filter(matches);
     const remote = await query(uid);
@@ -50,9 +91,14 @@ async function cachedThenRemote(query: Query, matches: (entry: TimeEntry) => boo
       for (const item of pending) if (!merged.some((entry) => entry.id === item.id)) merged.push(item);
       return { data: merged.sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)), error: friendly(remote.error) };
     }
-    const merged = [...(remote.data || [])];
-    for (const item of pending) if (!merged.some((entry) => entry.id === item.id)) merged.push(item);
-    await writeList(cacheKey(uid), [...allCached.filter((item) => !matches(item)), ...merged]);
+    const merged = await withCacheLock(uid, async () => {
+      const latestCached = await readCache(uid);
+      const latestPending = (await readPending(uid)).filter(matches);
+      const result = [...(remote.data || [])];
+      for (const item of latestPending) if (!result.some((entry) => entry.id === item.id)) result.push(item);
+      await writeCache(uid, [...latestCached.filter((item) => !matches(item)), ...result]);
+      return result;
+    });
     return { data: merged.sort((a, b) => a.registrado_em.localeCompare(b.registrado_em)), error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
@@ -100,26 +146,34 @@ function isNetworkFailure(error: { message?: string; code?: string; status?: num
 
 async function persistOrQueue(entry: TimeEntry): Promise<ServiceResult<TimeEntry>> {
   const uid = await currentUserId();
-  const [pending, cached] = await Promise.all([readList(pendingKey(uid)), readList(cacheKey(uid))]);
   try {
     const remote = await supabase.from('time_entries').insert(entry).select('*').single();
     if (remote.error) {
       const transportFailure = isNetworkFailure(remote.error) || !remote.error.code;
       if (!transportFailure) return { data: null, error: friendly(remote.error) };
       const queued = { ...entry, _pending: true } as TimeEntry;
-      await writeList(pendingKey(uid), [...pending.filter((item) => item.id !== entry.id), queued]);
-      await writeList(cacheKey(uid), [...cached.filter((item) => item.id !== entry.id), queued]);
+      await withCacheLock(uid, async () => {
+        const [pending, cached] = await Promise.all([readPending(uid), readCache(uid)]);
+        await writePending(uid, [...pending.filter((item) => item.id !== entry.id), queued]);
+        await writeCache(uid, [...cached.filter((item) => item.id !== entry.id), queued]);
+      });
       return { data: queued, error: null };
     }
-    await writeList(cacheKey(uid), [...cached.filter((item) => item.id !== entry.id), remote.data as TimeEntry]);
+    await withCacheLock(uid, async () => {
+      const cached = await readCache(uid);
+      await writeCache(uid, [...cached.filter((item) => item.id !== entry.id), remote.data as TimeEntry]);
+    });
     return { data: remote.data as TimeEntry, error: null };
   } catch (error) {
     const networkError = error instanceof Error ? { message: error.message, name: error.name } : { message: '' };
     const transportFailure = /TypeError|network|fetch|connection|offline|timeout|abort|load failed/i.test(`${networkError.name ?? ''} ${networkError.message}`) || !networkError.message;
     if (!transportFailure) return { data: null, error: friendly(error) };
     const queued = { ...entry, _pending: true } as TimeEntry;
-    await writeList(pendingKey(uid), [...pending.filter((item) => item.id !== entry.id), queued]);
-    await writeList(cacheKey(uid), [...cached.filter((item) => item.id !== entry.id), queued]);
+    await withCacheLock(uid, async () => {
+      const [pending, cached] = await Promise.all([readPending(uid), readCache(uid)]);
+      await writePending(uid, [...pending.filter((item) => item.id !== entry.id), queued]);
+      await writeCache(uid, [...cached.filter((item) => item.id !== entry.id), queued]);
+    });
     return { data: queued, error: null };
   }
 }
@@ -158,9 +212,11 @@ export async function updateTimeEntry(
     const values = { ...updates, ...(updates.registrado_em ? { registrado_em: new Date(updates.registrado_em).toISOString() } : {}), editado: true, atualizado_em: updatedAt };
     const { data, error } = await supabase.from('time_entries').update(values).eq('id', id).eq('user_id', uid).select('*').single();
     if (error) return { data: null, error: friendly(error) };
-    const [cached, pending] = await Promise.all([readList(cacheKey(uid)), readList(pendingKey(uid))]);
-    await writeList(cacheKey(uid), [...cached.filter((item) => item.id !== id), data as TimeEntry]);
-    await writeList(pendingKey(uid), pending.filter((item) => item.id !== id));
+    await withCacheLock(uid, async () => {
+      const [cached, pending] = await Promise.all([readCache(uid), readPending(uid)]);
+      await writeCache(uid, [...cached.filter((item) => item.id !== id), data as TimeEntry]);
+      await writePending(uid, pending.filter((item) => item.id !== id));
+    });
     return { data: data as TimeEntry, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
@@ -170,9 +226,11 @@ export async function deleteTimeEntry(id: string): Promise<ServiceResult<void>> 
     const uid = await currentUserId();
     const { error } = await supabase.from('time_entries').delete().eq('id', id).eq('user_id', uid);
     if (error) return { data: null, error: friendly(error) };
-    const [cached, pending] = await Promise.all([readList(cacheKey(uid)), readList(pendingKey(uid))]);
-    await writeList(cacheKey(uid), cached.filter((item) => item.id !== id));
-    await writeList(pendingKey(uid), pending.filter((item) => item.id !== id));
+    await withCacheLock(uid, async () => {
+      const [cached, pending] = await Promise.all([readCache(uid), readPending(uid)]);
+      await writeCache(uid, cached.filter((item) => item.id !== id));
+      await writePending(uid, pending.filter((item) => item.id !== id));
+    });
     return { data: null, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
@@ -181,9 +239,11 @@ export async function savePendingEntry(input: TimeEntryInput): Promise<ServiceRe
   try {
     const uid = await currentUserId();
     const row = { ...makeRow(uid, input), _pending: true } as TimeEntry;
-    const [pending, cached] = await Promise.all([readList(pendingKey(uid)), readList(cacheKey(uid))]);
-    await writeList(pendingKey(uid), [...pending, row]);
-    await writeList(cacheKey(uid), [...cached, row]);
+    await withCacheLock(uid, async () => {
+      const [pending, cached] = await Promise.all([readPending(uid), readCache(uid)]);
+      await writePending(uid, [...pending, row]);
+      await writeCache(uid, [...cached, row]);
+    });
     return { data: row, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
@@ -191,7 +251,7 @@ export async function savePendingEntry(input: TimeEntryInput): Promise<ServiceRe
 export async function loadAllEntries(): Promise<ServiceResult<TimeEntry[]>> {
   try {
     const uid = await currentUserId();
-    const [cached, pending] = await Promise.all([readList(cacheKey(uid)), readList(pendingKey(uid))]);
+    const [cached, pending] = await Promise.all([readCache(uid), readPending(uid)]);
     const rows: TimeEntry[] = [];
     const pageSize = 500;
     for (let offset = 0; ; offset += pageSize) {
@@ -207,7 +267,6 @@ export async function loadAllEntries(): Promise<ServiceResult<TimeEntry[]>> {
     const merged = [...rows];
     for (const entry of pending) if (!merged.some((item) => item.id === entry.id)) merged.push(entry);
     const ordered = merged.sort((a, b) => a.registrado_em.localeCompare(b.registrado_em));
-    await writeList(cacheKey(uid), ordered);
     return { data: ordered, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
@@ -215,7 +274,7 @@ export async function loadAllEntries(): Promise<ServiceResult<TimeEntry[]>> {
 export async function syncPendingEntries(): Promise<ServiceResult<{ synced: number; failed: number }>> {
   try {
     const uid = await currentUserId();
-    const pending = await readList(pendingKey(uid));
+    const pending = await withCacheLock(uid, () => readPending(uid));
     const remaining: TimeEntry[] = [];
     let synced = 0;
     let firstError: string | null = null;
@@ -226,19 +285,23 @@ export async function syncPendingEntries(): Promise<ServiceResult<{ synced: numb
         if (error.code === '23505') {
           const existing = await supabase.from('time_entries').select('*').eq('id', item.id).eq('user_id', uid).maybeSingle();
           if (!existing.error && existing.data) {
-            const cache = await readList(cacheKey(uid));
-            await writeList(cacheKey(uid), [...cache.filter((row) => row.id !== item.id), existing.data as TimeEntry]);
+            await withCacheLock(uid, async () => {
+              const cache = await readCache(uid);
+              await writeCache(uid, [...cache.filter((row) => row.id !== item.id), existing.data as TimeEntry]);
+            });
             synced++;
             continue;
           }
         }
         remaining.push(item); firstError ||= friendly(error); continue;
       }
-      const cache = await readList(cacheKey(uid));
-      await writeList(cacheKey(uid), [...cache.filter((row) => row.id !== item.id), data as TimeEntry]);
+      await withCacheLock(uid, async () => {
+        const cache = await readCache(uid);
+        await writeCache(uid, [...cache.filter((row) => row.id !== item.id), data as TimeEntry]);
+      });
       synced++;
     }
-    await writeList(pendingKey(uid), remaining);
+    await withCacheLock(uid, () => writePending(uid, remaining));
     return { data: { synced, failed: remaining.length }, error: firstError };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
