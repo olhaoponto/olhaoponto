@@ -42,6 +42,8 @@ export async function loadSevenSteps(input: {
 
   const nextStored = { lastRewardedEndDate: computed.lastResolvedDate, totalCycles: stored.totalCycles + 1 };
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(nextStored)).catch(() => undefined);
+  const { invalidateProgressCache } = await import('./avatar-service');
+  invalidateProgressCache(userId);
   useAppStore.getState().bumpJourney();
   return { ...computed, rewardDue: false, rewardGranted: true, totalCycles: nextStored.totalCycles };
 }

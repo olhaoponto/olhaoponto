@@ -108,7 +108,11 @@ export async function placeJourneyPiece(pieceId: string): Promise<JourneyState |
   }
   const next = { level, pieces };
   await writeLocal(userId, next);
-  if (level.concluido_em && !current.level.concluido_em) useAppStore.getState().bumpJourney();
+  if (level.concluido_em && !current.level.concluido_em) {
+    const { invalidateProgressCache } = await import('./avatar-service');
+    invalidateProgressCache(userId);
+    useAppStore.getState().bumpJourney();
+  }
   try {
     await supabase.from('jornada_pecas').update({ encaixada: true, encaixada_em: placed.encaixada_em }).eq('id', pieceId).eq('usuario_id', userId);
     if (level.concluido_em && !current.level.concluido_em) {

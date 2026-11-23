@@ -6,6 +6,9 @@ import { loadJourney } from '@/services/journey-service';
 import { supabase } from '@/services/supabase';
 import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
 import { getAvatarAnnouncement } from '@/utils/avatar-unlock-state';
+import { getProgressCache, invalidateProgressCache, setProgressCache } from '@/utils/progress-cache';
+
+export { invalidateProgressCache };
 
 const selectedKey = (userId: string) => avatarStorageKeys(userId).selected;
 const seenKey = (userId: string) => avatarStorageKeys(userId).seen;
@@ -15,7 +18,6 @@ const baselineKey = (userId: string) => `olhaponto:${userId}:avatares-baseline`;
 
 const selectedCache = new Map<string, string | null>();
 const selectedLoads = new Map<string, Promise<string | null>>();
-const progressCache = new Map<string, AvatarProgress>();
 const progressLoads = new Map<string, Promise<AvatarProgress>>();
 
 async function userId() { return (await getAuthenticatedSession()).session?.user.id ?? null; }
@@ -73,14 +75,14 @@ export async function recordNewPiece(): Promise<number> {
   if (!uid) return 0;
   const next = nextPieceCount(await readNumber(piecesKey(uid)));
   await AsyncStorage.setItem(piecesKey(uid), String(next));
-  progressCache.delete(uid);
+  invalidateProgressCache(uid);
   return next;
 }
 
 export async function getProgress(): Promise<AvatarProgress> {
   const uid = await userId();
   if (!uid) return { pecas: 0, ciclos: 0, puzzles: 0 };
-  const cached = progressCache.get(uid);
+  const cached = getProgressCache(uid);
   if (cached) return cached;
   const current = progressLoads.get(uid);
   if (current) return current;
@@ -91,7 +93,7 @@ export async function getProgress(): Promise<AvatarProgress> {
     const journeyPieces = journey?.pieces.length ?? 0;
     const completedLevels = levels.error ? (journey?.level.concluido_em ? 1 : 0) : (levels.data?.length ?? 0);
     const progress = { pecas: Math.max(counter, journeyPieces), ciclos: steps, puzzles: completedLevels };
-    progressCache.set(uid, progress);
+    setProgressCache(uid, progress);
     progressLoads.delete(uid);
     return progress;
   }).catch((error) => {

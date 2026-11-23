@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
+import { getProgressCache, invalidateProgressCache, setProgressCache } from '@/utils/progress-cache';
 
 describe('avatar service', () => {
   it('usa namespaces separados por usuário', () => {
@@ -22,5 +23,12 @@ describe('avatar service', () => {
     expect(parseCycles('{"lastRewardedEndDate":"2026-11-19","totalCycles":3}')).toBe(3);
     expect(parseCycles(null)).toBe(0);
     expect(parseCycles('não é JSON')).toBe(0);
+  });
+
+  it('invalida o progresso por usuário sem carregar assets', () => {
+    setProgressCache('user-7', { pecas: 3, ciclos: 1, puzzles: 2 });
+    expect(getProgressCache('user-7')).toEqual({ pecas: 3, ciclos: 1, puzzles: 2 });
+    invalidateProgressCache('user-7');
+    expect(getProgressCache('user-7')).toBeUndefined();
   });
 });
