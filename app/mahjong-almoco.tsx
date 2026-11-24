@@ -84,6 +84,11 @@ function makeGame(date: string, difficulty: LunchGameDifficulty, bestScore = 0, 
     phase,
   };
 }
+function nextPhaseGame(current: SavedGame, date: string): SavedGame {
+  const phase = (current.phase || 1) + 1;
+  const nextScore = current.score + 250;
+  return makeGame(date, difficultyForPhase(phase), Math.max(current.bestScore, nextScore), phase * 997, phase, nextScore);
+}
 function formatRemaining(milliseconds: number): string {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -286,7 +291,10 @@ export default function MahjongLunchScreen() {
         if (!active) return;
         const saved = raw ? (JSON.parse(raw) as Partial<SavedGame>) : null;
         if (saved?.boardVersion === LUNCH_GAME_BOARD_VERSION && saved.date === today && Array.isArray(saved.pieces)) {
-          setGame({ ...(saved as SavedGame), phase: Number(saved.phase) || 1 });
+          const current = { ...(saved as SavedGame), phase: Number(saved.phase) || 1 };
+          const next = Array.isArray(saved.removedIds) && saved.pieces.length > 0 && saved.removedIds.length >= saved.pieces.length ? nextPhaseGame(current, today) : current;
+          setGame(next);
+          if (next !== current) void persist(next);
         } else {
           setGame(makeGame(today, difficultyForPhase(1), 0, 0, 1));
         }
@@ -297,20 +305,16 @@ export default function MahjongLunchScreen() {
     };
     void load();
     return () => { active = false; };
-  }, [today, userId]);
+  }, [persist, today, userId]);
 
   const startNextPhase = useCallback(() => {
-    setGame((current) => {
-      if (!current) return current;
-      const phase = (current.phase || 1) + 1;
-      const nextScore = current.score + 250;
-      const next = makeGame(today, difficultyForPhase(phase), Math.max(current.bestScore, nextScore), phase * 997, phase, nextScore);
-      void persist(next);
-      return next;
-    });
+    if (!game) return;
+    const next = nextPhaseGame(game, today);
+    setGame(next);
+    void persist(next);
     setUndoStack([]); setSelectedId(null); setVictory(false); setCombo(0); setMessage("Nova fase pronta!");
     nextPhaseScheduled.current = false;
-  }, [persist, today]);
+  }, [game, persist, today]);
 
   useEffect(() => {
     if (!victory || !game || nextPhaseScheduled.current) return undefined;

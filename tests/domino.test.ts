@@ -6,6 +6,7 @@ import {
   drawDominoTile,
   DOMINO_MATCH_TARGET,
   DOMINO_SCORING,
+  getDominoMoveType,
   getLegalDominoMoves,
   playDominoMove,
 } from "../utils/domino";
@@ -63,6 +64,15 @@ describe("engine de Dominó", () => {
     const result = drawDominoTile(locked, "player");
     const result2 = drawDominoTile(result, "computer");
     expect(result2.roundWinner).toBe("player");
+    expect(result2.roundPoints).toBe(DOMINO_SCORING.trancado);
+  });
+
+  it("classifica carroça, lá-e-lô e cruzada pelo último lance", () => {
+    const openChain = { chain: [{ tile: { id: "2-4", a: 2, b: 4 }, left: 2, right: 5 }] };
+    expect(getDominoMoveType(openChain, { id: "2-5", a: 2, b: 5 })).toBe("la-e-lo");
+    expect(getDominoMoveType(openChain, { id: "2-2", a: 2, b: 2 })).toBe("carroca");
+    const equalEnds = { chain: [{ tile: { id: "2-2", a: 2, b: 2 }, left: 2, right: 2 }] };
+    expect(getDominoMoveType(equalEnds, { id: "2-2b", a: 2, b: 2 })).toBe("cruzada");
   });
 
   it("expõe alvo da partida e pontuações", () => {

@@ -1,6 +1,6 @@
 export type DominoPlayer = "player" | "computer";
 export type DominoSide = "left" | "right";
-export type DominoRoundType = "batida-simples" | "carroca" | "la-e-lo" | "cruzada";
+export type DominoRoundType = "batida-simples" | "carroca" | "la-e-lo" | "cruzada" | "trancado";
 
 export type DominoTile = { id: string; a: number; b: number };
 export type DominoMove = { tileId: string; side: DominoSide };
@@ -11,6 +11,7 @@ export const DOMINO_SCORING: Readonly<Record<DominoRoundType, number>> = {
   carroca: 2,
   "la-e-lo": 3,
   cruzada: 4,
+  trancado: 1,
 };
 export const DOMINO_MATCH_TARGET = 6;
 
@@ -115,13 +116,20 @@ function placeTile(chain: readonly DominoPlacedTile[], tile: DominoTile, side: D
   return [...chain, { tile, left: ends.right as number, right: tile.a === ends.right ? tile.b : tile.a }];
 }
 
-function roundTypeFor(winningTile: DominoTile, locked: boolean): DominoRoundType {
-  if (locked) return "cruzada";
-  return isDouble(winningTile) ? "carroca" : "batida-simples";
+function matchesEnd(tile: DominoTile, end: number | null): boolean {
+  return end !== null && (tile.a === end || tile.b === end);
 }
 
-function finishRound(state: DominoGameState, winner: DominoPlayer | "draw", winningTile: DominoTile, locked = false): DominoGameState {
-  const roundType = roundTypeFor(winningTile, locked);
+export function getDominoMoveType(state: Pick<DominoGameState, "chain">, tile: DominoTile): DominoRoundType {
+  if (state.chain.length === 0) return isDouble(tile) ? "carroca" : "batida-simples";
+  const ends = getDominoEnds(state);
+  const matchesBothEnds = matchesEnd(tile, ends.left) && matchesEnd(tile, ends.right);
+  if (isDouble(tile) && ends.left === ends.right && matchesBothEnds) return "cruzada";
+  if (!isDouble(tile) && matchesBothEnds) return "la-e-lo";
+  return isDouble(tile) ? "carroca" : "batida-simples";
+}
+
+function finishRound(state: DominoGameState, winner: DominoPlayer | "draw", roundType: DominoRoundType): DominoGameState {
   const roundPoints = winner === "draw" ? 0 : DOMINO_SCORING[roundType];
   const scores = winner === "draw" ? state.scores : { ...state.scores, [winner]: state.scores[winner] + roundPoints };
   return { ...state, scores, roundWinner: winner, matchWinner: scores.player >= DOMINO_MATCH_TARGET ? "player" : scores.computer >= DOMINO_MATCH_TARGET ? "computer" : null, roundType, roundPoints };
@@ -136,15 +144,15 @@ export function playDominoMove(state: DominoGameState, player: DominoPlayer, mov
   const tile = hand.find((candidate) => candidate.id === move.tileId);
   if (!tile) return state;
   const nextHand = hand.filter((candidate) => candidate.id !== move.tileId);
+  const roundType = getDominoMoveType(state, tile);
   const next = { ...state, [handKey]: nextHand, chain: placeTile(state.chain, tile, move.side), passes: 0, turn: player === "player" ? "computer" : "player" } as DominoGameState;
-  if (!nextHand.length) return finishRound(next, player, tile);
+  if (!nextHand.length) return finishRound(next, player, roundType);
   const other: DominoPlayer = player === "player" ? "computer" : "player";
   if (!next.boneyard.length && !getLegalDominoMoves(next, other).length && !getLegalDominoMoves(next, player).length) {
     const playerTotal = next.hand.reduce((sum, item) => sum + pipTotal(item), 0);
     const computerTotal = next.computerHand.reduce((sum, item) => sum + pipTotal(item), 0);
     const winner = playerTotal === computerTotal ? "draw" : playerTotal < computerTotal ? "player" : "computer";
-    const lowestTile = tile;
-    return finishRound(next, winner, lowestTile, true);
+    return finishRound(next, winner, "trancado");
   }
   return next;
 }
@@ -157,7 +165,7 @@ export function drawDominoTile(state: DominoGameState, player: DominoPlayer): Do
       const playerTotal = next.hand.reduce((sum, item) => sum + pipTotal(item), 0);
       const computerTotal = next.computerHand.reduce((sum, item) => sum + pipTotal(item), 0);
       const winner = playerTotal === computerTotal ? "draw" : playerTotal < computerTotal ? "player" : "computer";
-      return finishRound(next, winner, highestTile(state.hand) ?? { id: "none", a: 0, b: 0 }, true);
+      return finishRound(next, winner, "trancado");
     }
     return next;
   }
