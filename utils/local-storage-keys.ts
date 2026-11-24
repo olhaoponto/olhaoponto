@@ -12,6 +12,7 @@ export const PRESERVED_USER_DATA_PREFIXES = [
   'streak-best',
   'streak-milestones',
   'lunch-game',
+  'lunch-game-domino',
   'mission-events:',
 ] as const;
 

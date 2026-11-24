@@ -41,6 +41,7 @@ describe('chaves preservadas no logout', () => {
     'streak-best',
     'streak-milestones',
     'lunch-game',
+    'lunch-game-domino',
     'mission-events:2026-11-16',
     'mission-events:2026-11-23',
   ];
