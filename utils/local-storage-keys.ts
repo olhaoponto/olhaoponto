@@ -3,6 +3,7 @@
  * else under the user namespace is a cache or a queue and is dropped. */
 export const PRESERVED_USER_DATA_PREFIXES = [
   'avatar-escolhido',
+  'avatar-pendente',
   'avatares-vistos',
   'avatares-baseline',
   'pecas-total',

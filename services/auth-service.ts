@@ -24,6 +24,9 @@ const friendly = (error: unknown): string => {
 const profileCacheKey = (id: string) => `olhaponto:${id}:profile`;
 async function cacheProfile(profile: Profile): Promise<void> {
   try { await AsyncStorage.setItem(profileCacheKey(profile.id), JSON.stringify(profile)); } catch { /* cache local opcional */ }
+  void import('./avatar-service')
+    .then(({ syncAvatarFromProfile }) => syncAvatarFromProfile(profile.id, profile.avatar_id ?? null))
+    .catch(() => undefined);
 }
 
 export async function login(email: string, password: string): Promise<AuthResult<{ user: User; session: Session }>> {
@@ -78,7 +81,13 @@ export async function getProfile(userId?: string): Promise<AuthResult<Profile>> 
     }
     try {
       const cached = await AsyncStorage.getItem(profileCacheKey(id));
-      if (cached) return { data: JSON.parse(cached) as Profile, error: 'offline_cache' };
+      if (cached) {
+        const profile = JSON.parse(cached) as Profile;
+        void import('./avatar-service')
+          .then(({ syncAvatarFromProfile }) => syncAvatarFromProfile(profile.id, profile.avatar_id ?? null))
+          .catch(() => undefined);
+        return { data: profile, error: 'offline_cache' };
+      }
     } catch { /* cache ausente ou ilegível */ }
     return { data: null, error: error ? friendly(error) : null };
   } catch (error) { return { data: null, error: friendly(error) }; }

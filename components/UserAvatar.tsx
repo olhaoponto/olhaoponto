@@ -3,7 +3,7 @@ import { Image, StyleSheet, View } from 'react-native';
 import { AppText, initials, useAppColors } from '@/components/ui';
 import { useAppStore } from '@/store/app-store';
 import { getAvatar } from '@/utils/avatar-catalog';
-import { getCachedSelectedAvatarId, getSelectedAvatarId } from '@/services/avatar-service';
+import { getCachedSelectedAvatarId, getSelectedAvatarId, subscribeAvatarSelection } from '@/services/avatar-service';
 
 export function UserAvatar({ size = 42 }: { size?: number }) {
   const colors = useAppColors();
@@ -12,9 +12,12 @@ export function UserAvatar({ size = 42 }: { size?: number }) {
   const [avatarId, setAvatarId] = useState<string | null>(() => getCachedSelectedAvatarId(profile?.id));
   useEffect(() => {
     setAvatarId(getCachedSelectedAvatarId(profile?.id));
+    const unsubscribe = subscribeAvatarSelection((uid, id) => {
+      if (uid === profile?.id) setAvatarId(id);
+    });
     let active = true;
     void getSelectedAvatarId().then((id) => { if (active) setAvatarId(id); });
-    return () => { active = false; };
+    return () => { active = false; unsubscribe(); };
   }, [profile?.id, journeyVersion]);
   const avatar = avatarId ? getAvatar(avatarId) : undefined;
   return <View style={[styles.container, { width: size, height: size, borderRadius: size * 0.34, backgroundColor: `${colors.teal}25`, borderColor: `${colors.teal}70` }]}>

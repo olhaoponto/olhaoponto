@@ -7,6 +7,7 @@ import { supabase } from '@/services/supabase';
 import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
 import { getAvatarAnnouncement } from '@/utils/avatar-unlock-state';
 import { clearProgressCache, getProgressCache, invalidateProgressCache, setProgressCache } from '@/utils/progress-cache';
+import { decodePendingAvatarId, decideAvatarSync, encodePendingAvatarId } from '@/utils/avatar-db-sync';
 
 export { invalidateProgressCache };
 
@@ -25,6 +26,7 @@ export function invalidateAvatarCache(uid?: string): void {
 }
 
 const selectedKey = (userId: string) => avatarStorageKeys(userId).selected;
+const pendingKey = (userId: string) => `olhaponto:${userId}:avatar-pendente`;
 const seenKey = (userId: string) => avatarStorageKeys(userId).seen;
 const piecesKey = (userId: string) => avatarStorageKeys(userId).pieces;
 const stepsKey = (userId: string) => avatarStorageKeys(userId).steps;
@@ -33,6 +35,67 @@ const baselineKey = (userId: string) => `olhaponto:${userId}:avatares-baseline`;
 const selectedCache = new Map<string, string | null>();
 const selectedLoads = new Map<string, Promise<string | null>>();
 const progressLoads = new Map<string, Promise<AvatarProgress>>();
+type AvatarSelectionListener = (uid: string, id: string | null) => void;
+const selectionListeners = new Set<AvatarSelectionListener>();
+const validAvatarIds = new Set(AVATARS.map((avatar) => avatar.id));
+
+function notifyAvatarSelection(uid: string, id: string | null): void {
+  selectionListeners.forEach((listener) => listener(uid, id));
+}
+
+export function subscribeAvatarSelection(listener: AvatarSelectionListener): () => void {
+  selectionListeners.add(listener);
+  return () => selectionListeners.delete(listener);
+}
+
+async function persistLocalSelection(uid: string, id: string | null): Promise<void> {
+  if (id) await AsyncStorage.setItem(selectedKey(uid), id);
+  else await AsyncStorage.removeItem(selectedKey(uid));
+}
+
+async function uploadAvatarSelection(uid: string, id: string | null): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('profiles').update({ avatar_id: id }).eq('id', uid);
+    if (error) return false;
+    await AsyncStorage.removeItem(pendingKey(uid));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function syncSelectedAvatar(uid: string, id: string | null): Promise<void> {
+  if (await uploadAvatarSelection(uid, id)) return;
+  try { await AsyncStorage.setItem(pendingKey(uid), encodePendingAvatarId(id)); } catch { /* tentativa no próximo perfil */ }
+}
+
+export async function syncAvatarFromProfile(uid: string, dbId: string | null): Promise<void> {
+  try {
+    const [localValue, pendingValue] = await Promise.all([
+      selectedCache.has(uid) ? Promise.resolve(selectedCache.get(uid) ?? null) : AsyncStorage.getItem(selectedKey(uid)),
+      AsyncStorage.getItem(pendingKey(uid)),
+    ]);
+    const decision = decideAvatarSync({
+      dbId,
+      localId: localValue,
+      pendingId: decodePendingAvatarId(pendingValue),
+      validIds: validAvatarIds,
+    });
+
+    if (decision.kind === 'ignore') return;
+    if (decision.kind === 'use-database') {
+      selectedCache.set(uid, decision.id);
+      await persistLocalSelection(uid, decision.id);
+      await AsyncStorage.removeItem(pendingKey(uid));
+      notifyAvatarSelection(uid, decision.id);
+      return;
+    }
+
+    await syncSelectedAvatar(uid, decision.id);
+  } catch {
+    // Perfil e avatar continuam disponíveis localmente mesmo sem a coluna/rede.
+  }
+}
 
 async function userId() { return (await getAuthenticatedSession()).session?.user.id ?? null; }
 async function readNumber(key: string) {
@@ -71,9 +134,10 @@ export function getCachedSelectedAvatarId(uid: string | null | undefined): strin
 export async function setSelectedAvatar(id: string | null): Promise<void> {
   const uid = await userId();
   if (!uid) return;
-  if (id) await AsyncStorage.setItem(selectedKey(uid), id);
-  else await AsyncStorage.removeItem(selectedKey(uid));
   selectedCache.set(uid, id);
+  notifyAvatarSelection(uid, id);
+  try { await persistLocalSelection(uid, id); } catch { /* a tentativa de banco ainda pode recuperar a seleção */ }
+  void syncSelectedAvatar(uid, id);
 }
 
 export async function markAvatarsSeen(ids: readonly string[]): Promise<void> {

@@ -142,6 +142,7 @@ export interface Profile {
   id: string;
   nome: string;
   email: string;
+  avatar_id?: string | null;
   role: UserRole;
   ativo: boolean;
   senha_provisoria: boolean;

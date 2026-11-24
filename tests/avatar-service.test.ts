@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { avatarStorageKeys, nextPieceCount, parseCycles } from '@/utils/avatar-storage';
 import { getProgressCache, invalidateProgressCache, setProgressCache } from '@/utils/progress-cache';
+import { decodePendingAvatarId, decideAvatarSync, encodePendingAvatarId } from '@/utils/avatar-db-sync';
+
+const validIds = new Set(['av-01', 'av-02']);
 
 describe('avatar service', () => {
   it('usa namespaces separados por usuário', () => {
@@ -30,5 +33,22 @@ describe('avatar service', () => {
     expect(getProgressCache('user-7')).toEqual({ pecas: 3, ciclos: 1, puzzles: 2 });
     invalidateProgressCache('user-7');
     expect(getProgressCache('user-7')).toBeUndefined();
+  });
+
+  it('faz o banco vencer o avatar local', () => {
+    expect(decideAvatarSync({ dbId: 'av-02', localId: 'av-01', pendingId: 'av-01', validIds })).toEqual({ kind: 'use-database', id: 'av-02' });
+  });
+
+  it('sobe o avatar local quando o banco está nulo', () => {
+    expect(decideAvatarSync({ dbId: null, localId: 'av-01', pendingId: undefined, validIds })).toEqual({ kind: 'upload', id: 'av-01', source: 'local' });
+  });
+
+  it('ignora id inválido vindo do banco', () => {
+    expect(decideAvatarSync({ dbId: 'av-99', localId: 'av-01', pendingId: 'av-01', validIds })).toEqual({ kind: 'ignore' });
+  });
+
+  it('prioriza a seleção pendente e preserva null como seleção válida', () => {
+    expect(decideAvatarSync({ dbId: null, localId: 'av-01', pendingId: null, validIds })).toEqual({ kind: 'upload', id: null, source: 'pending' });
+    expect(decodePendingAvatarId(encodePendingAvatarId(null))).toBeNull();
   });
 });
