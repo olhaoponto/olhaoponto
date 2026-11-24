@@ -36,7 +36,11 @@ describe('avatar service', () => {
   });
 
   it('faz o banco vencer o avatar local', () => {
-    expect(decideAvatarSync({ dbId: 'av-02', localId: 'av-01', pendingId: 'av-01', validIds })).toEqual({ kind: 'use-database', id: 'av-02' });
+    expect(decideAvatarSync({ dbId: 'av-02', localId: 'av-01', pendingId: undefined, validIds })).toEqual({ kind: 'use-database', id: 'av-02' });
+  });
+
+  it('faz o pendente vencer o avatar do banco', () => {
+    expect(decideAvatarSync({ dbId: 'av-02', localId: 'av-01', pendingId: 'av-01', validIds })).toEqual({ kind: 'upload', id: 'av-01', source: 'pending' });
   });
 
   it('sobe o avatar local quando o banco está nulo', () => {
@@ -44,7 +48,7 @@ describe('avatar service', () => {
   });
 
   it('ignora id inválido vindo do banco', () => {
-    expect(decideAvatarSync({ dbId: 'av-99', localId: 'av-01', pendingId: 'av-01', validIds })).toEqual({ kind: 'ignore' });
+    expect(decideAvatarSync({ dbId: 'av-99', localId: 'av-01', pendingId: undefined, validIds })).toEqual({ kind: 'ignore' });
   });
 
   it('prioriza a seleção pendente e preserva null como seleção válida', () => {

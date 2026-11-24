@@ -136,7 +136,12 @@ export async function setSelectedAvatar(id: string | null): Promise<void> {
   if (!uid) return;
   selectedCache.set(uid, id);
   notifyAvatarSelection(uid, id);
-  try { await persistLocalSelection(uid, id); } catch { /* a tentativa de banco ainda pode recuperar a seleção */ }
+  try {
+    await AsyncStorage.setItem(pendingKey(uid), encodePendingAvatarId(id));
+    await persistLocalSelection(uid, id);
+  } catch {
+    return;
+  }
   void syncSelectedAvatar(uid, id);
 }
 

@@ -22,15 +22,15 @@ export function decideAvatarSync(input: {
   pendingId: string | null | undefined;
   validIds: ReadonlySet<string>;
 }): AvatarSyncDecision {
-  if (input.dbId !== null) {
-    return isKnownAvatarId(input.dbId, input.validIds)
-      ? { kind: 'use-database', id: input.dbId }
-      : { kind: 'ignore' };
-  }
-
   if (input.pendingId !== undefined) {
     return input.pendingId === null || isKnownAvatarId(input.pendingId, input.validIds)
       ? { kind: 'upload', id: input.pendingId, source: 'pending' }
+      : { kind: 'ignore' };
+  }
+
+  if (input.dbId !== null) {
+    return isKnownAvatarId(input.dbId, input.validIds)
+      ? { kind: 'use-database', id: input.dbId }
       : { kind: 'ignore' };
   }
 

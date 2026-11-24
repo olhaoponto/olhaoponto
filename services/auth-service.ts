@@ -83,9 +83,6 @@ export async function getProfile(userId?: string): Promise<AuthResult<Profile>> 
       const cached = await AsyncStorage.getItem(profileCacheKey(id));
       if (cached) {
         const profile = JSON.parse(cached) as Profile;
-        void import('./avatar-service')
-          .then(({ syncAvatarFromProfile }) => syncAvatarFromProfile(profile.id, profile.avatar_id ?? null))
-          .catch(() => undefined);
         return { data: profile, error: 'offline_cache' };
       }
     } catch { /* cache ausente ou ilegível */ }
