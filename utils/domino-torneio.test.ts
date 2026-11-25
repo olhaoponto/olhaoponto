@@ -6,6 +6,7 @@ import {
   jogar,
   passar,
   resolverMao,
+  totaisEspeciais,
   type Confronto,
   type EstadoMao,
   type Jogador,
@@ -61,7 +62,7 @@ describe("domino-torneio", () => {
   it("abre com 1/1 em 0x0 e em 3x3, reembaralhando se necessário", () => {
     for (const confronto of [
       criarConfronto(1),
-      { ...criarConfronto(2), pontos: { JER: 3, JES: 3 } },
+      { ...criarConfronto(2), pontos: { A: 3, B: 3 } },
     ]) {
       const mao = iniciarMao(confronto);
       expect(mao.aberturaPorBucha).toBe(true);
@@ -74,20 +75,41 @@ describe("domino-torneio", () => {
   it("aplica a progressão normal 0 para 3, 5 e uma peça", () => {
     let confronto = criarConfronto(3);
     confronto = jogar(estadoTeste(confronto), 0, { pedraId: "p0", lado: "direita" }).confronto;
-    expect(confronto.pontos.JER).toBe(3);
+    expect(confronto.pontos.A).toBe(3);
     confronto = jogar(estadoTeste(confronto), 0, { pedraId: "p0", lado: "direita" }).confronto;
-    expect(confronto.pontos.JER).toBe(5);
+    expect(confronto.pontos.A).toBe(5);
     confronto = jogar(estadoTeste(confronto), 0, { pedraId: "p0", lado: "direita" }).confronto;
-    expect(confronto.pontos.JER).toBe(0);
-    expect(confronto.pecas.JER).toBe(1);
+    expect(confronto.pontos.A).toBe(0);
+    expect(confronto.pecas.A).toBe(1);
   });
 
   it("concede buchada como uma peça automática e registra feita/sofrida", () => {
     const resultado = vencerComBuchada(criarConfronto(4));
-    expect(resultado.resultado).toMatchObject({ motivo: "buchada", vencedor: "JER", pecaConcedida: true });
-    expect(resultado.confronto.pecas.JER).toBe(1);
-    expect(resultado.confronto.especiais.JER.feitas.buchada).toBe(1);
-    expect(resultado.confronto.especiais.JES.sofridas.buchada).toBe(1);
+    expect(resultado.resultado).toMatchObject({ motivo: "buchada", vencedor: "A", pecaConcedida: true });
+    expect(resultado.confronto.pecas.A).toBe(1);
+    expect(resultado.confronto.especiais.A.feitas.buchada).toBe(1);
+    expect(resultado.confronto.especiais.B.sofridas.buchada).toBe(1);
+  });
+
+  it("aplica aberturaValeCinco: zero vira cinco e três vira peça", () => {
+    const zero = estadoTeste({ ...criarConfronto(41), pontos: { A: 0, B: 3 } }, {
+      aberturaValeCinco: true,
+    });
+    const resultadoZero = jogar(zero, 0, { pedraId: "p0", lado: "direita" });
+    expect(resultadoZero.confronto.pontos).toEqual({ A: 5, B: 3 });
+
+    const tres = estadoTeste({ ...criarConfronto(42), pontos: { A: 3, B: 5 } }, {
+      aberturaValeCinco: true,
+    });
+    const resultadoTres = jogar(tres, 0, { pedraId: "p0", lado: "direita" });
+    expect(resultadoTres.confronto.pontos).toEqual({ A: 0, B: 0 });
+    expect(resultadoTres.confronto.pecas.A).toBe(1);
+  });
+
+  it("zera os pontos das duas duplas ao fechar uma peça", () => {
+    const resultado = vencerComBuchada({ ...criarConfronto(43), pontos: { A: 5, B: 3 } });
+    expect(resultado.confronto.pecas.A).toBe(1);
+    expect(resultado.confronto.pontos).toEqual({ A: 0, B: 0 });
   });
 
   it("registra Lasquinê solto sem encerrar a mão", () => {
@@ -102,8 +124,8 @@ describe("domino-torneio", () => {
     });
     const resultado = jogar(estado, 0, { pedraId: "lasquine", lado: "esquerda" });
     expect(resultado.resolvida).toBe(false);
-    expect(resultado.confronto.especiais.JER.feitas.lasquine).toBe(1);
-    expect(resultado.confronto.pecas.JER).toBe(0);
+    expect(resultado.confronto.especiais.A.feitas.lasquine).toBe(1);
+    expect(resultado.confronto.pecas.A).toBe(0);
   });
 
   it("concede uma peça para Lasquinê preso", () => {
@@ -117,8 +139,8 @@ describe("domino-torneio", () => {
       },
     });
     const resultado = jogar(estado, 0, { pedraId: "lasquine", lado: "esquerda" });
-    expect(resultado.resultado).toMatchObject({ motivo: "lasquine-preso", vencedor: "JER", pecaConcedida: true });
-    expect(resultado.confronto.especiais.JER.feitas["lasquine-preso"]).toBe(1);
+    expect(resultado.resultado).toMatchObject({ motivo: "lasquine-preso", vencedor: "A", pecaConcedida: true });
+    expect(resultado.confronto.especiais.A.feitas["lasquine-preso"]).toBe(1);
   });
 
   it("resolve Fechado de Propósito quando o jogador tem alternativa não travante", () => {
@@ -132,7 +154,7 @@ describe("domino-torneio", () => {
       },
     });
     const resultado = jogar(estado, 0, { pedraId: "trava", lado: "esquerda" });
-    expect(resultado.resultado).toMatchObject({ motivo: "fechado-proposito", vencedor: "JER", pecaConcedida: true });
+    expect(resultado.resultado).toMatchObject({ motivo: "fechado-proposito", vencedor: "A", pecaConcedida: true });
   });
 
   it("entrega Fechado de Propósito à dupla adversária quando a soma não é menor", () => {
@@ -146,7 +168,7 @@ describe("domino-torneio", () => {
       },
     });
     const resultado = jogar(estado, 0, { pedraId: "trava", lado: "esquerda" });
-    expect(resultado.resultado).toMatchObject({ motivo: "fechado-proposito", vencedor: "JES", pecaConcedida: true });
+    expect(resultado.resultado).toMatchObject({ motivo: "fechado-proposito", vencedor: "B", pecaConcedida: true });
   });
 
   it("resolve Fechado por Ponta e anula quando há empate entre duplas", () => {
@@ -159,7 +181,7 @@ describe("domino-torneio", () => {
         3: [pedra("d", 2, 2)],
       },
     });
-    expect(fecharPorPasses(fechado).resultado).toMatchObject({ motivo: "fechado-ponta", vencedor: "JES" });
+    expect(fecharPorPasses(fechado).resultado).toMatchObject({ motivo: "fechado-ponta", vencedor: "B" });
 
     const empate = estadoTeste(criarConfronto(10), {
       mesa: [{ pedra: pedra("mesa", 0, 0), esquerda: 0, direita: 0 }],
@@ -176,6 +198,70 @@ describe("domino-torneio", () => {
     expect(iniciarMao(anulado.confronto).aberturaValeCinco).toBe(true);
   });
 
+  it("faz a dupla vencedora abrir após Fechado por Ponta, mesmo se o último a passar perdeu", () => {
+    const confronto = { ...criarConfronto(44), pontos: { A: 3, B: 5 } };
+    const estado = estadoTeste(confronto, {
+      mesa: [{ pedra: pedra("mesa", 0, 0), esquerda: 0, direita: 0 }],
+      maos: {
+        0: [pedra("a0", 1, 1)],
+        1: [pedra("b1", 4, 4)],
+        2: [pedra("a2", 2, 2)],
+        3: [pedra("b3", 5, 5)],
+      },
+    });
+    const fechado = fecharPorPasses(estado);
+    expect(fechado.resultado?.vencedor).toBe("A");
+    expect(fechado.confronto.ultimoJogadorVencedor).toBe(0);
+  });
+
+  it("classifica Lasquinê que trava só um lado como Fechado de Propósito", () => {
+    const estado = estadoTeste(criarConfronto(45), {
+      mesa: [{ pedra: pedra("mesa", 1, 2), esquerda: 1, direita: 2 }],
+      maos: {
+        0: [pedra("lasquine", 1, 2), pedra("extra", 6, 6)],
+        1: [pedra("outro-lado", 1, 3)],
+        2: [pedra("j2", 4, 4)],
+        3: [pedra("j3", 5, 5)],
+      },
+    });
+    const resultado = jogar(estado, 0, { pedraId: "lasquine", lado: "esquerda" });
+    expect(resultado.resultado?.motivo).toBe("fechado-proposito");
+    expect(resultado.confronto.especiais.A.feitas.lasquine).toBe(1);
+    expect(resultado.confronto.especiais.A.feitas["lasquine-preso"]).toBe(0);
+  });
+
+  it("classifica Lasquinê que trava os dois lados como Lasquinê preso", () => {
+    const estado = estadoTeste(criarConfronto(46), {
+      mesa: [{ pedra: pedra("mesa", 1, 2), esquerda: 1, direita: 2 }],
+      maos: {
+        0: [pedra("lasquine", 1, 2), pedra("extra", 6, 6)],
+        1: [pedra("j1", 0, 0)],
+        2: [pedra("j2", 4, 4)],
+        3: [pedra("j3", 5, 5)],
+      },
+    });
+    const resultado = jogar(estado, 0, { pedraId: "lasquine", lado: "esquerda" });
+    expect(resultado.resultado?.motivo).toBe("lasquine-preso");
+    expect(resultado.confronto.especiais.A.feitas["lasquine-preso"]).toBe(1);
+  });
+
+  it("não registra Fechado por Ponta e calcula totais de especiais", () => {
+    const resultado = vencerComBuchada(criarConfronto(47));
+    const fechado = fecharPorPasses(estadoTeste(resultado.confronto, {
+      mesa: [{ pedra: pedra("mesa", 0, 0), esquerda: 0, direita: 0 }],
+      maos: {
+        0: [pedra("a0", 6, 6)],
+        1: [pedra("b1", 1, 1)],
+        2: [pedra("a2", 5, 5)],
+        3: [pedra("b3", 2, 2)],
+      },
+    }));
+    expect(fechado.resultado?.motivo).toBe("fechado-ponta");
+    expect(fechado.confronto.especiais.A.feitas).not.toHaveProperty("fechado-ponta");
+    expect(totaisEspeciais(resultado.confronto, "A")).toEqual({ jer: 1, jes: 0, saldo: 1 });
+    expect(totaisEspeciais(resultado.confronto, "B")).toEqual({ jer: 0, jes: 1, saldo: -1 });
+  });
+
   it("fecha a mão seguinte ao empate com abertura em 1/1 e valor cinco", () => {
     const confronto = { ...criarConfronto(11), proximaMaoValeCinco: true };
     const mao = iniciarMao(confronto);
@@ -187,7 +273,7 @@ describe("domino-torneio", () => {
   it("vence o confronto melhor de três ao alcançar duas peças", () => {
     let resultado = vencerComBuchada(criarConfronto(12));
     resultado = vencerComBuchada(resultado.confronto);
-    expect(resultado.confronto.pecas.JER).toBe(2);
-    expect(resultado.confronto.vencedor).toBe("JER");
+    expect(resultado.confronto.pecas.A).toBe(2);
+    expect(resultado.confronto.vencedor).toBe("A");
   });
 });

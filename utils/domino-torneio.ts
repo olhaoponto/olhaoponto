@@ -1,12 +1,11 @@
 export type Jogador = 0 | 1 | 2 | 3;
-export type Dupla = "JER" | "JES";
+export type Dupla = "A" | "B";
 export type Lado = "esquerda" | "direita";
 export type TipoJogadaEspecial =
   | "buchada"
   | "lasquine"
   | "lasquine-preso"
-  | "fechado-proposito"
-  | "fechado-ponta";
+  | "fechado-proposito";
 
 export type Pedra = { id: string; a: number; b: number };
 export type Jogada = { pedraId: string; lado: Lado };
@@ -54,21 +53,21 @@ export type ResultadoMao = {
   pecaConcedida: boolean;
 };
 
-export const DUPLA_DE: Record<Jogador, Dupla> = { 0: "JER", 1: "JES", 2: "JER", 3: "JES" };
+export const DUPLA_DE: Record<Jogador, Dupla> = { 0: "A", 1: "B", 2: "A", 3: "B" };
 export const JOGADORES: readonly Jogador[] = [0, 1, 2, 3];
 export const META_PECAS = 2;
 export const PEDRAS_POR_JOGADOR = 6;
 export const PEDRAS_DORMEM = 4;
 
 const tiposEspeciais: readonly TipoJogadaEspecial[] = [
-  "buchada", "lasquine", "lasquine-preso", "fechado-proposito", "fechado-ponta",
+  "buchada", "lasquine", "lasquine-preso", "fechado-proposito",
 ];
 
 function registroVazio(): RegistroEspeciais {
   const zerado = () => Object.fromEntries(tiposEspeciais.map((tipo) => [tipo, 0])) as Record<TipoJogadaEspecial, number>;
   return {
-    JER: { feitas: zerado(), sofridas: zerado() },
-    JES: { feitas: zerado(), sofridas: zerado() },
+    A: { feitas: zerado(), sofridas: zerado() },
+    B: { feitas: zerado(), sofridas: zerado() },
   };
 }
 
@@ -116,15 +115,15 @@ function duplaDo(jogador: Jogador): Dupla {
 }
 
 function copiaPlacar(placar: PlacarDuplas): PlacarDuplas {
-  return { JER: placar.JER, JES: placar.JES };
+  return { A: placar.A, B: placar.B };
 }
 
 export function criarConfronto(seed: number): Confronto {
   return {
     seed,
     mao: 0,
-    pontos: { JER: 0, JES: 0 },
-    pecas: { JER: 0, JES: 0 },
+    pontos: { A: 0, B: 0 },
+    pecas: { A: 0, B: 0 },
     gc: 0,
     ultimaDuplaVencedora: null,
     ultimoJogadorVencedor: null,
@@ -136,7 +135,7 @@ export function criarConfronto(seed: number): Confronto {
 
 function distribuir(confronto: Confronto): { maos: Record<Jogador, Pedra[]>; dormem: Pedra[]; seed: number } {
   const precisaBucha = confronto.proximaMaoValeCinco ||
-    ((confronto.pontos.JER === 0 && confronto.pontos.JES === 0) || (confronto.pontos.JER === 3 && confronto.pontos.JES === 3));
+    ((confronto.pontos.A === 0 && confronto.pontos.B === 0) || (confronto.pontos.A === 3 && confronto.pontos.B === 3));
   let seed = confronto.seed + confronto.mao * 1009 + 17;
   for (let tentativa = 0; tentativa < 256; tentativa += 1) {
     const pedras = embaralhar(conjuntoDuploSeis(), seed);
@@ -158,11 +157,11 @@ export function iniciarMao(confronto: Confronto): EstadoMao {
   const distribuicao = distribuir(confronto);
   const mao = confronto.mao + 1;
   const aberturaPorBucha = confronto.proximaMaoValeCinco ||
-    ((confronto.pontos.JER === 0 && confronto.pontos.JES === 0) || (confronto.pontos.JER === 3 && confronto.pontos.JES === 3));
+    ((confronto.pontos.A === 0 && confronto.pontos.B === 0) || (confronto.pontos.A === 3 && confronto.pontos.B === 3));
   const jogadorComBucha = (JOGADORES.find((jogador) => distribuicao.maos[jogador].some((pedra) => pedra.a === 1 && pedra.b === 1)) ?? 0) as Jogador;
   const vez = aberturaPorBucha
     ? jogadorComBucha
-    : (confronto.ultimoJogadorVencedor ?? (confronto.ultimaDuplaVencedora === "JER" ? 0 : 1));
+    : (confronto.ultimoJogadorVencedor ?? (confronto.ultimaDuplaVencedora === "A" ? 0 : 1));
   return {
     confronto: { ...confronto, mao, seed: distribuicao.seed },
     mao,
@@ -242,14 +241,29 @@ function jogadaTrava(estado: EstadoMao, jogada: Jogada, jogador: Jogador): boole
 }
 
 function registraEspecial(confronto: Confronto, dupla: Dupla, tipo: TipoJogadaEspecial): Confronto {
-  const outro: Dupla = dupla === "JER" ? "JES" : "JER";
+  const outro: Dupla = dupla === "A" ? "B" : "A";
   const especiais: RegistroEspeciais = {
-    JER: { feitas: { ...confronto.especiais.JER.feitas }, sofridas: { ...confronto.especiais.JER.sofridas } },
-    JES: { feitas: { ...confronto.especiais.JES.feitas }, sofridas: { ...confronto.especiais.JES.sofridas } },
+    A: { feitas: { ...confronto.especiais.A.feitas }, sofridas: { ...confronto.especiais.A.sofridas } },
+    B: { feitas: { ...confronto.especiais.B.feitas }, sofridas: { ...confronto.especiais.B.sofridas } },
   };
   especiais[dupla].feitas[tipo] += 1;
   especiais[outro].sofridas[tipo] += 1;
   return { ...confronto, especiais };
+}
+
+export function totaisEspeciais(confronto: Confronto, dupla: Dupla): { jer: number; jes: number; saldo: number } {
+  const registro = confronto.especiais[dupla];
+  const jer = Object.values(registro.feitas).reduce((total, valor) => total + valor, 0);
+  const jes = Object.values(registro.sofridas).reduce((total, valor) => total + valor, 0);
+  return { jer, jes, saldo: jer - jes };
+}
+
+function jogadorAbertura(dupla: Dupla, referencia: Jogador): Jogador {
+  for (let deslocamento = 0; deslocamento < JOGADORES.length; deslocamento += 1) {
+    const candidato = ((referencia + deslocamento) % 4) as Jogador;
+    if (duplaDo(candidato) === dupla) return candidato;
+  }
+  return referencia;
 }
 
 function atualizaPlacar(confronto: Confronto, dupla: Dupla, especial: boolean, valeCinco: boolean): { confronto: Confronto; pontos: number; peca: boolean } {
@@ -257,7 +271,8 @@ function atualizaPlacar(confronto: Confronto, dupla: Dupla, especial: boolean, v
   const pecas = copiaPlacar(confronto.pecas);
   if (especial) {
     pecas[dupla] += 1;
-    pontos[dupla] = 0;
+    pontos.A = 0;
+    pontos.B = 0;
     return { confronto: { ...confronto, pontos, pecas, vencedor: pecas[dupla] >= META_PECAS ? dupla : null }, pontos: 0, peca: true };
   }
   const atual = pontos[dupla];
@@ -267,7 +282,8 @@ function atualizaPlacar(confronto: Confronto, dupla: Dupla, especial: boolean, v
       return { confronto: { ...confronto, pontos }, pontos: 5, peca: false };
     }
     pecas[dupla] += 1;
-    pontos[dupla] = 0;
+    pontos.A = 0;
+    pontos.B = 0;
     return { confronto: { ...confronto, pontos, pecas, vencedor: pecas[dupla] >= META_PECAS ? dupla : null }, pontos: 0, peca: true };
   }
   if (atual === 0) {
@@ -279,23 +295,33 @@ function atualizaPlacar(confronto: Confronto, dupla: Dupla, especial: boolean, v
     return { confronto: { ...confronto, pontos }, pontos: 5, peca: false };
   }
   pecas[dupla] += 1;
-  pontos[dupla] = 0;
+  pontos.A = 0;
+  pontos.B = 0;
   return { confronto: { ...confronto, pontos, pecas, vencedor: pecas[dupla] >= META_PECAS ? dupla : null }, pontos: 0, peca: true };
 }
 
-function conclui(estado: EstadoMao, vencedor: Dupla | null, motivo: ResultadoMao["motivo"], jogador: Jogador | null, especial: TipoJogadaEspecial | null, forcaPeca: boolean, valeCinco = false): EstadoMao {
+function conclui(estado: EstadoMao, vencedor: Dupla | null, motivo: ResultadoMao["motivo"], jogador: Jogador | null, especial: TipoJogadaEspecial | null, forcaPeca: boolean, duplaEspecial?: Dupla): EstadoMao {
   let confronto = { ...estado.confronto, proximaMaoValeCinco: vencedor === null && motivo === "anulada" };
-  if (especial) confronto = registraEspecial(confronto, duplaDo(jogador ?? 0), especial);
+  if (especial) confronto = registraEspecial(confronto, duplaEspecial ?? duplaDo(jogador ?? 0), especial);
+  let pontosConcedidos = 0;
+  let pecaConcedida = false;
   if (vencedor) {
-    const atualizado = atualizaPlacar(confronto, vencedor, forcaPeca, valeCinco);
-    confronto = { ...atualizado.confronto, ultimaDuplaVencedora: vencedor, ultimoJogadorVencedor: jogador };
+    const atualizado = atualizaPlacar(confronto, vencedor, forcaPeca, estado.aberturaValeCinco);
+    pontosConcedidos = atualizado.pontos;
+    pecaConcedida = atualizado.peca;
+    const referencia = jogador ?? (estado.passes >= 4 ? ((estado.vez + 3) % 4) as Jogador : estado.vez);
+    confronto = {
+      ...atualizado.confronto,
+      ultimaDuplaVencedora: vencedor,
+      ultimoJogadorVencedor: jogadorAbertura(vencedor, referencia),
+    };
   }
   const resultado: ResultadoMao = {
     vencedor,
     motivo,
     jogador,
-    pontosConcedidos: vencedor ? (forcaPeca ? 0 : (valeCinco && confronto.pontos[vencedor] === 5 ? 5 : confronto.pontos[vencedor])) : 0,
-    pecaConcedida: vencedor ? forcaPeca || (valeCinco && confronto.pontos[vencedor] === 0) : false,
+    pontosConcedidos,
+    pecaConcedida,
   };
   return { ...estado, confronto, resolvida: true, resultado, fechado: motivo === "fechado-ponta" || motivo === "fechado-proposito" || motivo === "lasquine-preso" };
 }
@@ -306,11 +332,13 @@ export function jogar(estado: EstadoMao, jogador: Jogador, jogada: Jogada): Esta
   if (!pedra) return estado;
   const lasquine = estado.mesa.length > 0 && jogadasLegais(estado, jogador).filter((item) => item.pedraId === jogada.pedraId).length === 2;
   const travou = jogadaTrava(estado, jogada, jogador);
-  const alternativas = jogadasLegais(estado, jogador).filter((item) => item.pedraId !== jogada.pedraId).some((item) => !jogadaTrava(estado, item, jogador));
+  const alternativas = jogadasLegais(estado, jogador)
+    .filter((item) => item.pedraId !== jogada.pedraId || item.lado !== jogada.lado)
+    .some((item) => !jogadaTrava(estado, item, jogador));
   const depois = estadoComJogada(estado, jogador, jogada);
   if (!depois) return estado;
   const confrontoComLasquine = lasquine
-    ? registraEspecial(depois.confronto, duplaDo(jogador), travou ? "lasquine-preso" : "lasquine")
+    ? registraEspecial(depois.confronto, duplaDo(jogador), travou && !alternativas ? "lasquine-preso" : "lasquine")
     : depois.confronto;
   const depoisComEspecial = { ...depois, confronto: confrontoComLasquine };
   if (!depois.maos[jogador].length) {
@@ -320,8 +348,8 @@ export function jogar(estado: EstadoMao, jogador: Jogador, jogada: Jogada): Esta
   if (travou && alternativas) {
     const somaJogador = somaPedras(depois.maos[jogador]);
     const menores = JOGADORES.filter((outro) => duplaDo(outro) !== duplaDo(jogador)).every((outro) => somaJogador < somaPedras(depois.maos[outro]));
-    const vencedor = menores ? duplaDo(jogador) : (duplaDo(jogador) === "JER" ? "JES" : "JER");
-    return conclui(depoisComEspecial, vencedor, "fechado-proposito", jogador, "fechado-proposito", true);
+    const vencedor = menores ? duplaDo(jogador) : (duplaDo(jogador) === "A" ? "B" : "A");
+    return conclui(depoisComEspecial, vencedor, "fechado-proposito", jogador, "fechado-proposito", true, vencedor);
   }
   if (travou && lasquine) {
     return conclui(depoisComEspecial, duplaDo(jogador), "lasquine-preso", jogador, null, true);
@@ -331,7 +359,7 @@ export function jogar(estado: EstadoMao, jogador: Jogador, jogada: Jogada): Esta
     const menor = Math.min(...somas.map((item) => item.soma));
     const duplasMenores = new Set(somas.filter((item) => item.soma === menor).map((item) => item.dupla));
     if (duplasMenores.size > 1) return conclui(depoisComEspecial, null, "anulada", jogador, null, false);
-    return conclui(depoisComEspecial, [...duplasMenores][0] as Dupla, "fechado-ponta", jogador, "fechado-ponta", false);
+    return conclui(depoisComEspecial, [...duplasMenores][0] as Dupla, "fechado-ponta", jogador, null, false);
   }
   return depoisComEspecial;
 }
@@ -349,7 +377,7 @@ export function resolverMao(estado: EstadoMao): EstadoMao {
   const menores = new Set(somas.filter((item) => item.soma === menor).map((item) => item.dupla));
   if (menores.size > 1) return conclui(estado, null, "anulada", null, null, false);
   const vencedor = [...menores][0] as Dupla;
-  return conclui(estado, vencedor, "fechado-ponta", null, "fechado-ponta", false);
+  return conclui(estado, vencedor, "fechado-ponta", null, null, false);
 }
 
 export function jogadaBot(estado: EstadoMao, jogador: Jogador): Jogada | null {
