@@ -1,136 +1,300 @@
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { AppState, Image, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Svg, { Circle } from "react-native-svg";
-import Animated, { SlideInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { AppText, ScreenShell, SurfaceCard, useAppColors } from "@/components/ui";
+import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
+import Animated, { SlideInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { AppText, ScreenShell, useAppColors } from "@/components/ui";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useAppStore } from "@/store/app-store";
+import { getAvatar } from "@/utils/avatar-catalog";
 import { getLunchGameState } from "@/utils/lunch-game";
-import { chooseComputerDominoMove, createDominoRound, drawDominoTile, getDominoEnds, getLegalDominoMoves, playDominoMove, type DominoGameState, type DominoMove, type DominoPlayer, type DominoTile } from "@/utils/domino";
+import { layoutCorrente } from "@/utils/domino-layout";
+import {
+  iniciarMao,
+  jogar,
+  jogadaBot,
+  jogadasLegais,
+  passar,
+  pontas,
+  resolverMao,
+  type Confronto,
+  type EstadoMao,
+  type Jogada,
+  type Jogador,
+  type Lado,
+  type Pedra,
+} from "@/utils/domino-torneio";
 
 const STORAGE_PREFIX = "olhaponto:";
 const STORAGE_SUFFIX = ":lunch-game-domino";
-const BOARD_VERSION = 1;
+const STORAGE_VERSION = 2;
+const STONE_SIDE = 44;
+const PLAYER_NAMES: Record<Jogador, string> = { 0: "Você", 1: "Marina", 2: "Rui", 3: "Zeca" };
+const BOT_AVATARS: Record<Exclude<Jogador, 0>, string> = { 1: "av-01", 2: "av-08", 3: "av-04" };
 const PIP_POSITIONS: Record<number, Array<[number, number]>> = {
   0: [], 1: [[12, 12]], 2: [[7, 7], [17, 17]], 3: [[7, 7], [12, 12], [17, 17]],
   4: [[7, 7], [17, 7], [7, 17], [17, 17]], 5: [[7, 7], [17, 7], [12, 12], [7, 17], [17, 17]],
   6: [[7, 6], [17, 6], [7, 12], [17, 12], [7, 18], [17, 18]],
 };
 
-type SavedDomino = { version: number; date: string; state: DominoGameState };
-function key(uid: string): string { return `${STORAGE_PREFIX}${uid}${STORAGE_SUFFIX}`; }
-function todayKey(date: Date): string { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bahia", year: "numeric", month: "2-digit", day: "2-digit" }).format(date); }
-function tileLabel(tile: DominoTile): string { return `${tile.a}–${tile.b}`; }
+type SavedDomino = { version: number; date: string; state: EstadoMao };
 
-function Pips({ value, size, offset = 0 }: { value: number; size: number; offset?: number }) {
-  return <Svg width={size} height={size} viewBox="0 0 24 24">{PIP_POSITIONS[value].map(([cx, cy], index) => <Circle key={`${offset}-${index}`} cx={cx} cy={cy} r={1.8} fill="#173B39" />)}</Svg>;
+function storageKey(uid: string): string { return `${STORAGE_PREFIX}${uid}${STORAGE_SUFFIX}`; }
+function todayKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bahia", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+function seedFor(date: string): number { return Number(date.replaceAll("-", "")) || 1; }
+function tileLabel(pedra: Pedra): string { return `${pedra.a}–${pedra.b}`; }
+function jogadorNome(jogador: Jogador | null): string { return jogador === null ? "" : PLAYER_NAMES[jogador]; }
+function outraDupla(dupla: "A" | "B"): "A" | "B" { return dupla === "A" ? "B" : "A"; }
+
+function formatRemaining(milliseconds: number): string {
+  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function DominoVisual({ tile, values, compact = false, selected = false, onPress, disabled = false }: { tile: DominoTile; values?: { a: number; b: number }; compact?: boolean; selected?: boolean; onPress?: () => void; disabled?: boolean }) {
-  const scale = useSharedValue(1);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const display = values ?? { a: tile.a, b: tile.b };
-  const pipSize = compact ? 22 : 28;
-  const content = <Animated.View entering={SlideInDown.springify()} style={[styles.dominoShadow, compact && styles.dominoCompact, selected && styles.dominoSelected, style]}><View style={[styles.dominoFace, compact && styles.dominoFaceCompact]}><Pips value={display.a} size={pipSize} offset={display.a} /><View style={styles.divider} /><Pips value={display.b} size={pipSize} offset={display.b} /></View></Animated.View>;
+function resultadoLabel(estado: EstadoMao): string {
+  const resultado = estado.resultado;
+  if (!resultado) return "";
+  if (resultado.motivo === "anulada") return "Jogo anulado: a próxima mão vale 5 pontos.";
+  if (resultado.motivo === "buchada") return `Buchada: ${jogadorNome(resultado.jogador)} fechou com uma dupla.`;
+  if (resultado.motivo === "lasquine-preso") return `Lasquinê preso: ${jogadorNome(resultado.jogador)} ganhou uma peça.`;
+  if (resultado.motivo === "fechado-proposito") return `Fechado de propósito: a dupla ${resultado.vencedor ?? "vencedora"} ganhou uma peça.`;
+  if (resultado.motivo === "fechado-ponta") return `Fechado por ponta: a dupla ${resultado.vencedor ?? "vencedora"} levou a mão.`;
+  return resultado.jogador === null ? "Batida." : `Batida: ${jogadorNome(resultado.jogador)} encerrou a mão.`;
+}
+
+function openingLabel(estado: EstadoMao): string {
+  if (estado.aberturaPorBucha) return "Abre com a bucha 1/1";
+  return `Abre ${jogadorNome(estado.vez)}`;
+}
+
+function PipHalf({ value, side }: { value: number; side: number }) {
+  const scale = side / 24;
+  return <Svg width={side} height={side} viewBox="0 0 24 24">
+    {PIP_POSITIONS[value].map(([cx, cy], index) => <Circle key={`${value}-${index}`} cx={cx} cy={cy} r={Math.max(1.35, 1.8 * scale)} fill="#173B39" />)}
+  </Svg>;
+}
+
+const DominoStone = memo(function DominoStone({
+  pedra,
+  values,
+  compact = false,
+  dimmed = false,
+  highlighted = false,
+  animate = false,
+  onPress,
+  accessibilityLabel,
+}: {
+  pedra: Pedra;
+  values?: { esquerda: number; direita: number };
+  compact?: boolean;
+  dimmed?: boolean;
+  highlighted?: boolean;
+  animate?: boolean;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+}) {
+  const pulse = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  const side = compact ? 22 : 28;
+  const display = values ?? { esquerda: pedra.a, direita: pedra.b };
+  const content = <Animated.View entering={animate ? SlideInDown.springify() : undefined} style={[styles.stone, compact && styles.compactStone, dimmed && styles.dimmedStone, highlighted && styles.highlightedStone, animatedStyle]}>
+    <View style={[styles.stoneFace, compact && styles.compactFace]}>
+      <PipHalf value={display.esquerda} side={side} />
+      <View style={styles.stoneDivider} />
+      <PipHalf value={display.direita} side={side} />
+    </View>
+  </Animated.View>;
   if (!onPress) return content;
-  return <Pressable disabled={disabled} onPress={() => { scale.value = withTiming(1.06, { duration: 100 }, () => { scale.value = withTiming(1); }); onPress(); }} accessibilityRole="button" accessibilityLabel={`Peça ${tileLabel(tile)}`} accessibilityState={{ disabled, selected }}>{content}</Pressable>;
-}
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? `Peça ${tileLabel(pedra)}`} onPress={() => {
+    pulse.value = withSequence(withTiming(1.06, { duration: 90 }), withTiming(1, { duration: 150 }));
+    onPress();
+  }}>{content}</Pressable>;
+});
 
-function Timer({ closesAt, onExpired }: { closesAt: string; onExpired: () => void }) {
-  const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(closesAt) - Date.now()));
+function TimerPill({ closesAt, onExpired }: { closesAt: string | null; onExpired: () => void }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, (closesAt ? Date.parse(closesAt) : 0) - Date.now()));
   const expired = useRef(false);
   useEffect(() => {
+    if (!closesAt) return undefined;
     expired.current = false;
-    const update = () => { const next = Math.max(0, Date.parse(closesAt) - Date.now()); setRemaining(next); if (!next && !expired.current) { expired.current = true; onExpired(); } };
+    const update = () => {
+      const next = Math.max(0, Date.parse(closesAt) - Date.now());
+      setRemaining(next);
+      if (!next && !expired.current) { expired.current = true; onExpired(); }
+    };
     update();
-    const timer = setInterval(() => { if (AppState.currentState === "active") update(); }, 1000);
+    const interval = setInterval(() => { if (AppState.currentState === "active") update(); }, 1000);
     const subscription = AppState.addEventListener("change", (state) => { if (state === "active") update(); });
-    return () => { clearInterval(timer); subscription.remove(); };
+    return () => { clearInterval(interval); subscription.remove(); };
   }, [closesAt, onExpired]);
-  const seconds = Math.ceil(remaining / 1000);
-  return <View style={styles.timer}><AppText variant="tiny" color="#BFE9D6">TEMPO DO ALMOÇO</AppText><AppText variant="subtitle" color="#FFF5D8">{String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}</AppText></View>;
+  return <View style={styles.timerPill}><AppText variant="tiny" color="#BFE9D6">TEMPO DO ALMOÇO</AppText><AppText variant="subtitle" color="#FFF5D8">{formatRemaining(remaining)}</AppText></View>;
+}
+
+function ScoreCard({ label, confronto, dupla, accent }: { label: string; confronto: Confronto; dupla: "A" | "B"; accent: string }) {
+  const pontos = confronto.pontos[dupla];
+  return <View style={[styles.scoreCard, { borderColor: `${accent}99` }]}>
+    <View style={styles.scoreHeading}><AppText variant="tiny" color="#D9F2E5" style={styles.scoreLabel}>{label}</AppText><AppText variant="title" color="#FFF5D8">{pontos}</AppText></View>
+    <View style={styles.steps}>{[0, 3, 5].map((step) => <View key={step} style={[styles.step, pontos >= step && styles.stepOn, { backgroundColor: pontos >= step ? accent : "#FFFFFF20" }]} />)}</View>
+    <View style={styles.pieceDots}><AppText variant="tiny" color="#CDEBDD">PEÇAS</AppText>{[0, 1].map((index) => <View key={index} style={[styles.pieceDot, index < confronto.pecas[dupla] && { backgroundColor: accent, borderColor: accent }]} />)}</View>
+  </View>;
+}
+
+function AvatarSeat({ jogador, estado, active }: { jogador: Exclude<Jogador, 0>; estado: EstadoMao; active: boolean }) {
+  const avatar = getAvatar(BOT_AVATARS[jogador]);
+  return <View style={[styles.seat, active && styles.activeSeat]}>
+    <View style={styles.seatAvatar}>{avatar ? <Image source={avatar.source} resizeMode="cover" style={styles.seatImage} /> : null}</View>
+    <AppText variant="tiny" color="#FFF5D8" style={styles.seatName}>{PLAYER_NAMES[jogador]}</AppText>
+    <View style={styles.miniStones}>{Array.from({ length: estado.maos[jogador].length }, (_, index) => <View key={index} style={styles.miniStone} />)}</View>
+  </View>;
+}
+
+function GradientFelt({ children }: { children: React.ReactNode }) {
+  return <View style={styles.feltWrap}><Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none"><Defs><LinearGradient id="feltGradient" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#2C8A5B" /><Stop offset="1" stopColor="#16553A" /></LinearGradient></Defs><Path d="M0 0 H1000 V1000 H0 Z" fill="url(#feltGradient)" /></Svg>{children}</View>;
 }
 
 export default function DominoLunchScreen() {
   const router = useRouter();
   const colors = useAppColors();
+  const { width } = useWindowDimensions();
   const userId = useAppStore((state) => state.session?.user.id ?? null);
   const entries = useAppStore((state) => state.entries);
   const today = todayKey(new Date());
   const lunchState = useMemo(() => getLunchGameState(entries), [entries]);
-  const [state, setState] = useState<DominoGameState | null>(null);
+  const [estado, setEstado] = useState<EstadoMao | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
-  const [message, setMessage] = useState("Sua vez: escolha uma peça.");
-  const [ended, setEnded] = useState(false);
-  const persist = useCallback((next: DominoGameState) => { if (userId) void AsyncStorage.setItem(key(userId), JSON.stringify({ version: BOARD_VERSION, date: today, state: next })).catch(() => undefined); }, [today, userId]);
+  const [lastPlacedId, setLastPlacedId] = useState<string | null>(null);
+
+  const persist = useCallback((next: EstadoMao) => {
+    if (userId) void AsyncStorage.setItem(storageKey(userId), JSON.stringify({ version: STORAGE_VERSION, date: today, state: next })).catch(() => undefined);
+  }, [today, userId]);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       if (!userId) { setLoaded(true); return; }
+      const fresh = () => iniciarMao(criarConfrontoLocal(seedFor(today)));
       try {
-        const raw = await AsyncStorage.getItem(key(userId));
+        const raw = await AsyncStorage.getItem(storageKey(userId));
         const saved = raw ? JSON.parse(raw) as SavedDomino : null;
-        if (active) setState(saved?.version === BOARD_VERSION && saved.date === today ? saved.state : createDominoRound(Number(today.replaceAll("-", ""))));
-      } catch { if (active) setState(createDominoRound(Number(today.replaceAll("-", "")))); }
+        const next = saved?.version === STORAGE_VERSION && saved.date === today && saved.state?.maos ? saved.state : fresh();
+        if (active) setEstado(next);
+      } catch { if (active) setEstado(fresh()); }
       if (active) setLoaded(true);
     };
     void load();
     return () => { active = false; };
   }, [today, userId]);
-  useEffect(() => { if (loaded && state) persist(state); }, [loaded, persist, state]);
-  const closeGame = useCallback(() => { setEnded(true); }, []);
+
+  useEffect(() => { if (loaded && estado) persist(estado); }, [estado, loaded, persist]);
+
+  const currentPlayer = estado?.vez ?? 0;
   useEffect(() => {
-    if (!state || state.turn !== "computer" || state.roundWinner || state.matchWinner || ended) return undefined;
+    if (!estado || estado.resolvida || estado.confronto.vencedor || currentPlayer === 0 || expired || lunchState.status !== "open") return undefined;
     const timeout = setTimeout(() => {
-      const move = chooseComputerDominoMove(state);
-      const next = move ? playDominoMove(state, "computer", move) : drawDominoTile(state, "computer");
-      setState(next); setMessage(move ? "O computador jogou." : next.boneyard.length < state.boneyard.length ? "O computador comprou uma peça." : "O computador passou.");
-    }, 720);
+      const bot = estado.vez;
+      const move = jogadaBot(estado, bot);
+      let next = move ? jogar(estado, bot, move) : passar(estado, bot);
+      if (next.fechado && !next.resolvida) next = resolverMao(next);
+      setLastPlacedId(move?.pedraId ?? null);
+      setEstado(next);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }, 700);
     return () => clearTimeout(timeout);
-  }, [ended, state]);
+  }, [currentPlayer, estado, expired, lunchState.status]);
 
-  const playerMoves = useMemo(() => state ? getLegalDominoMoves(state, "player") : [], [state]);
-  const selectedMoves = useMemo(() => playerMoves.filter((move) => move.tileId === selectedTileId), [playerMoves, selectedTileId]);
-  const ends = useMemo(() => state ? getDominoEnds(state) : { left: null, right: null }, [state]);
-  const commitMove = useCallback((move: DominoMove) => {
-    if (!state) return;
-    const next = playDominoMove(state, "player", move);
-    if (next === state) return;
-    setState(next); setSelectedTileId(null); setMessage(next.roundWinner ? (next.roundWinner === "player" ? "Você venceu a rodada!" : "O computador venceu a rodada.") : "O computador está pensando...");
+  const legalMoves = useMemo(() => estado && currentPlayer === 0 ? jogadasLegais(estado, 0) : [], [currentPlayer, estado]);
+  const ends = useMemo(() => estado ? pontas(estado) : { esquerda: null, direita: null }, [estado]);
+  const layoutWidth = Math.max(180, width - 46);
+  const chainLayout = useMemo(() => layoutCorrente(estado?.mesa.length ?? 0, layoutWidth, STONE_SIDE), [estado?.mesa.length, layoutWidth]);
+  const chainHeight = Math.max(78, (chainLayout.at(-1)?.y ?? 0) + STONE_SIDE + 12);
+  const legalAtEnd = useMemo(() => ({
+    esquerda: legalMoves.some((move) => move.lado === "esquerda"),
+    direita: legalMoves.some((move) => move.lado === "direita"),
+  }), [legalMoves]);
+
+  const applyMove = useCallback((move: Jogada) => {
+    if (!estado || estado.resolvida || estado.vez !== 0) return;
+    const next = jogar(estado, 0, move);
+    if (next === estado) return;
+    setEstado(next);
+    setSelectedTileId(null);
+    setLastPlacedId(move.pedraId);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-  }, [state]);
-  const playTile = useCallback((tileId: string) => {
-    const moves = playerMoves.filter((move) => move.tileId === tileId);
-    if (moves.length === 1) commitMove(moves[0]); else setSelectedTileId(tileId);
-  }, [commitMove, playerMoves]);
-  const draw = useCallback(() => {
-    if (!state || playerMoves.length) return;
-    const next = drawDominoTile(state, "player");
-    setState(next); setMessage(next.boneyard.length < state.boneyard.length ? "Você comprou uma peça." : "Monte vazio: você passou.");
-  }, [playerMoves.length, state]);
-  const newRound = useCallback(() => { const scores = state?.matchWinner ? { player: 0, computer: 0 } : (state?.scores ?? { player: 0, computer: 0 }); const next = createDominoRound(Date.now(), scores); setState(next); setEnded(false); setSelectedTileId(null); setMessage(state?.matchWinner ? "Nova partida: escolha uma peça." : "Nova rodada: escolha uma peça."); }, [state?.matchWinner, state?.scores]);
+  }, [estado]);
 
-  if (!userId || lunchState.status === "locked") return <ScreenShell contentStyle={styles.centerPage}><SurfaceCard style={styles.lockCard}><AppText style={styles.heroEmoji}>🁣</AppText><AppText variant="title" style={styles.centerText}>Dominó do almoço</AppText><AppText variant="body" color={colors.muted} style={styles.centerText}>Disponível depois de bater a saída do almoço.</AppText><Pressable onPress={() => router.replace("/jogo-almoco")} style={[styles.primaryButton, { backgroundColor: colors.deepTeal }]}><AppText variant="small" color="#FFFFFF">Voltar aos jogos</AppText></Pressable></SurfaceCard></ScreenShell>;
-  if (ended || lunchState.status === "closed") return <ScreenShell contentStyle={styles.centerPage}><SurfaceCard style={styles.lockCard}><AppText style={styles.heroEmoji}>🌿</AppText><AppText variant="title" style={styles.centerText}>Intervalo encerrado</AppText><AppText variant="body" color={colors.muted} style={styles.centerText}>Intervalo encerrado. Bom retorno!</AppText></SurfaceCard></ScreenShell>;
-  if (!loaded || !state) return <ScreenShell contentStyle={styles.centerPage}><AppText>Preparando o dominó...</AppText></ScreenShell>;
+  const chooseTile = useCallback((pedraId: string) => {
+    const moves = legalMoves.filter((move) => move.pedraId === pedraId);
+    if (moves.length === 1) applyMove(moves[0]);
+    else if (moves.length > 1) setSelectedTileId((current) => current === pedraId ? null : pedraId);
+  }, [applyMove, legalMoves]);
 
-  const activePlayer = state.turn === "player" && !state.roundWinner && !state.matchWinner;
-  return <ScreenShell scroll={false} contentStyle={styles.page}><View style={styles.felt}>
-    <View style={styles.topbar}><Pressable onPress={() => router.replace("/jogo-almoco")} style={styles.back}><AppText style={styles.backText}>‹</AppText></Pressable><View style={{ flex: 1 }}><AppText variant="tiny" color="#BFE9D6" style={styles.eyebrow}>INTERVALO SOLO</AppText><AppText variant="title" color="#FFF5D8">Dominó</AppText></View><Timer closesAt={lunchState.closesAt ?? new Date().toISOString()} onExpired={closeGame} /></View>
-    <View style={styles.scoreboard}><View><AppText variant="tiny" color="#BFE9D6">VOCÊ</AppText><AppText variant="title" color="#FFF5D8">{state.scores.player}</AppText></View><AppText style={styles.vs}>×</AppText><View style={{ alignItems: "flex-end" }}><AppText variant="tiny" color="#BFE9D6">COMPUTADOR</AppText><AppText variant="title" color="#F2C648">{state.scores.computer}</AppText></View></View>
-    <View style={styles.chainArea}><AppText variant="tiny" color="#BFE9D6">MESA · {state.boneyard.length} no monte</AppText><View style={styles.chain}>{state.chain.length ? state.chain.map((placed) => <DominoVisual key={`${placed.tile.id}-${placed.left}-${placed.right}`} tile={placed.tile} values={{ a: placed.left, b: placed.right }} compact />) : <AppText variant="small" color="#BFE9D6">A mesa está vazia</AppText>}</View><View style={styles.ends}><View style={styles.endPill}><AppText variant="tiny" color="#F2C648">{ends.left === null ? "" : `◀ ${ends.left}`}</AppText></View><View style={styles.endPill}><AppText variant="tiny" color="#F2C648">{ends.right === null ? "" : `${ends.right} ▶`}</AppText></View></View></View>
-    <View style={styles.computerHand}><AppText variant="tiny" color="#BFE9D6">MÃO DO COMPUTADOR · {state.computerHand.length}</AppText><View style={styles.backTiles}>{state.computerHand.map((tile) => <View key={tile.id} style={styles.hiddenTile}><AppText style={styles.hiddenMark}>◆</AppText></View>)}</View></View>
-    <View style={styles.message}><AppText variant="small" color="#FFF5D8" style={styles.centerText}>{state.matchWinner ? "Partida encerrada!" : state.roundWinner ? `${state.roundWinner === "draw" ? "Rodada empatada" : state.roundWinner === "player" ? "Você venceu" : "Computador venceu"} · +${state.roundPoints} ponto${state.roundPoints === 1 ? "" : "s"}` : message}</AppText></View>
-    <View style={styles.handHeader}><AppText variant="tiny" color="#BFE9D6">SUA MÃO · {state.hand.length}</AppText><AppText variant="tiny" color="#BFE9D6">{activePlayer ? "JOGUE UMA PEÇA" : "AGUARDE"}</AppText></View>
-    <View style={styles.hand}>{state.hand.map((tile) => <View key={tile.id} style={styles.handItem}><DominoVisual tile={tile} selected={selectedTileId === tile.id} onPress={() => activePlayer && playTile(tile.id)} disabled={!activePlayer || !playerMoves.some((move) => move.tileId === tile.id)} />{selectedTileId === tile.id && selectedMoves.length > 1 ? <View style={styles.sidePicker}>{selectedMoves.map((move) => <Pressable key={move.side} onPress={() => commitMove(move)} style={styles.sideButton}><AppText variant="tiny" color="#FFF5D8">{move.side === "left" ? `← ${ends.left}` : `${ends.right} →`}</AppText></Pressable>)}</View> : null}</View>)}</View>
-    <View style={styles.actions}><Pressable onPress={draw} disabled={!activePlayer || playerMoves.length > 0} style={[styles.action, (!activePlayer || playerMoves.length > 0) && styles.disabled]}><AppText variant="small" color="#FFF5D8">Comprar ({state.boneyard.length})</AppText></Pressable><Pressable onPress={newRound} style={styles.action}><AppText variant="small" color="#FFF5D8">{state.matchWinner ? "Nova partida" : "Nova rodada"}</AppText></Pressable><Pressable onPress={() => router.replace("/jogo-almoco")} style={styles.action}><AppText variant="small" color="#FFF5D8">Voltar</AppText></Pressable></View>
-  </View></ScreenShell>;
+  const pass = useCallback(() => {
+    if (!estado || estado.vez !== 0 || legalMoves.length > 0 || estado.resolvida) return;
+    let next = passar(estado, 0);
+    if (next.fechado && !next.resolvida) next = resolverMao(next);
+    setEstado(next);
+  }, [estado, legalMoves.length]);
+
+  const nextHand = useCallback(() => {
+    if (!estado || estado.confronto.vencedor) return;
+    setEstado(iniciarMao(estado.confronto));
+    setSelectedTileId(null);
+    setLastPlacedId(null);
+  }, [estado]);
+
+  const newMatch = useCallback(() => {
+    setEstado(iniciarMao(criarConfrontoLocal(Date.now())));
+    setSelectedTileId(null);
+    setLastPlacedId(null);
+    setExpired(false);
+  }, []);
+
+  if (!userId || lunchState.status === "locked") return <ScreenShell contentStyle={styles.centerPage}><AppText style={styles.heroEmoji}>🁣</AppText><AppText variant="title" style={styles.centerText}>Dominó do almoço</AppText><AppText variant="body" color={colors.muted} style={styles.centerText}>Disponível depois de bater a saída do almoço.</AppText><Pressable onPress={() => router.replace("/jogo-almoco")} style={styles.primaryButton}><AppText variant="small" color="#FFFFFF">Voltar aos jogos</AppText></Pressable></ScreenShell>;
+  if (expired || lunchState.status === "closed") return <ScreenShell contentStyle={styles.centerPage}><AppText style={styles.heroEmoji}>🌿</AppText><AppText variant="title" style={styles.centerText}>Intervalo encerrado</AppText><AppText variant="body" color={colors.muted} style={styles.centerText}>Intervalo encerrado. Bom retorno!</AppText></ScreenShell>;
+  if (!loaded || !estado) return <ScreenShell contentStyle={styles.centerPage}><AppText>Preparando o dominó...</AppText></ScreenShell>;
+
+  const humanTurn = estado.vez === 0 && !estado.resolvida && !estado.confronto.vencedor;
+  const selectedMoves = selectedTileId ? legalMoves.filter((move) => move.pedraId === selectedTileId) : [];
+  const winnerName = estado.confronto.vencedor ? (estado.confronto.vencedor === "A" ? "Nós vencemos!" : "Eles venceram!") : null;
+  const statusText = estado.resolvida ? resultadoLabel(estado) : humanTurn ? `Sua vez · ${legalMoves.length} jogada${legalMoves.length === 1 ? "" : "s"}` : `Vez de ${jogadorNome(estado.vez)}`;
+  const chainLeft = chainLayout.length ? Math.min(...chainLayout.map((position) => position.x)) : 0;
+
+  return <ScreenShell scroll={false} contentStyle={styles.page}>
+    <View style={styles.screen}>
+      <View style={styles.header}><Pressable onPress={() => router.replace("/jogo-almoco")} style={styles.back}><AppText style={styles.backText}>‹</AppText></Pressable><View style={styles.titleBlock}><AppText variant="tiny" color="#BFE9D6" style={styles.eyebrow}>DOMINÓ 2 × 2</AppText><AppText variant="title" color="#FFF5D8">Mesa do almoço</AppText></View><TimerPill closesAt={lunchState.closesAt} onExpired={() => setExpired(true)} /></View>
+      <View style={styles.scoreRow}><ScoreCard label="NÓS" confronto={estado.confronto} dupla="A" accent="#E7B84B" /><ScoreCard label="ELES" confronto={estado.confronto} dupla="B" accent="#F08A5D" /></View>
+      <GradientFelt>
+        <AvatarSeat jogador={2} estado={estado} active={estado.vez === 2} />
+        <AvatarSeat jogador={1} estado={estado} active={estado.vez === 1} />
+        <AvatarSeat jogador={3} estado={estado} active={estado.vez === 3} />
+        {estado.mesa.length === 0 ? <View style={styles.opening}><AppText variant="tiny" color="#D9F2E5">{openingLabel(estado)}</AppText></View> : null}
+        <View style={styles.chainViewport}>
+          {estado.mesa.length ? <View style={{ height: chainHeight, width: layoutWidth, position: "relative", marginLeft: -chainLeft }}>{estado.mesa.map((placed, index) => {
+            const position = chainLayout[index];
+            return <View key={`${placed.pedra.id}-${index}`} style={{ position: "absolute", left: position.x, top: position.y }}><DominoStone pedra={placed.pedra} values={{ esquerda: placed.esquerda, direita: placed.direita }} compact animate={placed.pedra.id === lastPlacedId} /></View>;
+          })}</View> : <AppText variant="small" color="#D9F2E5">A primeira pedra abre a mesa.</AppText>}
+        </View>
+        <View style={styles.endsRow}><View style={[styles.endHighlight, legalAtEnd.esquerda && styles.endHighlightOn]}><AppText variant="subtitle" color="#FFF5D8">{ends.esquerda ?? "·"}</AppText><AppText variant="tiny" color="#D9F2E5">PONTA</AppText></View><View style={[styles.endHighlight, legalAtEnd.direita && styles.endHighlightOn]}><AppText variant="subtitle" color="#FFF5D8">{ends.direita ?? "·"}</AppText><AppText variant="tiny" color="#D9F2E5">PONTA</AppText></View></View>
+      </GradientFelt>
+      <View style={styles.statusRow}><AppText variant="small" color={estado.resolvida ? "#B87333" : "#0B6A63"} style={styles.statusText}>{winnerName ?? statusText}</AppText><View style={styles.inviteChip}><AppText variant="tiny" color="#7C6B59">Convidar colega · em breve</AppText></View></View>
+      {estado.resolvida ? <View style={styles.resultCard}><AppText variant="subtitle" color="#173B39">{resultadoLabel(estado)}</AppText>{estado.confronto.vencedor ? <AppText variant="body" color="#0B6A63">{winnerName}</AppText> : null}<Pressable onPress={estado.confronto.vencedor ? newMatch : nextHand} style={styles.primaryButton}><AppText variant="small" color="#FFFFFF">{estado.confronto.vencedor ? "Nova partida" : "Próxima mão"}</AppText></Pressable></View> : null}
+      <View style={styles.handHeader}><AppText variant="tiny" color="#0B6A63">SUA MÃO · {estado.maos[0].length}</AppText><AppText variant="tiny" color="#6C7F78">{humanTurn ? "TOQUE NA PONTA PARA JOGAR" : "AGUARDE"}</AppText></View>
+      <View style={styles.hand}>{estado.maos[0].map((pedra) => { const moves = legalMoves.filter((move) => move.pedraId === pedra.id); const highlighted = moves.length > 0; return <View key={pedra.id} style={styles.handItem}><DominoStone pedra={pedra} highlighted={highlighted} dimmed={!highlighted} animate={pedra.id === lastPlacedId} onPress={() => chooseTile(pedra.id)} />{selectedTileId === pedra.id && selectedMoves.length > 1 ? <View style={styles.sidePicker}>{selectedMoves.map((move) => <Pressable key={move.lado} onPress={() => applyMove(move)} style={styles.sideButton}><AppText variant="tiny" color="#FFF5D8">{move.lado === "esquerda" ? `← ${ends.esquerda}` : `${ends.direita} →`}</AppText></Pressable>)}</View> : null}</View>; })}</View>
+      <Pressable disabled={!humanTurn || legalMoves.length > 0} onPress={pass} style={[styles.passButton, (!humanTurn || legalMoves.length > 0) && styles.disabled]}><AppText variant="small" color="#FFF5D8">Passar</AppText></Pressable>
+    </View>
+  </ScreenShell>;
+}
+
+function criarConfrontoLocal(seed: number): Confronto {
+  return { seed, mao: 0, pontos: { A: 0, B: 0 }, pecas: { A: 0, B: 0 }, gc: 0, ultimaDuplaVencedora: null, ultimoJogadorVencedor: null, proximaMaoValeCinco: false, vencedor: null, especiais: { A: { feitas: { buchada: 0, lasquine: 0, "lasquine-preso": 0, "fechado-proposito": 0 }, sofridas: { buchada: 0, lasquine: 0, "lasquine-preso": 0, "fechado-proposito": 0 } }, B: { feitas: { buchada: 0, lasquine: 0, "lasquine-preso": 0, "fechado-proposito": 0 }, sofridas: { buchada: 0, lasquine: 0, "lasquine-preso": 0, "fechado-proposito": 0 } } } };
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 0 }, felt: { flex: 1, backgroundColor: "#103E35", padding: 14, gap: 10 }, topbar: { flexDirection: "row", alignItems: "center", gap: 10 }, eyebrow: { letterSpacing: 1.5, fontWeight: "800" }, back: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#6D4029", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#B87942" }, backText: { fontSize: 32, lineHeight: 34, color: "#FFF5D8" }, timer: { alignItems: "flex-end", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 14, backgroundColor: "#082B2B", borderWidth: 1, borderColor: "#D8B45A66" }, scoreboard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: "#BFE9D633" }, vs: { color: "#F2C648", fontSize: 24 }, chainArea: { flex: 1, minHeight: 150, padding: 10, borderRadius: 18, backgroundColor: "#082B2B88", borderWidth: 1, borderColor: "#BFE9D633" }, chain: { flexDirection: "row", flexWrap: "wrap", alignContent: "center", alignItems: "center", justifyContent: "center", gap: 5, flex: 1, paddingVertical: 8 }, ends: { flexDirection: "row", justifyContent: "space-between", gap: 8 }, endPill: { minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: "#6D402966", borderWidth: 1, borderColor: "#F2C64899", alignItems: "center" }, computerHand: { minHeight: 42, gap: 4 }, backTiles: { flexDirection: "row", justifyContent: "center", gap: 4 }, hiddenTile: { width: 25, height: 34, borderRadius: 5, backgroundColor: "#6D4029", borderWidth: 1, borderColor: "#B87942", alignItems: "center", justifyContent: "center" }, hiddenMark: { color: "#F2C648", fontSize: 12 }, message: { minHeight: 30, alignItems: "center", justifyContent: "center" }, centerText: { textAlign: "center" }, handHeader: { flexDirection: "row", justifyContent: "space-between" }, hand: { minHeight: 88, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-start", gap: 6 }, handItem: { alignItems: "center", minHeight: 78 }, dominoShadow: { width: 56, height: 28, padding: 0, borderRadius: 8, backgroundColor: "#1B4B3C", borderRightWidth: 3, borderBottomWidth: 3, borderColor: "#0A2823", shadowColor: "#061A16", shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 5, position: "relative" }, dominoCompact: { width: 44, height: 22, borderRightWidth: 2, borderBottomWidth: 2, borderRadius: 6 }, dominoSelected: { borderColor: "#F2C648", backgroundColor: "#765032" }, dominoFace: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 6, backgroundColor: "#FBF7EC", borderWidth: 1, borderColor: "#E6D9B8", overflow: "hidden" }, dominoFaceCompact: { borderRadius: 4 }, divider: { position: "absolute", left: "50%", top: "13%", width: 1, height: "74%", backgroundColor: "#D8CBAE" }, sidePicker: { position: "absolute", top: 33, zIndex: 5, flexDirection: "row", gap: 4 }, sideButton: { paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: "#765032", borderWidth: 1, borderColor: "#F2C648" }, actions: { flexDirection: "row", justifyContent: "center", gap: 7, paddingTop: 2 }, action: { paddingHorizontal: 10, paddingVertical: 9, borderRadius: 13, backgroundColor: "#6D4029", borderWidth: 2, borderColor: "#B87942" }, disabled: { opacity: 0.45 }, centerPage: { flex: 1, justifyContent: "center", padding: 22, backgroundColor: "#E4F5F2" }, lockCard: { alignItems: "center", gap: 13, padding: 24 }, heroEmoji: { fontSize: 52, lineHeight: 62 }, primaryButton: { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 11, marginTop: 4 },
+  page: { padding: 0, backgroundColor: "#EAF5EE" }, screen: { flex: 1, padding: 12, gap: 8 }, header: { flexDirection: "row", alignItems: "center", gap: 9 }, back: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#6D4029", alignItems: "center", justifyContent: "center" }, backText: { color: "#FFF5D8", fontSize: 30, lineHeight: 32 }, titleBlock: { flex: 1 }, eyebrow: { letterSpacing: 1.4, fontWeight: "800" }, timerPill: { alignItems: "flex-end", paddingHorizontal: 9, paddingVertical: 6, borderRadius: 13, backgroundColor: "#173B39" }, scoreRow: { flexDirection: "row", gap: 8 }, scoreCard: { flex: 1, padding: 8, borderRadius: 14, backgroundColor: "#16553A", borderWidth: 1.5 }, scoreHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, scoreLabel: { fontWeight: "800", letterSpacing: 1 }, steps: { flexDirection: "row", gap: 3, marginTop: 3 }, step: { flex: 1, height: 5, borderRadius: 3 }, stepOn: { shadowColor: "#FFF5D8", shadowOpacity: 0.55, shadowRadius: 4 }, pieceDots: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }, pieceDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1, borderColor: "#FFFFFF70", backgroundColor: "#FFFFFF18" }, feltWrap: { minHeight: 285, flex: 1, overflow: "hidden", borderRadius: 34, borderWidth: 3, borderColor: "#6B4A2B", padding: 10, position: "relative" }, seat: { position: "absolute", alignItems: "center", width: 74, zIndex: 2, padding: 3, borderRadius: 16 }, activeSeat: { backgroundColor: "#E7B84B55", shadowColor: "#E7B84B", shadowOpacity: 0.9, shadowRadius: 12 }, seatAvatar: { width: 52, height: 52, borderRadius: 26, overflow: "hidden", borderWidth: 3, borderColor: "#F08A5D" }, seatImage: { width: 52, height: 52 }, seatName: { fontWeight: "800", marginTop: 1 }, miniStones: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", maxWidth: 65, gap: 2, marginTop: 2 }, miniStone: { width: 7, height: 12, borderRadius: 2, backgroundColor: "#D9C5A0", borderWidth: 1, borderColor: "#69462E" }, opening: { alignSelf: "center", marginTop: 2, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10, backgroundColor: "#0D4933AA" }, chainViewport: { flex: 1, minHeight: 110, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: 7 }, stone: { width: 56, height: 28, borderRadius: 8, backgroundColor: "#1B4B3C", borderRightWidth: 4, borderBottomWidth: 4, borderColor: "#0A2823", shadowColor: "#061A16", shadowOpacity: 0.36, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 5 }, compactStone: { width: 44, height: 22, borderRadius: 6, borderRightWidth: 3, borderBottomWidth: 3 }, dimmedStone: { opacity: 0.5 }, highlightedStone: { borderColor: "#E7B84B", shadowColor: "#E7B84B", shadowOpacity: 0.8, shadowRadius: 8 }, stoneFace: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-around", borderRadius: 6, backgroundColor: "#FBF7EC", borderWidth: 1, borderColor: "#E6D9B8", overflow: "hidden" }, compactFace: { borderRadius: 4 }, stoneDivider: { position: "absolute", left: "50%", top: "12%", width: 1, height: "76%", backgroundColor: "#D8CBAE" }, endsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 12 }, endHighlight: { minWidth: 58, alignItems: "center", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: "#FFFFFF28" }, endHighlightOn: { borderColor: "#E7B84B", backgroundColor: "#E7B84B35", shadowColor: "#E7B84B", shadowOpacity: 0.8, shadowRadius: 8 }, statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 30, gap: 6 }, statusText: { flex: 1, fontWeight: "700" }, inviteChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: "#D7E8DD" }, resultCard: { alignItems: "center", gap: 4, padding: 8, borderRadius: 14, backgroundColor: "#FFF6DE", borderWidth: 1, borderColor: "#E7B84B" }, handHeader: { flexDirection: "row", justifyContent: "space-between" }, hand: { minHeight: 72, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-start", gap: 5 }, handItem: { alignItems: "center", minHeight: 54 }, sidePicker: { position: "absolute", top: 32, zIndex: 5, flexDirection: "row", gap: 4 }, sideButton: { paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: "#6D4029", borderWidth: 1, borderColor: "#E7B84B" }, passButton: { alignSelf: "center", paddingHorizontal: 26, paddingVertical: 9, borderRadius: 15, backgroundColor: "#6D4029", borderWidth: 2, borderColor: "#B87942" }, disabled: { opacity: 0.38 }, centerPage: { flex: 1, justifyContent: "center", alignItems: "center", padding: 22, backgroundColor: "#E4F5F2", gap: 10 }, heroEmoji: { fontSize: 52 }, centerText: { textAlign: "center" }, primaryButton: { borderRadius: 13, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: "#0B6A63", marginTop: 3 },
 });
