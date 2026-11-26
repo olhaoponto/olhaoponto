@@ -10,7 +10,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useAppStore } from "@/store/app-store";
 import { getAvatar } from "@/utils/avatar-catalog";
 import { getLunchGameState } from "@/utils/lunch-game";
-import { layoutCorrente } from "@/utils/domino-layout";
+import { dimensoesCorrente, layoutCorrente } from "@/utils/domino-layout";
 import {
   criarConfronto,
   iniciarMao,
@@ -31,7 +31,9 @@ import {
 const STORAGE_PREFIX = "olhaponto:";
 const STORAGE_SUFFIX = ":lunch-game-domino";
 const STORAGE_VERSION = 2;
-const STONE_SIDE = 44;
+const MAX_STONE_SIDE = 44;
+const MIN_STONE_SIDE = 24;
+const STONE_SIDE_STEP = 2;
 const PLAYER_NAMES: Record<Jogador, string> = { 0: "Você", 1: "Marina", 2: "Rui", 3: "Zeca" };
 const BOT_AVATARS: Record<Exclude<Jogador, 0>, string> = { 1: "av-01", 2: "av-08", 3: "av-04" };
 const PIP_POSITIONS: Record<number, Array<[number, number]>> = {
@@ -83,6 +85,7 @@ const DominoStone = memo(function DominoStone({
   values,
   compact = false,
   vertical = false,
+  stoneSide,
   dimmed = false,
   highlighted = false,
   animate = false,
@@ -93,6 +96,7 @@ const DominoStone = memo(function DominoStone({
   values?: { esquerda: number; direita: number };
   compact?: boolean;
   vertical?: boolean;
+  stoneSide?: number;
   dimmed?: boolean;
   highlighted?: boolean;
   animate?: boolean;
@@ -101,9 +105,12 @@ const DominoStone = memo(function DominoStone({
 }) {
   const pulse = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
-  const side = compact ? 22 : 28;
+  const baseSide = stoneSide ?? (compact ? 44 : 56);
+  const stoneWidth = vertical ? baseSide / 2 : baseSide;
+  const stoneHeight = vertical ? baseSide : baseSide / 2;
+  const side = baseSide / 2;
   const display = values ?? { esquerda: pedra.a, direita: pedra.b };
-  const content = <Animated.View entering={animate ? SlideInDown.springify() : undefined} style={[styles.stone, compact && styles.compactStone, vertical && styles.verticalStone, dimmed && styles.dimmedStone, highlighted && styles.highlightedStone, animatedStyle]}>
+  const content = <Animated.View entering={animate ? SlideInDown.springify() : undefined} style={[styles.stone, compact && styles.compactStone, vertical && styles.verticalStone, { width: stoneWidth, height: stoneHeight }, dimmed && styles.dimmedStone, highlighted && styles.highlightedStone, animatedStyle]}>
     <View style={[styles.stoneFace, compact && styles.compactFace, vertical && styles.verticalFace]}>
       <PipHalf value={display.esquerda} side={side} />
       <View style={[styles.stoneDivider, vertical && styles.verticalDivider]} />
@@ -178,6 +185,7 @@ export default function DominoLunchScreen() {
   const [expired, setExpired] = useState(false);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [lastPlacedId, setLastPlacedId] = useState<string | null>(null);
+  const [chainViewport, setChainViewport] = useState({ width: 0, height: 0 });
 
   const persist = useCallback((next: EstadoMao) => {
     if (userId) void AsyncStorage.setItem(storageKey(userId), JSON.stringify({ version: STORAGE_VERSION, date: today, state: next })).catch(() => undefined);
@@ -219,9 +227,17 @@ export default function DominoLunchScreen() {
 
   const legalMoves = useMemo(() => estado && currentPlayer === 0 ? jogadasLegais(estado, 0) : [], [currentPlayer, estado]);
   const ends = useMemo(() => estado ? pontas(estado) : { esquerda: null, direita: null }, [estado]);
-  const layoutWidth = Math.max(88, width - 206);
-  const chainLayout = useMemo(() => layoutCorrente(estado?.mesa.length ?? 0, layoutWidth, STONE_SIDE), [estado?.mesa.length, layoutWidth]);
-  const chainHeight = Math.max(78, (chainLayout.at(-1)?.y ?? 0) + STONE_SIDE + 12);
+  const layoutWidth = chainViewport.width || Math.max(88, width - 206);
+  const layoutHeight = chainViewport.height || 160;
+  const chainSide = useMemo(() => {
+    for (let candidato = MAX_STONE_SIDE; candidato >= MIN_STONE_SIDE; candidato -= STONE_SIDE_STEP) {
+      const dimensoes = dimensoesCorrente(layoutCorrente(24, layoutWidth, candidato), candidato);
+      if (dimensoes.width <= layoutWidth && dimensoes.height <= layoutHeight) return candidato;
+    }
+    return MIN_STONE_SIDE;
+  }, [layoutHeight, layoutWidth]);
+  const chainLayout = useMemo(() => layoutCorrente(estado?.mesa.length ?? 0, layoutWidth, chainSide), [estado?.mesa.length, chainSide, layoutWidth]);
+  const chainHeight = Math.max(78, dimensoesCorrente(chainLayout, chainSide).height + 4);
   const legalAtEnd = useMemo(() => ({
     esquerda: legalMoves.some((move) => move.lado === "esquerda"),
     direita: legalMoves.some((move) => move.lado === "direita"),
@@ -282,10 +298,13 @@ export default function DominoLunchScreen() {
         <AvatarSeat jogador={1} estado={estado} active={estado.vez === 1} accent="#F08A5D" positionStyle={styles.leftSeat} />
         <AvatarSeat jogador={3} estado={estado} active={estado.vez === 3} accent="#F08A5D" positionStyle={styles.rightSeat} />
         {estado.mesa.length === 0 ? <View style={styles.opening}><AppText variant="tiny" color="#D9F2E5">{openingLabel(estado)}</AppText></View> : null}
-        <View style={styles.chainViewport}>
+        <View style={styles.chainViewport} onLayout={(event) => {
+          const { width: measuredWidth, height: measuredHeight } = event.nativeEvent.layout;
+          if (measuredWidth !== chainViewport.width || measuredHeight !== chainViewport.height) setChainViewport({ width: measuredWidth, height: measuredHeight });
+        }}>
           {estado.mesa.length ? <View style={{ height: chainHeight, width: layoutWidth, position: "relative" }}>{estado.mesa.map((placed, index) => {
             const position = chainLayout[index];
-            return <View key={`${placed.pedra.id}-${index}`} style={{ position: "absolute", left: position.x, top: position.y }}><DominoStone pedra={placed.pedra} values={{ esquerda: placed.esquerda, direita: placed.direita }} compact vertical={position.vertical && placed.pedra.a !== placed.pedra.b} animate={placed.pedra.id === lastPlacedId} /></View>;
+            return <View key={`${placed.pedra.id}-${index}`} style={{ position: "absolute", left: position.x, top: position.y }}><DominoStone pedra={placed.pedra} values={{ esquerda: placed.esquerda, direita: placed.direita }} compact stoneSide={chainSide} vertical={position.vertical && placed.pedra.a !== placed.pedra.b} animate={placed.pedra.id === lastPlacedId} /></View>;
           })}</View> : <AppText variant="small" color="#D9F2E5">A primeira pedra abre a mesa.</AppText>}
         </View>
         <View style={styles.endsRow}><View style={[styles.endHighlight, legalAtEnd.esquerda && styles.endHighlightOn]}><AppText variant="subtitle" color="#FFF5D8">{ends.esquerda ?? "·"}</AppText><AppText variant="tiny" color="#D9F2E5">PONTA</AppText></View><View style={[styles.endHighlight, legalAtEnd.direita && styles.endHighlightOn]}><AppText variant="subtitle" color="#FFF5D8">{ends.direita ?? "·"}</AppText><AppText variant="tiny" color="#D9F2E5">PONTA</AppText></View></View>
