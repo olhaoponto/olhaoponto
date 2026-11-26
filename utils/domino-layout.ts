@@ -5,8 +5,10 @@ export type PosicaoCorrente = {
 };
 
 /**
- * Distribui as pedras em linhas alternadas: esquerda→direita e direita→esquerda.
- * O passo inclui uma pequena folga para que as caixas nunca se sobreponham.
+ * Distribui as pedras em fileiras horizontais alternadas. A última pedra de
+ * cada fileira fica atravessada para formar a curva de 90 graus da corrente.
+ * Cada posição ocupa uma célula quadrada, por isso também acomoda uma pedra
+ * vertical sem sobreposição.
  */
 export function layoutCorrente(
   quantidade: number,
@@ -14,15 +16,19 @@ export function layoutCorrente(
   ladoPedra: number,
 ): PosicaoCorrente[] {
   if (quantidade <= 0 || larguraDisponivel <= 0 || ladoPedra <= 0) return [];
-  const passo = ladoPedra;
-  const colunas = Math.max(1, Math.floor(larguraDisponivel / passo));
+  const colunas = Math.max(1, Math.floor(larguraDisponivel / ladoPedra));
   const resultado: PosicaoCorrente[] = [];
   for (let indice = 0; indice < quantidade; indice += 1) {
     const linha = Math.floor(indice / colunas);
     const coluna = indice % colunas;
     const invertida = linha % 2 === 1;
-    const x = invertida ? (colunas - coluna - 1) * passo : coluna * passo;
-    resultado.push({ x, y: linha * passo, vertical: false });
+    const x = invertida ? (colunas - coluna - 1) * ladoPedra : coluna * ladoPedra;
+    const ultimaDaLinha = coluna === colunas - 1 || indice === quantidade - 1;
+    resultado.push({
+      x,
+      y: linha * ladoPedra,
+      vertical: ultimaDaLinha,
+    });
   }
   return resultado;
 }

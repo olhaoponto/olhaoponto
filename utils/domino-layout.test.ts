@@ -2,38 +2,45 @@ import { describe, expect, it } from "vitest";
 import { layoutCorrente } from "./domino-layout";
 
 describe("layoutCorrente", () => {
-  it("mantém todas as pedras dentro da largura e sem sobreposição", () => {
+  it("mantém pedras horizontais e verticais dentro da largura e sem sobreposição", () => {
     const lado = 44;
     const largura = 220;
     const layout = layoutCorrente(31, largura, lado);
 
     expect(layout).toHaveLength(31);
     for (const posicao of layout) {
+      const larguraPedra = posicao.vertical ? lado / 2 : lado;
+      const alturaPedra = posicao.vertical ? lado : lado / 2;
       expect(posicao.x).toBeGreaterThanOrEqual(0);
-      expect(posicao.x + lado).toBeLessThanOrEqual(largura);
+      expect(posicao.x + larguraPedra).toBeLessThanOrEqual(largura);
       expect(posicao.y).toBeGreaterThanOrEqual(0);
+      expect(alturaPedra).toBeGreaterThan(0);
     }
 
     for (let i = 0; i < layout.length; i += 1) {
       for (let j = i + 1; j < layout.length; j += 1) {
         const a = layout[i];
         const b = layout[j];
-        const sobrepoe = a.x < b.x + lado && a.x + lado > b.x && a.y < b.y + lado && a.y + lado > b.y;
+        const aWidth = a.vertical ? lado / 2 : lado;
+        const aHeight = a.vertical ? lado : lado / 2;
+        const bWidth = b.vertical ? lado / 2 : lado;
+        const bHeight = b.vertical ? lado : lado / 2;
+        const sobrepoe = a.x < b.x + bWidth && a.x + aWidth > b.x && a.y < b.y + bHeight && a.y + aHeight > b.y;
         expect(sobrepoe).toBe(false);
       }
     }
   });
 
-  it("alterna o sentido das linhas", () => {
+  it("alterna o sentido e curva a corrente nas pontas", () => {
     expect(layoutCorrente(8, 176, 44)).toEqual([
       { x: 0, y: 0, vertical: false },
       { x: 44, y: 0, vertical: false },
       { x: 88, y: 0, vertical: false },
-      { x: 132, y: 0, vertical: false },
+      { x: 132, y: 0, vertical: true },
       { x: 132, y: 44, vertical: false },
       { x: 88, y: 44, vertical: false },
       { x: 44, y: 44, vertical: false },
-      { x: 0, y: 44, vertical: false },
+      { x: 0, y: 44, vertical: true },
     ]);
   });
 
