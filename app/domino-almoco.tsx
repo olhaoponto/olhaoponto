@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { AppState, Image, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import Animated, { SlideInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { AppText, ScreenShell, useAppColors } from "@/components/ui";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -75,8 +75,17 @@ function openingLabel(estado: EstadoMao): string {
 
 function PipHalf({ value, side }: { value: number; side: number }) {
   const scale = side / 24;
+  const gradientId = `pipGradient-${value}-${Math.round(side)}`;
   return <Svg width={side} height={side} viewBox="0 0 24 24">
-    {PIP_POSITIONS[value].map(([cx, cy], index) => <Circle key={`${value}-${index}`} cx={cx} cy={cy} r={Math.max(1.35, 1.8 * scale)} fill="#173B39" />)}
+    <Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#3C5B58" /><Stop offset="1" stopColor="#0F2624" /></LinearGradient></Defs>
+    {PIP_POSITIONS[value].map(([cx, cy], index) => <Circle key={`${value}-${index}`} cx={cx} cy={cy} r={Math.max(1.35, 1.8 * scale)} fill={`url(#${gradientId})`} />)}
+  </Svg>;
+}
+
+function StoneSurface({ side }: { side: number }) {
+  return <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width={side} height={side * 2}>
+    <Defs><LinearGradient id={`stoneGradient-${Math.round(side)}`} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#FFFDF4" /><Stop offset="1" stopColor="#EFE5CC" /></LinearGradient></Defs>
+    <Rect x="0" y="0" width={side} height={side * 2} rx={10} fill={`url(#stoneGradient-${Math.round(side)})`} />
   </Svg>;
 }
 
@@ -84,7 +93,7 @@ const DominoStone = memo(function DominoStone({
   pedra,
   values,
   compact = false,
-  vertical = false,
+  vertical,
   stoneSide,
   dimmed = false,
   highlighted = false,
@@ -105,15 +114,17 @@ const DominoStone = memo(function DominoStone({
 }) {
   const pulse = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
-  const baseSide = stoneSide ?? (compact ? 44 : 56);
-  const stoneWidth = vertical ? baseSide / 2 : baseSide;
-  const stoneHeight = vertical ? baseSide : baseSide / 2;
-  const side = baseSide / 2;
+  const side = stoneSide ?? (compact ? 22 : 36);
+  const standing = vertical ?? !compact;
+  const stoneWidth = standing ? side : side * 2;
+  const stoneHeight = standing ? side * 2 : side;
   const display = values ?? { esquerda: pedra.a, direita: pedra.b };
-  const content = <Animated.View entering={animate ? SlideInDown.springify() : undefined} style={[styles.stone, compact && styles.compactStone, vertical && styles.verticalStone, { width: stoneWidth, height: stoneHeight }, dimmed && styles.dimmedStone, highlighted && styles.highlightedStone, animatedStyle]}>
-    <View style={[styles.stoneFace, compact && styles.compactFace, vertical && styles.verticalFace]}>
+  const content = <Animated.View entering={animate ? SlideInDown.springify() : undefined} style={[styles.stone, { width: stoneWidth, height: stoneHeight }, dimmed && styles.dimmedStone, highlighted && styles.highlightedStone, animatedStyle]}>
+    <View style={[styles.stoneFace, { width: side, height: side * 2 }, !standing && { position: "absolute", left: side / 2, top: -side / 2, transform: [{ rotate: "90deg" }] }]}>
+      <StoneSurface side={side} />
       <PipHalf value={display.esquerda} side={side} />
-      <View style={[styles.stoneDivider, vertical && styles.verticalDivider]} />
+      <View style={styles.stoneDivider} />
+      <View style={styles.stonePin} />
       <PipHalf value={display.direita} side={side} />
     </View>
   </Animated.View>;
@@ -169,7 +180,19 @@ function YourSeat({ estado }: { estado: EstadoMao }) {
 }
 
 function GradientFelt({ children }: { children: React.ReactNode }) {
-  return <View style={styles.feltWrap}><Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none"><Defs><LinearGradient id="feltGradient" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#2C8A5B" /><Stop offset="1" stopColor="#16553A" /></LinearGradient></Defs><Path d="M0 0 H1000 V1000 H0 Z" fill="url(#feltGradient)" /></Svg>{children}</View>;
+  return <View style={styles.tableFrame}>
+    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+      <Defs><LinearGradient id="woodGradient" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#8A5A32" /><Stop offset="0.5" stopColor="#5A3820" /><Stop offset="1" stopColor="#7B4E2B" /></LinearGradient></Defs>
+      <Path d="M0 0 H1000 V1000 H0 Z" fill="url(#woodGradient)" />
+    </Svg>
+    <View style={styles.feltWrap}>
+      <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+        <Defs><RadialGradient id="feltGradient" cx="50%" cy="42%" r="72%"><Stop offset="0" stopColor="#2F9A66" /><Stop offset="0.68" stopColor="#1F7549" /><Stop offset="1" stopColor="#124A2E" /></RadialGradient></Defs>
+        <Path d="M0 0 H1000 V1000 H0 Z" fill="url(#feltGradient)" />
+      </Svg>
+      {children}
+    </View>
+  </View>;
 }
 
 export default function DominoLunchScreen() {
@@ -231,12 +254,12 @@ export default function DominoLunchScreen() {
   const layoutHeight = chainViewport.height || 160;
   const chainSide = useMemo(() => {
     for (let candidato = MAX_STONE_SIDE; candidato >= MIN_STONE_SIDE; candidato -= STONE_SIDE_STEP) {
-      const dimensoes = dimensoesCorrente(layoutCorrente(24, layoutWidth, candidato), candidato);
+      const dimensoes = dimensoesCorrente(layoutCorrente(24, layoutWidth, candidato, estado?.mesa.map((placed) => placed.pedra)), candidato);
       if (dimensoes.width <= layoutWidth && dimensoes.height <= layoutHeight) return candidato;
     }
     return MIN_STONE_SIDE;
-  }, [layoutHeight, layoutWidth]);
-  const chainLayout = useMemo(() => layoutCorrente(estado?.mesa.length ?? 0, layoutWidth, chainSide), [estado?.mesa.length, chainSide, layoutWidth]);
+  }, [estado?.mesa, layoutHeight, layoutWidth]);
+  const chainLayout = useMemo(() => layoutCorrente(estado?.mesa.length ?? 0, layoutWidth, chainSide, estado?.mesa.map((placed) => placed.pedra)), [estado?.mesa, chainSide, layoutWidth]);
   const chainHeight = Math.max(78, dimensoesCorrente(chainLayout, chainSide).height + 4);
   const legalAtEnd = useMemo(() => ({
     esquerda: legalMoves.some((move) => move.lado === "esquerda"),
@@ -304,7 +327,7 @@ export default function DominoLunchScreen() {
         }}>
           {estado.mesa.length ? <View style={{ height: chainHeight, width: layoutWidth, position: "relative" }}>{estado.mesa.map((placed, index) => {
             const position = chainLayout[index];
-            return <View key={`${placed.pedra.id}-${index}`} style={{ position: "absolute", left: position.x, top: position.y }}><DominoStone pedra={placed.pedra} values={{ esquerda: placed.esquerda, direita: placed.direita }} compact stoneSide={chainSide} vertical={position.vertical && placed.pedra.a !== placed.pedra.b} animate={placed.pedra.id === lastPlacedId} /></View>;
+            return <View key={`${placed.pedra.id}-${index}`} style={{ position: "absolute", left: position.x, top: position.y }}><DominoStone pedra={placed.pedra} values={{ esquerda: placed.esquerda, direita: placed.direita }} compact stoneSide={chainSide / 2} vertical={position.vertical} animate={placed.pedra.id === lastPlacedId} /></View>;
           })}</View> : <AppText variant="small" color="#D9F2E5">A primeira pedra abre a mesa.</AppText>}
         </View>
         <View style={styles.endsRow}><View style={[styles.endHighlight, legalAtEnd.esquerda && styles.endHighlightOn]}><AppText variant="subtitle" color="#FFF5D8">{ends.esquerda ?? "·"}</AppText><AppText variant="tiny" color="#D9F2E5">PONTA</AppText></View><View style={[styles.endHighlight, legalAtEnd.direita && styles.endHighlightOn]}><AppText variant="subtitle" color="#FFF5D8">{ends.direita ?? "·"}</AppText><AppText variant="tiny" color="#D9F2E5">PONTA</AppText></View></View>
@@ -330,7 +353,8 @@ const styles = StyleSheet.create({
   scoreHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, scoreLabel: { fontWeight: "800", letterSpacing: 1 },
   steps: { flexDirection: "row", gap: 3, marginTop: 3 }, step: { flex: 1, height: 5, borderRadius: 3 }, stepOn: { shadowColor: "#FFF5D8", shadowOpacity: 0.55, shadowRadius: 4 },
   pieceDots: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }, pieceDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1, borderColor: "#FFFFFF70", backgroundColor: "#FFFFFF18" },
-  feltWrap: { minHeight: 285, flex: 1, overflow: "hidden", borderRadius: 34, borderWidth: 3, borderColor: "#6B4A2B", padding: 10, position: "relative" },
+  tableFrame: { minHeight: 285, flex: 1, overflow: "hidden", borderRadius: 40, padding: 12, position: "relative", shadowColor: "#321D10", shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 8 },
+  feltWrap: { flex: 1, overflow: "hidden", borderRadius: 28, borderWidth: 2, borderColor: "#0B3B27", padding: 10, position: "relative", shadowColor: "#061E13", shadowOpacity: 0.65, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
   seat: { position: "absolute", alignItems: "center", width: 74, zIndex: 2, padding: 3, borderRadius: 16 },
   topSeat: { top: 4, left: "50%", marginLeft: -37 }, leftSeat: { left: 2, top: "39%" }, rightSeat: { right: 2, top: "39%" },
   activeSeat: { backgroundColor: "#E7B84B55", shadowColor: "#E7B84B", shadowOpacity: 0.9, shadowRadius: 12 },
@@ -340,16 +364,15 @@ const styles = StyleSheet.create({
   miniStone: { width: 7, height: 12, borderRadius: 2, backgroundColor: "#D9C5A0", borderWidth: 1, borderColor: "#69462E" },
   opening: { alignSelf: "center", marginTop: 66, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10, backgroundColor: "#0D4933AA" },
   chainViewport: { flex: 1, minHeight: 110, alignItems: "center", justifyContent: "center", overflow: "hidden", marginHorizontal: 80, marginTop: 2, marginBottom: 2 },
-  stone: { width: 56, height: 28, borderRadius: 8, backgroundColor: "#1B4B3C", borderRightWidth: 4, borderBottomWidth: 4, borderColor: "#0A2823", shadowColor: "#061A16", shadowOpacity: 0.36, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
-  compactStone: { width: 44, height: 22, borderRadius: 6, borderRightWidth: 3, borderBottomWidth: 3 }, verticalStone: { width: 22, height: 44 },
-  dimmedStone: { opacity: 0.5 }, highlightedStone: { borderColor: "#E7B84B", shadowColor: "#E7B84B", shadowOpacity: 0.8, shadowRadius: 8 },
-  stoneFace: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-around", borderRadius: 6, backgroundColor: "#FBF7EC", borderWidth: 1, borderColor: "#E6D9B8", overflow: "hidden" },
-  compactFace: { borderRadius: 4 }, verticalFace: { flexDirection: "column" }, stoneDivider: { position: "absolute", left: "50%", top: "12%", width: 1, height: "76%", backgroundColor: "#D8CBAE" }, verticalDivider: { left: "12%", top: "50%", width: "76%", height: 1 },
+  stone: { borderRadius: 10, shadowColor: "#1A251F", shadowOpacity: 0.34, shadowRadius: 6, shadowOffset: { width: 2, height: 4 }, elevation: 6 },
+  dimmedStone: { opacity: 0.42 }, highlightedStone: { borderWidth: 2, borderColor: "#E7B84B", shadowColor: "#E7B84B", shadowOpacity: 0.85, shadowRadius: 10 },
+  stoneFace: { position: "absolute", left: 0, top: 0, flexDirection: "column", alignItems: "center", justifyContent: "space-around", borderRadius: 10, backgroundColor: "#FBF7EC", borderWidth: 1, borderColor: "#D8C9A3", overflow: "hidden" },
+  stoneDivider: { position: "absolute", left: 0, right: 0, top: "50%", height: 2, marginTop: -1, backgroundColor: "#B9A97F" }, stonePin: { position: "absolute", top: "50%", left: "50%", width: 6, height: 6, marginLeft: -3, marginTop: -3, borderRadius: 3, backgroundColor: "#C9A24A", borderWidth: 1, borderColor: "#A27A2D" },
   endsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 80 }, endHighlight: { minWidth: 58, alignItems: "center", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: "#FFFFFF28" },
   endHighlightOn: { borderColor: "#E7B84B", backgroundColor: "#E7B84B35", shadowColor: "#E7B84B", shadowOpacity: 0.8, shadowRadius: 8 },
   statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 30, gap: 6 }, statusText: { flex: 1, fontWeight: "700" }, inviteChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: "#D7E8DD" },
   resultCard: { alignItems: "center", gap: 4, padding: 8, borderRadius: 14, backgroundColor: "#FFF6DE", borderWidth: 1, borderColor: "#E7B84B" }, handHeader: { flexDirection: "row", justifyContent: "space-between" },
-  hand: { minHeight: 72, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-start", gap: 5 }, handItem: { alignItems: "center", minHeight: 54 }, sidePicker: { position: "absolute", top: 32, zIndex: 5, flexDirection: "row", gap: 4 },
+  hand: { minHeight: 78, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-start", gap: 7 }, handItem: { alignItems: "center", minHeight: 76 }, sidePicker: { position: "absolute", top: 74, zIndex: 5, flexDirection: "row", gap: 4 },
   sideButton: { paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: "#6D4029", borderWidth: 1, borderColor: "#E7B84B" }, passButton: { alignSelf: "center", paddingHorizontal: 26, paddingVertical: 9, borderRadius: 15, backgroundColor: "#6D4029", borderWidth: 2, borderColor: "#B87942" },
   disabled: { opacity: 0.38 }, centerPage: { flex: 1, justifyContent: "center", alignItems: "center", padding: 22, backgroundColor: "#E4F5F2", gap: 10 }, heroEmoji: { fontSize: 52 }, centerText: { textAlign: "center" }, primaryButton: { borderRadius: 13, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: "#0B6A63", marginTop: 3 },
 });
