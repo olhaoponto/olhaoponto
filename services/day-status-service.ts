@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import { pruneDayStatuses, rowsChanged } from '@/utils/local-history-cache';
 import { recordCacheFirst } from '@/utils/perf-metrics';
 import { serveCached } from '@/utils/cache-first';
+import { keepCachedOnError, mergeDayStatuses } from '@/utils/day-cache-merge';
 
 export interface DayStatusResult<T> { data: T | null; error: string | null; }
 export interface DayStatusLoadOptions { onCached?: (rows: DayStatusRecord[]) => void; }
@@ -40,6 +41,17 @@ const withCacheLock = async <T>(key: string, task: () => Promise<T>): Promise<T>
 export function invalidateDayStatusCache(uid?: string): void {
   if (uid) memoryCache.delete(cacheKey(uid));
   else memoryCache.clear();
+}
+
+export async function invalidateDayStatusDate(data: string, uid?: string): Promise<void> {
+  try {
+    const userId = uid ?? await authenticatedUserId();
+    const key = cacheKey(userId);
+    await withCacheLock(key, async () => {
+      const cached = await readCache(key);
+      await writeCache(key, cached.filter((row) => row.data !== data || row._pending));
+    });
+  } catch { /* a limpeza local é best effort */ }
 }
 
 async function readCache(key: string): Promise<DayStatusRecord[]> {
@@ -84,6 +96,10 @@ async function userId(): Promise<string> {
   return result.session.user.id;
 }
 
+async function authenticatedUserId(): Promise<string> {
+  return userId();
+}
+
 export async function loadDayStatuses(startDate: string, endDate: string, options?: DayStatusLoadOptions): Promise<DayStatusResult<DayStatusRecord[]>> {
   if (!isValidCivilDate(startDate) || !isValidCivilDate(endDate) || startDate > endDate) return { data: null, error: 'O período informado para os status do dia é inválido.' };
   try {
@@ -93,13 +109,10 @@ export async function loadDayStatuses(startDate: string, endDate: string, option
     const localRange = cached.filter((row) => row.data >= startDate && row.data <= endDate);
     if (options?.onCached) { recordCacheFirst(); serveCached(localRange, options.onCached); }
     const response = await (supabase as any).from('day_statuses').select('user_id,data,status,atualizado_em').eq('user_id', uid).gte('data', startDate).lte('data', endDate).order('data').limit(120);
-    if (response.error) return { data: localRange, error: friendly(response.error) };
+    if (response.error) return { data: keepCachedOnError(localRange), error: friendly(response.error) };
     const rows = await withCacheLock(key, async () => {
       const latest = await readCache(key);
-      const merged = new Map<string, DayStatusRecord>();
-      for (const row of (response.data ?? []) as DayStatusRecord[]) merged.set(row.data, row);
-      for (const row of latest) if (row._pending || row.data < startDate || row.data > endDate) merged.set(row.data, row);
-      const result = [...merged.values()].sort((a, b) => a.data.localeCompare(b.data));
+      const result = mergeDayStatuses(latest, (response.data ?? []) as DayStatusRecord[], startDate, endDate);
       await writeCache(key, result);
       return result.filter((row) => row.data >= startDate && row.data <= endDate);
     });

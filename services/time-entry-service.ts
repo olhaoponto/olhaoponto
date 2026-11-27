@@ -63,6 +63,16 @@ export function invalidateTimeEntryCache(uid?: string): void {
   memoryCache.clear();
 }
 
+export async function invalidateTimeEntryDate(data: string, uid?: string): Promise<void> {
+  try {
+    const userId = uid ?? await currentUserId();
+    await withCacheLock(userId, async () => {
+      const cached = await readCache(userId);
+      await writeCache(userId, cached.filter((entry) => entry.data !== data || (entry as TimeEntry & { _pending?: boolean })._pending));
+    });
+  } catch { /* a limpeza local é best effort */ }
+}
+
 function uuidV4(): string {
   const cryptoApi = globalThis.crypto;
   if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();

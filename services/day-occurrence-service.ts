@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DayOccurrence, OccurrenceReason } from '../types/app';
 import { getAuthenticatedSession, SESSION_REQUIRED_MESSAGE } from './auth-session';
 import { supabase } from './supabase';
+import { keepCachedOnError, mergeDayOccurrence, mergeDayOccurrences } from '@/utils/day-cache-merge';
 
 export interface DayOccurrenceResult<T> { data: T | null; error: string | null; }
 const reasons: OccurrenceReason[] = ['Pessoal', 'Saúde', 'Trabalho externo', 'Outro'];
@@ -15,16 +16,25 @@ async function uid() { const auth = await getAuthenticatedSession(); if (!auth.s
 async function read(key: string): Promise<DayOccurrence[]> { try { const value = JSON.parse((await AsyncStorage.getItem(key)) || '[]'); return Array.isArray(value) ? value.filter((x) => x && typeof x.work_date === 'string') : []; } catch { return []; } }
 async function write(key: string, rows: DayOccurrence[]) { await AsyncStorage.setItem(key, JSON.stringify(rows)); }
 export function isOccurrenceReason(value: string): value is OccurrenceReason { return reasons.includes(value as OccurrenceReason); }
+export async function invalidateDayOccurrenceCache(workDate: string, userId?: string): Promise<void> {
+  try {
+    const id = userId ?? (await uid());
+    const key = cacheKey(id);
+    const cached = await read(key);
+    const kept = cached.filter((row) => row.work_date !== workDate || row._pending);
+    await write(key, kept);
+  } catch { /* a limpeza local é best effort */ }
+}
 export async function loadDayOccurrence(workDate: string): Promise<DayOccurrenceResult<DayOccurrence>> {
   try { const user_id = await uid(); const key = cacheKey(user_id); const cached = await read(key); const local = cached.find((x) => x.work_date === workDate) ?? null;
     const response = await (supabase as any).from('day_occurrences').select('id,user_id,work_date,motivo,occurred_at,observacao,debito_minutos,created_at').eq('user_id', user_id).eq('work_date', workDate).maybeSingle();
-    if (response.error) return { data: local, error: friendly(response.error) };
+    if (response.error) return { data: keepCachedOnError([local])[0] ?? null, error: friendly(response.error) };
     const remote = response.data as DayOccurrence | null;
     if (!remote && local?._pending) {
       const pendingResponse = await (supabase as any).from('day_occurrences').upsert({ user_id, work_date: local.work_date, motivo: local.motivo, occurred_at: local.occurred_at, observacao: local.observacao, debito_minutos: local.debito_minutos }, { onConflict: 'user_id,work_date' }).select('id,user_id,work_date,motivo,occurred_at,observacao,debito_minutos,created_at').single();
       if (!pendingResponse.error) { const saved = pendingResponse.data as DayOccurrence; await write(key, [...cached.filter((x) => x.work_date !== workDate), saved]); return { data: saved, error: null }; }
     }
-    const rows = [...cached.filter((x) => x.work_date !== workDate), ...(remote ? [remote] : local ? [local] : [])]; await write(key, rows); return { data: remote ?? local, error: null };
+    const merged = mergeDayOccurrence(cached, workDate, remote); await write(key, merged.rows); return { data: merged.data, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 
@@ -32,11 +42,8 @@ export async function loadDayOccurrences(): Promise<DayOccurrenceResult<DayOccur
   try {
     const user_id = await uid(); const key = cacheKey(user_id); const cached = await read(key);
     const response = await (supabase as any).from('day_occurrences').select('id,user_id,work_date,motivo,occurred_at,observacao,debito_minutos,created_at').eq('user_id', user_id).order('work_date', { ascending: false }).limit(3660);
-    if (response.error) return { data: cached, error: friendly(response.error) };
-    const merged = new Map<string, DayOccurrence>();
-    for (const row of (response.data ?? []) as DayOccurrence[]) merged.set(row.work_date, row);
-    for (const row of cached) if (row._pending) merged.set(row.work_date, row);
-    const rows = [...merged.values()].sort((a, b) => b.work_date.localeCompare(a.work_date)); await write(key, rows); return { data: rows, error: null };
+    if (response.error) return { data: keepCachedOnError(cached), error: friendly(response.error) };
+    const rows = mergeDayOccurrences(cached, (response.data ?? []) as DayOccurrence[]); await write(key, rows); return { data: rows, error: null };
   } catch (error) { return { data: null, error: friendly(error) }; }
 }
 export async function saveDayOccurrence(input: { work_date: string; motivo: OccurrenceReason; occurred_at: string; observacao?: string; debito_minutos: number }): Promise<DayOccurrenceResult<DayOccurrence>> {
