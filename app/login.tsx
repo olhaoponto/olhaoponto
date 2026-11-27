@@ -7,10 +7,6 @@ import { ActionButton, AppText, ClockMascot, ScreenShell, SurfaceCard, TextField
 import { login, getProfile, recoverPassword } from '@/services/auth-service';
 import { supabase } from '@/services/supabase';
 import { useAppStore } from '@/store/app-store';
-import { loadEntriesByDate } from '@/services/time-entry-service';
-import { loadDayStatuses } from '@/services/day-status-service';
-import { loadDayOccurrence } from '@/services/day-occurrence-service';
-import { getBahiaDate } from '@/utils/work-time';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -52,13 +48,6 @@ export default function LoginScreen() {
         return;
       }
       useAppStore.getState().setProfile(profile);
-      const today = getBahiaDate(new Date());
-      const [entriesResult] = await Promise.all([
-        loadEntriesByDate(today),
-        loadDayStatuses(today, today),
-        loadDayOccurrence(today),
-      ]);
-      useAppStore.getState().setEntries(entriesResult.data ?? []);
       if (Platform.OS === 'web' && typeof localStorage !== 'undefined') localStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
       else await AsyncStorage.setItem(`olhaponto:${profile.id}:profile`, JSON.stringify(profile));
       if (profile.senha_provisoria || user.user_metadata?.senha_provisoria === true) router.replace('/change-password');

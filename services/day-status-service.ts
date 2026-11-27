@@ -43,17 +43,6 @@ export function invalidateDayStatusCache(uid?: string): void {
   else memoryCache.clear();
 }
 
-export async function invalidateDayStatusDate(data: string, uid?: string): Promise<void> {
-  try {
-    const userId = uid ?? await authenticatedUserId();
-    const key = cacheKey(userId);
-    await withCacheLock(key, async () => {
-      const cached = await readCache(key);
-      await writeCache(key, cached.filter((row) => row.data !== data || row._pending));
-    });
-  } catch { /* a limpeza local é best effort */ }
-}
-
 async function readCache(key: string): Promise<DayStatusRecord[]> {
   const cached = memoryCache.get(key);
   if (cached) return cached;
@@ -94,10 +83,6 @@ async function userId(): Promise<string> {
   const result = await getAuthenticatedSession();
   if (!result.session) throw new Error(result.error || SESSION_REQUIRED_MESSAGE);
   return result.session.user.id;
-}
-
-async function authenticatedUserId(): Promise<string> {
-  return userId();
 }
 
 export async function loadDayStatuses(startDate: string, endDate: string, options?: DayStatusLoadOptions): Promise<DayStatusResult<DayStatusRecord[]>> {

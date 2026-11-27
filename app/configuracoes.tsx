@@ -17,10 +17,6 @@ import { getLunchReturnWarningMinutes, parseLunchReturnWarningMinutes } from '@/
 import { getLunchReminderMinutes, MAX_LUNCH_REMINDER_MINUTES, MIN_LUNCH_REMINDER_MINUTES } from '@/utils/alerts';
 import { updateRankingVisibility } from '@/services/ranking-service';
 import { checkForAppUpdate, getInstalledVersion, type AppUpdate } from '@/services/update-service';
-import { invalidateTimeEntryDate, loadEntriesByDate } from '@/services/time-entry-service';
-import { invalidateDayStatusDate, loadDayStatuses } from '@/services/day-status-service';
-import { invalidateDayOccurrenceCache, loadDayOccurrence } from '@/services/day-occurrence-service';
-import { getBahiaDate } from '@/utils/work-time';
 
 const WORK_ALERT_OPTIONS = [
   { key: 'alerta_8h', label: 'Jornada completa (8h)' },
@@ -50,7 +46,6 @@ export default function ConfiguracoesScreen() {
   const [appUpdate, setAppUpdate] = useState<AppUpdate | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState('');
-  const [refreshingToday, setRefreshingToday] = useState(false);
   const prefs: AlertPreferences = profile?.preferencias_alerta || {};
   const schedules = getWorkSchedules(prefs, profile?.almoco_minutos ?? 60);
   const activeSchedule = getActiveWorkSchedule(prefs, profile?.almoco_minutos ?? 60);
@@ -66,27 +61,6 @@ export default function ConfiguracoesScreen() {
     setAppUpdate(result);
     setUpdateMessage(result ? `Nova versão ${result.version} disponível.` : 'Você já está usando a versão mais recente ou não foi possível consultar agora.');
     setCheckingUpdate(false);
-  };
-
-  const refreshTodayData = async () => {
-    if (!profile) return;
-    const date = getBahiaDate(new Date());
-    setRefreshingToday(true); setError(''); setMessage('');
-    await Promise.all([
-      invalidateTimeEntryDate(date, profile.id),
-      invalidateDayStatusDate(date, profile.id),
-      invalidateDayOccurrenceCache(date, profile.id),
-    ]);
-    const [entries, statuses, occurrence] = await Promise.all([
-      loadEntriesByDate(date),
-      loadDayStatuses(date, date),
-      loadDayOccurrence(date),
-    ]);
-    if (entries.data) useAppStore.getState().mergeEntries(entries.data);
-    const errors = [entries.error, statuses.error, occurrence.error].filter(Boolean);
-    setRefreshingToday(false);
-    if (errors.length) { setError('Não foi possível atualizar todos os dados agora. Os dados pendentes continuam neste aparelho.'); return; }
-    setMessage('Dados deste aparelho atualizados.');
   };
 
   // Keep the editable field aligned with the saved profile preference.
@@ -247,12 +221,6 @@ export default function ConfiguracoesScreen() {
         {updateMessage ? <AppText variant="small" color={appUpdate ? colors.deepTeal : colors.muted}>{updateMessage}</AppText> : null}
         <ActionButton title="Verificar atualização" variant="outline" onPress={() => void verifyAppUpdate()} loading={checkingUpdate} />
       </SurfaceCard> : null}
-
-      <SurfaceCard>
-        <AppText variant="subtitle">Dados deste aparelho</AppText>
-        <AppText variant="small" color={colors.muted}>Atualize as batidas, o status e a intercorrência de hoje diretamente do servidor. Registros pendentes não são apagados.</AppText>
-        <ActionButton title="Atualizar dados deste aparelho" variant="outline" onPress={() => void refreshTodayData()} loading={refreshingToday} />
-      </SurfaceCard>
 
       <SurfaceCard>
         <AppText variant="subtitle">Alertas, aparência e segurança</AppText>

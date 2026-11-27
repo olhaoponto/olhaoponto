@@ -6,10 +6,6 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { AppText, ScreenShell, useAppColors } from '@/components/ui';
 import { isSupabaseConfigured, supabase } from '@/services/supabase';
 import { getProfile } from '@/services/auth-service';
-import { loadEntriesByDate } from '@/services/time-entry-service';
-import { loadDayStatuses } from '@/services/day-status-service';
-import { loadDayOccurrence } from '@/services/day-occurrence-service';
-import { getBahiaDate } from '@/utils/work-time';
 import { useAppStore } from '@/store/app-store';
 
 const STEPS = ['Conectando ao banco...', 'Sincronizando batidas...', 'Preparando seu espelho de ponto...'];
@@ -100,14 +96,6 @@ export default function SplashRoute() {
         setBusy(false);
         return;
       }
-      const today = getBahiaDate(new Date());
-      const [entriesResult, statusesResult, occurrenceResult] = await Promise.all([
-        loadEntriesByDate(today),
-        loadDayStatuses(today, today),
-        loadDayOccurrence(today),
-      ]);
-      useAppStore.getState().setEntries(entriesResult.data ?? []);
-      if (entriesResult.error || statusesResult.error || occurrenceResult.error) setOffline(true);
       const biometricEnabled = await AsyncStorage.getItem(`olhaponto:${session.user.id}:biometric`).catch(() => null);
       if (biometricEnabled === 'true' && Platform.OS !== 'web') {
         const auth = await LocalAuthentication.authenticateAsync({ promptMessage: 'Desbloqueie o Olha o Ponto', cancelLabel: 'Tentar novamente' });

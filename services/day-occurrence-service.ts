@@ -16,15 +16,6 @@ async function uid() { const auth = await getAuthenticatedSession(); if (!auth.s
 async function read(key: string): Promise<DayOccurrence[]> { try { const value = JSON.parse((await AsyncStorage.getItem(key)) || '[]'); return Array.isArray(value) ? value.filter((x) => x && typeof x.work_date === 'string') : []; } catch { return []; } }
 async function write(key: string, rows: DayOccurrence[]) { await AsyncStorage.setItem(key, JSON.stringify(rows)); }
 export function isOccurrenceReason(value: string): value is OccurrenceReason { return reasons.includes(value as OccurrenceReason); }
-export async function invalidateDayOccurrenceCache(workDate: string, userId?: string): Promise<void> {
-  try {
-    const id = userId ?? (await uid());
-    const key = cacheKey(id);
-    const cached = await read(key);
-    const kept = cached.filter((row) => row.work_date !== workDate || row._pending);
-    await write(key, kept);
-  } catch { /* a limpeza local é best effort */ }
-}
 export async function loadDayOccurrence(workDate: string): Promise<DayOccurrenceResult<DayOccurrence>> {
   try { const user_id = await uid(); const key = cacheKey(user_id); const cached = await read(key); const local = cached.find((x) => x.work_date === workDate) ?? null;
     const response = await (supabase as any).from('day_occurrences').select('id,user_id,work_date,motivo,occurred_at,observacao,debito_minutos,created_at').eq('user_id', user_id).eq('work_date', workDate).maybeSingle();
